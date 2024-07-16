@@ -32,6 +32,8 @@ services:
     container_name: dev_rucio_1
     image: docker.io/rucio/rucio-dev:latest-alma9
     platform: linux/amd64
+    ports:
+      - "443:443"
     entrypoint: ["/rucio_source/etc/docker/dev/rucio/entrypoint.sh"]
     command: ["httpd","-D","FOREGROUND"]
     volumes:
@@ -58,6 +60,8 @@ services:
   ruciodb:
     image: docker.io/postgres:14
     platform: linux/amd64
+    ports:
+      - "5432:5432"
     environment:
       - POSTGRES_USER=rucio
       - POSTGRES_DB=rucio
