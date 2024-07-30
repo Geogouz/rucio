@@ -301,7 +301,7 @@ propcache==0.2.0
     # via
     #   -r requirements.server.txt
     #   yarl
-psycopg2-binary==2.9.9
+psycopg==3.2.1
     # via -r requirements.server.txt
 pyasn1==0.6.0
     # via
