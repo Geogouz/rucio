@@ -34,6 +34,8 @@ services:
     platform: linux/amd64
     entrypoint: ["/rucio_source/etc/docker/dev/rucio/entrypoint.sh"]
     command: ["httpd","-D","FOREGROUND"]
+    ports:
+      - "443:443"  # Expose port 443 on the host
     volumes:
       - ../../certs/rucio_ca.pem:/etc/grid-security/certificates/5fca1cb1.0:ro
       - ../../certs/rucio_ca.pem:/opt/rucio/etc/rucio_ca.pem:ro
@@ -63,6 +65,8 @@ services:
       - POSTGRES_DB=rucio
       - POSTGRES_PASSWORD=secret
     command: ["-c", "fsync=off","-c", "synchronous_commit=off","-c", "full_page_writes=off"]
+    ports:
+      - "5432:5432"  # Expose the PostgreSQL port on the host
   graphite:
     image: docker.io/graphiteapp/graphite-statsd
     platform: linux/amd64
