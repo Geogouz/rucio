@@ -87,6 +87,7 @@ def get_metadata(scope, name, plugin="DID_COLUMN", *, session: "Session"):
     :returns: List of metadata for did.
     :raises: NotImplementedError
     """
+
     if plugin.lower() == "all":
         all_metadata = {}
         for metadata_plugin in METADATA_PLUGIN_MODULES:
@@ -96,6 +97,7 @@ def get_metadata(scope, name, plugin="DID_COLUMN", *, session: "Session"):
     else:
         for metadata_plugin in METADATA_PLUGIN_MODULES:
             if metadata_plugin.get_plugin_name().lower() == plugin.lower():
+                # TODO: What when plugin == "all"?
                 return metadata_plugin.get_metadata(scope, name, session=session)
     raise NotImplementedError('Metadata plugin "%s" is not enabled on the server.' % plugin)
 

@@ -63,7 +63,7 @@ class JSONDidMeta(DidMetaPlugin):
             meta = getattr(row, 'meta')
             return json_lib.loads(meta) if session.bind.dialect.name in ['oracle', 'sqlite'] else meta
         except NoResultFound:
-            return {}
+            return {}  # TODO: Is this even possible?
 
     @transactional_session
     def set_metadata(self, scope, name, key, value, recursive=False, *, session: "Session"):
@@ -230,7 +230,9 @@ class JSONDidMeta(DidMetaPlugin):
 
     @read_session
     def manages_key(self, key, *, session: "Session"):
-        return json_implemented(session=session)
+        # We reserve the key '{}' for the structured JSON only (The plugin though needs to be enabled)
+        # TODO: decide on the best approach
+        return json_implemented(session=session) and key != '{}'
 
     def get_plugin_name(self):
         """

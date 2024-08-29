@@ -1321,12 +1321,16 @@ class Meta(ErrorHandlingMethodView):
                 schema:
                   description: A data identifier with all attributes.
                   type: object
-          401:
+          400:
+            description: No matching scope_name found
+          401:  # TODO: Didn't locate where 401 can come from
             description: Invalid Auth Token
           404:
-            description: Did not found
+            description: No Did meta entry or content found
           406:
             description: Not acceptable
+          500:
+            description: Internal error
         """
         try:
             scope, name = parse_scope_name(scope_name, request.environ.get('vo'))
@@ -1339,6 +1343,14 @@ class Meta(ErrorHandlingMethodView):
             return Response(render_json(**meta), content_type='application/json')
         except DataIdentifierNotFound as error:
             return generate_http_error_flask(404, error)
+        except InvalidMetadata as error:
+            return generate_http_error_flask(404, error)
+        except NotImplementedError as error:
+            return generate_http_error_flask(500, error)
+        except DatabaseException as error:
+            return generate_http_error_flask(500, error)
+        except InvalidObject as error:  # TODO: Get a better Exception for this (this is a server-side problem)
+            return generate_http_error_flask(500, error)
 
     def post(self, scope_name):
         """
@@ -1366,7 +1378,7 @@ class Meta(ErrorHandlingMethodView):
                     description: The metadata to add. A dictionary containing the metadata name as key and the value as value.
                     type: object
                   recursive:
-                    description: Flag if the metadata should be applied recirsively to children.
+                    description: Flag if the metadata should be applied recursively to children.
                     type: boolean
                     default: false
         responses:
@@ -1494,7 +1506,7 @@ class SingleMeta(ErrorHandlingMethodView):
                 properties:
                   value:
                     description: The value to set.
-                    type: object
+                    type: any
         responses:
           201:
             description: Created
@@ -1503,16 +1515,18 @@ class SingleMeta(ErrorHandlingMethodView):
                 schema:
                   type: string
                   enum: ["Created"]
+          400:
+            description: Invalid key or value
           401:
             description: Invalid Auth Token
           404:
             description: Did not found
-          406:
+          406:  # TODO: Didn't locate where 406 can come from
             description: Not acceptable
           409:
-            description: Metadata already exists
-          400:
-            description: Invalid key or value
+            description: Metadata insertion issue
+          500:
+            description: Internal error
         """
         try:
             scope, name = parse_scope_name(scope_name, request.environ.get('vo'))
@@ -1532,13 +1546,22 @@ class SingleMeta(ErrorHandlingMethodView):
                 recursive=param_get(parameters, 'recursive', default=False),
                 vo=request.environ.get('vo'),
             )
+        except (InvalidObject, InvalidMetadata, InvalidValueForKey) as error:
+            return generate_http_error_flask(400, error)
+        except AccessDenied as error:
+            return generate_http_error_flask(401, error)
         except DataIdentifierNotFound as error:
             return generate_http_error_flask(404, error)
-        except Duplicate as error:
+        except UnsupportedOperation as error:
             return generate_http_error_flask(409, error)
-        except (KeyNotFound, InvalidMetadata, InvalidValueForKey) as error:
-            return generate_http_error_flask(400, error)
-
+        except NotImplementedError as error:
+            return generate_http_error_flask(500, error)
+        except DatabaseException as error:
+            return generate_http_error_flask(500, error)
+        # except Duplicate as error:  # TODO: Didn't locate where Duplicate exception can come from
+        #     return generate_http_error_flask(409, error)
+        # except KeyNotFound as error:  # TODO: Didn't locate where KeyNotFound exception can come from
+        #     return generate_http_error_flask(400, error)
         return 'Created', 201
 
 

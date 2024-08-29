@@ -485,6 +485,7 @@ class DidMeta(BASE, ModelBase):
     did_type: Mapped[Optional[DIDType]] = mapped_column(Enum(DIDType, name='DID_META_DID_TYPE_CHK',
                                                              create_constraint=True,
                                                              values_callable=lambda obj: [e.value for e in obj]))
+    structured_meta: Mapped[Optional[Union[str, dict[str, Any]]]] = mapped_column(JSON())
     _table_args = (PrimaryKeyConstraint('scope', 'name', name='DID_META_PK'),
                    ForeignKeyConstraint(['scope', 'name'], ['dids.scope', 'dids.name'], name='DID_META_FK'),
                    Index('DID_META_DID_TYPE_IDX', 'did_type'))

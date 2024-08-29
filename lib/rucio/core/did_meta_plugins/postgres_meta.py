@@ -304,7 +304,7 @@ class ExternalPostgresJSONDidMeta(DidMetaPlugin):
                     yield row['name']
 
     def manages_key(self, key, *, session: "Optional[Session]" = None):
-        return True
+        return key != '{}'  # TODO: Check if previously used "True" was crucial
 
     def get_plugin_name(self):
         """
