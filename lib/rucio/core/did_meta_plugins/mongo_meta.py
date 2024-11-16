@@ -69,7 +69,7 @@ class MongoDidMeta(DidMetaPlugin):
         self.db = self.client[db]
         self.col = self.db[collection]
 
-        self.plugin_name = "MONGO"
+        self._plugin_name = "MONGO"
 
     def drop_database(self):
         self.client.drop_database(self.db.name)
@@ -80,7 +80,7 @@ class MongoDidMeta(DidMetaPlugin):
 
         :param scope: The scope name
         :param name: The data identifier name
-        :param session: The database session in use
+        :param session: The database session in use.
         :returns: The metadata for the did
         """
         # get first document with this did == _id
@@ -106,7 +106,7 @@ class MongoDidMeta(DidMetaPlugin):
         :param key: the key to be added
         :param value: the value of the key to be added
         :param recursive: recurse into DIDs (not supported)
-        :param session: The database session in use
+        :param session: The database session in use.
         """
         self.set_metadata_bulk(scope=scope, name=name, metadata={key: value}, recursive=recursive, session=session)
 
@@ -118,7 +118,7 @@ class MongoDidMeta(DidMetaPlugin):
         :param name: the name of the did
         :param metadata: dictionary of metadata keypairs to be added
         :param recursive: recurse into DIDs (not supported)
-        :param session: The database session in use
+        :param session: The database session in use.
         """
         # pop immutable keys
         for key in IMMUTABLE_KEYS:
@@ -206,11 +206,3 @@ class MongoDidMeta(DidMetaPlugin):
 
     def manages_key(self, key, *, session: "Optional[Session]" = None):
         return True
-
-    def get_plugin_name(self):
-        """
-        Returns a unique identifier for this plugin. This can be later used for filtering down results to this plugin only.
-
-        :returns: The name of the plugin
-        """
-        return self.plugin_name

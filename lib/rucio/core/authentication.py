@@ -460,7 +460,7 @@ def delete_expired_tokens(
     :param total_workers:      Number of total workers.
     :param worker_number:      id of the executing worker.
     :param limit:              Maximum number of tokens to delete.
-    :param session:            Database session in use.
+    :param session: The database session in use.
 
     :returns: number of deleted rows
     """

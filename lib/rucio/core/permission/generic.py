@@ -39,7 +39,7 @@ def has_permission(issuer: "InternalAccount", action: str, kwargs: dict[str, Any
     :param issuer: Account identifier which issues the command..
     :param action:  The action(API call) called by the account.
     :param kwargs: List of arguments for the action.
-    :param session: The DB session to use
+    :param session: The database session in use.
     :returns: True if account is allowed, otherwise False
     """
     perm = {'add_account': perm_add_account,
@@ -136,7 +136,7 @@ def perm_default(issuer: "InternalAccount", kwargs: dict[str, Any], *, session: 
 
     :param issuer: Account identifier which issues the command.
     :param kwargs: List of arguments for the action.
-    :param session: The DB session to use
+    :param session: The database session in use.
     :returns: True if account is allowed, otherwise False
     """
     return _is_root(issuer) or has_account_attribute(account=issuer, key='admin', session=session)
@@ -148,7 +148,7 @@ def perm_add_rse(issuer: "InternalAccount", kwargs: dict[str, Any], *, session: 
 
     :param issuer: Account identifier which issues the command.
     :param kwargs: List of arguments for the action.
-    :param session: The DB session to use
+    :param session: The database session in use.
     :returns: True if account is allowed, otherwise False
     """
     return _is_root(issuer) or has_account_attribute(account=issuer, key='admin', session=session)
@@ -160,7 +160,7 @@ def perm_update_rse(issuer: "InternalAccount", kwargs: dict[str, Any], *, sessio
 
     :param issuer: Account identifier which issues the command.
     :param kwargs: List of arguments for the action.
-    :param session: The DB session to use
+    :param session: The database session in use.
     :returns: True if account is allowed, otherwise False
     """
     return _is_root(issuer) or has_account_attribute(account=issuer, key='admin', session=session)
@@ -172,7 +172,7 @@ def perm_add_rule(issuer: "InternalAccount", kwargs: dict[str, Any], *, session:
 
     :param issuer: Account identifier which issues the command.
     :param kwargs: List of arguments for the action.
-    :param session: The DB session to use
+    :param session: The database session in use.
     :returns: True if account is allowed, otherwise False
     """
     if kwargs['account'] == issuer and not kwargs['locked']:
@@ -188,7 +188,7 @@ def perm_add_subscription(issuer: "InternalAccount", kwargs: dict[str, Any], *, 
 
     :param issuer: Account identifier which issues the command.
     :param kwargs: List of arguments for the action.
-    :param session: The DB session to use
+    :param session: The database session in use.
     :returns: True if account is allowed, otherwise False
     """
     if _is_root(issuer) or has_account_attribute(account=issuer, key='admin', session=session):
@@ -202,7 +202,7 @@ def perm_add_rse_attribute(issuer: "InternalAccount", kwargs: dict[str, Any], *,
 
     :param issuer: Account identifier which issues the command.
     :param kwargs: List of arguments for the action.
-    :param session: The DB session to use
+    :param session: The database session in use.
     :returns: True if account is allowed, otherwise False
     """
     if _is_root(issuer) or has_account_attribute(account=issuer, key='admin', session=session):
@@ -216,7 +216,7 @@ def perm_del_rse_attribute(issuer: "InternalAccount", kwargs: dict[str, Any], *,
 
     :param issuer: Account identifier which issues the command.
     :param kwargs: List of arguments for the action.
-    :param session: The DB session to use
+    :param session: The database session in use.
     :returns: True if account is allowed, otherwise False
     """
     if _is_root(issuer) or has_account_attribute(account=issuer, key='admin', session=session):
@@ -230,7 +230,7 @@ def perm_del_rse(issuer: "InternalAccount", kwargs: dict[str, Any], *, session: 
 
     :param issuer: Account identifier which issues the command.
     :param kwargs: List of arguments for the action.
-    :param session: The DB session to use
+    :param session: The database session in use.
     :returns: True if account is allowed, otherwise False
     """
     return _is_root(issuer) or has_account_attribute(account=issuer, key='admin', session=session)
@@ -242,7 +242,7 @@ def perm_add_account(issuer: "InternalAccount", kwargs: dict[str, Any], *, sessi
 
     :param issuer: Account identifier which issues the command.
     :param kwargs: List of arguments for the action.
-    :param session: The DB session to use
+    :param session: The database session in use.
     :returns: True if account is allowed, otherwise False
     """
     return _is_root(issuer)
@@ -254,7 +254,7 @@ def perm_del_account(issuer: "InternalAccount", kwargs: dict[str, Any], *, sessi
 
     :param issuer: Account identifier which issues the command.
     :param kwargs: List of arguments for the action.
-    :param session: The DB session to use
+    :param session: The database session in use.
     :returns: True if account is allowed, otherwise False
     """
     return _is_root(issuer)
@@ -266,7 +266,7 @@ def perm_update_account(issuer: "InternalAccount", kwargs: dict[str, Any], *, se
 
     :param issuer: Account identifier which issues the command.
     :param kwargs: List of arguments for the action.
-    :param session: The DB session to use
+    :param session: The database session in use.
     :returns: True if account is allowed, otherwise False
     """
     return _is_root(issuer) or has_account_attribute(account=issuer, key='admin', session=session)
@@ -278,7 +278,7 @@ def perm_add_scope(issuer: "InternalAccount", kwargs: dict[str, Any], *, session
 
     :param issuer: Account identifier which issues the command.
     :param kwargs: List of arguments for the action.
-    :param session: The DB session to use
+    :param session: The database session in use.
     :returns: True if account is allowed, otherwise False
     """
     return _is_root(issuer) or has_account_attribute(account=issuer, key='admin', session=session)
@@ -290,7 +290,7 @@ def perm_get_auth_token_user_pass(issuer: "InternalAccount", kwargs: dict[str, A
 
     :param issuer: Account identifier which issues the command.
     :param kwargs: List of arguments for the action.
-    :param session: The DB session to use
+    :param session: The database session in use.
     :returns: True if account is allowed, otherwise False
     """
     if exist_identity_account(identity=kwargs['username'], type_=IdentityType.USERPASS, account=kwargs['account'], session=session):
@@ -304,7 +304,7 @@ def perm_get_auth_token_gss(issuer: "InternalAccount", kwargs: dict[str, Any], *
 
     :param issuer: Account identifier which issues the command.
     :param kwargs: List of arguments for the action.
-    :param session: The DB session to use
+    :param session: The database session in use.
     :returns: True if account is allowed, otherwise False
     """
     if exist_identity_account(identity=kwargs['gsscred'], type_=IdentityType.GSS, account=kwargs['account'], session=session):
@@ -318,7 +318,7 @@ def perm_get_auth_token_x509(issuer: "InternalAccount", kwargs: dict[str, Any], 
 
     :param issuer: Account identifier which issues the command.
     :param kwargs: List of arguments for the action.
-    :param session: The DB session to use
+    :param session: The database session in use.
     :returns: True if account is allowed, otherwise False
     """
     if exist_identity_account(identity=kwargs['dn'], type_=IdentityType.X509, account=kwargs['account'], session=session):
@@ -332,7 +332,7 @@ def perm_get_auth_token_saml(issuer: "InternalAccount", kwargs: dict[str, Any], 
 
     :param issuer: Account identifier which issues the command.
     :param kwargs: List of arguments for the action.
-    :param session: The DB session to use
+    :param session: The database session in use.
     :returns: True if account is allowed, otherwise False
     """
     if exist_identity_account(identity=kwargs['saml_nameid'], type_=IdentityType.SAML, account=kwargs['account'], session=session):
@@ -346,7 +346,7 @@ def perm_add_account_identity(issuer: "InternalAccount", kwargs: dict[str, Any],
 
     :param issuer: Account identifier which issues the command.
     :param kwargs: List of arguments for the action.
-    :param session: The DB session to use
+    :param session: The database session in use.
     :returns: True if account is allowed, otherwise False
     """
 
@@ -359,7 +359,7 @@ def perm_del_account_identity(issuer: "InternalAccount", kwargs: dict[str, Any],
 
     :param issuer: Account identifier which issues the command.
     :param kwargs: List of arguments for the action.
-    :param session: The DB session to use
+    :param session: The database session in use.
     :returns: True if account is allowed, otherwise False
     """
 

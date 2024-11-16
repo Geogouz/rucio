@@ -1677,7 +1677,7 @@ def gateway_update_return_dict(
     Ensure that rse is in a dictionary returned from core
 
     :param dictionary: The dictionary to edit
-    :param session: The DB session to use
+    :param session: The database session in use.
     :returns dictionary: The edited dictionary
     """
     if not isinstance(dictionary, dict):

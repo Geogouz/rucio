@@ -422,7 +422,7 @@ def get_usage(
 
     :param rse_id:           The id of the RSE.
     :param account:          The account name.
-    :param session:          The database session in use.
+    :param session: The database session in use.
     :returns:                A dictionary {'bytes', 'files', 'updated_at'}
     """
     query = select(
@@ -450,7 +450,7 @@ def get_all_rse_usages_per_account(
 
     :param rse_id:           The id of the RSE.
     :param account:          The account name.
-    :param session:          The database session in use.
+    :param session: The database session in use.
     :returns:                List of dicts with :py:class:`models.AccountUsage` items
     """
     query = select(
@@ -476,7 +476,7 @@ def get_usage_history(
 
     :param rse_id:           The id of the RSE.
     :param account:          The account name.
-    :param session:          The database session in use.
+    :param session: The database session in use.
     :returns:                A dictionary {'bytes', 'files', 'updated_at'}
     """
     query = select(

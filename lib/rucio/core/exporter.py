@@ -28,7 +28,7 @@ def export_rses(vo: str = 'def', *, session: "Session") -> dict[str, dict[str, A
     Export RSE data.
 
     :param vo: The VO to export.
-    :param session: database session in use.
+    :param session: The database session in use.
     """
     data = {}
     for rse in rse_module.list_rses(filters={'vo': vo}, session=session):
@@ -45,7 +45,7 @@ def export_data(vo: str = 'def', distance: bool = True, *, session: "Session") -
 
     :param vo: The VO to export.
     :param distance: To enable the reporting of distance.
-    :param session: database session in use.
+    :param session: The database session in use.
     """
     if distance:
         data = {

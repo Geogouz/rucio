@@ -72,7 +72,7 @@ def add_subscription(name: str,
     :type dry_run:             Boolean
     :param priority:           The priority of the subscription
     :type priority:            Integer
-    :param session:            The database session in use.
+    :param session: The database session in use.
 
     :returns:                  The subscriptionid
     """
@@ -142,7 +142,7 @@ def update_subscription(name: str,
     :type account:             String
     :param metadata:           Dictionary of metadata to update. Supported keys : filter, replication_rules, comments, lifetime, retroactive, dry_run, priority, last_processed
     :type metadata:            Dict
-    :param session:            The database session in use.
+    :param session: The database session in use.
 
     :raises: SubscriptionNotFound if subscription is not found
     """
@@ -224,7 +224,7 @@ def list_subscriptions(name: Optional[str] = None,
     :type name:                String
     :param account:            Account identifier
     :type account:             String
-    :param session:            The database session in use.
+    :param session: The database session in use.
     :param logger:             Optional decorated logger that can be passed from the calling daemons or servers.
 
     :returns:                  Dictionary containing subscription parameter
@@ -292,7 +292,7 @@ def list_subscription_rule_states(
 
     :param name:               Name of the subscription
     :param account:            Account identifier
-    :param session:            The database session in use.
+    :param session: The database session in use.
     :param logger:             Optional decorated logger that can be passed from the calling daemons or servers.
     :returns:                  List with tuple (account, name, state, count)
     """
@@ -346,7 +346,7 @@ def get_subscription_by_id(subscription_id: str, *, session: "Session") -> "Subs
     Get a specific subscription by id.
 
     :param subscription_id:    The subscription_id to select.
-    :param session:            The database session in use.
+    :param session: The database session in use.
 
     :raises:                   SubscriptionNotFound if no Subscription can be found.
     """

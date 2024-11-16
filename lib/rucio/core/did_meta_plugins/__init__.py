@@ -14,13 +14,15 @@
 
 import importlib
 from configparser import NoOptionError, NoSectionError
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from rucio.common import config, exception
 from rucio.db.sqla.session import read_session, transactional_session
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
+
+    from rucio.common.types import InternalScope
 
 # Set default modules.
 #
@@ -62,9 +64,9 @@ for meta_module_path in METADATA_PLUGIN_MODULE_PATHS:
         metadata_plugin_module = getattr(importlib.import_module(base_module), base_class)()
         METADATA_PLUGIN_MODULES.append(metadata_plugin_module)
     except ModuleNotFoundError:
-        raise exception.PolicyPackageNotFound(meta_module_path)
+        raise exception.PolicyPackageNotFound('Module ' + meta_module_path + ' not found')
     except ImportError:
-        raise exception.ErrorLoadingPolicyPackage(meta_module_path)
+        raise exception.ErrorLoadingPolicyPackage('An error occurred while loading module ' + meta_module_path)
 
 # Set restricted character set for metadata in form character: reason
 #
@@ -74,18 +76,25 @@ RESTRICTED_CHARACTERS = {
 
 
 @read_session
-def get_metadata(scope, name, plugin="DID_COLUMN", *, session: "Session"):
+def get_metadata(
+        scope: "InternalScope",
+        name: str,
+        plugin: str = 'DID_COLUMN',
+        *,
+        session: "Session"
+) -> dict[str, Any]:
     """
-    Gets the metadata for a given did from a specified plugin.
+    Returns a dictionary holding all metadata available for a given DID with optional plugin selection.
 
-    If [plugin] is set to "all", metadata from all available metadata plugins will be returned,
-    else [plugin] can be used to only return the metadata using a specific plugin.
+    If [plugin] is set to "all", the metadata from all available plugins will be merged (if keys are not unique
+    across plugins, they will be overwritten). If a single [plugin] has been specified, this will be used only.
 
-    :param scope: The scope of the did.
+    :param scope: The scope of the DID.
     :param name: The data identifier name.
-    :param plugin: (optional) Filter specific metadata plugins.
-    :returns: List of metadata for did.
-    :raises: NotImplementedError
+    :param plugin: The selected backend metadata plugin to handle the operation ("DID_COLUMN" by default)
+    :param session: The database session in use.
+    :returns: Dictionary containing metadata for the DID.
+    :raises: UnsupportedMetadataPlugin: If the specified plugin is not enabled/available
     """
     if plugin.lower() == "all":
         all_metadata = {}
@@ -94,32 +103,33 @@ def get_metadata(scope, name, plugin="DID_COLUMN", *, session: "Session"):
             all_metadata.update(metadata)
         return all_metadata
     else:
+        # TODO[DX]: We should better get the plugin object directly using its provided name instead of iterating through all.
         for metadata_plugin in METADATA_PLUGIN_MODULES:
-            if metadata_plugin.get_plugin_name().lower() == plugin.lower():
+            if metadata_plugin.plugin_name == plugin.lower():
                 return metadata_plugin.get_metadata(scope, name, session=session)
-    raise NotImplementedError('Metadata plugin "%s" is not enabled on the server.' % plugin)
+
+    raise exception.UnsupportedMetadataPlugin(f'Metadata plugin "{plugin}" is not enabled on the server.')
 
 
 @transactional_session
-def set_metadata(scope, name, key, value, recursive=False, *, session: "Session"):
+def set_metadata(scope, name, key, value, recursive=False, plugin="all", *, session: "Session"):
     """
     Sets metadata for a given did.
 
-    :param scope: The scope of the did.
+    :param scope: The scope of the DID.
     :param name: The data identifier name.
     :param key: Metadata key.
     :param value: Metadata value.
-    :param recursive: (optional) Propagate the metadata change recursively to content.
-    :param session: (optional) The database session in use.
+    :param recursive: Instruction to propagate the metadata change recursively to content (False by default).
+    :param plugin: The selected backend metadata plugin to handle the operation ("all" by default)
+    :param session: The database session in use.
     :raises: InvalidMetadata
     """
     # Check for forbidden characters in key.
     for char in RESTRICTED_CHARACTERS:
         if char in key:
-            raise exception.InvalidMetadata('Restricted character "{}" found in metadata key. Reason: {}'.format(
-                char,
-                RESTRICTED_CHARACTERS[char]
-            ))
+            raise exception.InvalidMetadata(f'Restricted character "{char}" found in metadata key. '
+                                            f'Reason: {RESTRICTED_CHARACTERS[char]}')
 
     # Sequentially check if each metadata plugin manages this key. Note that the order of [METADATA_PLUGIN_MODULES]
     # means that the key is always checked for existence in the base list first.
@@ -131,65 +141,190 @@ def set_metadata(scope, name, key, value, recursive=False, *, session: "Session"
             break
 
     if not metadata_was_set:
-        raise exception.InvalidMetadata('No plugin manages metadata key %s for DID %s:%s' % (key, scope, name))
+        raise exception.InvalidMetadata(f'No plugin manages metadata key "{key}" for DID "{scope}:{name}"')
 
 
 @transactional_session
-def set_metadata_bulk(scope, name, meta, recursive=False, *, session: "Session"):
+def set_metadata_atomic(
+        scope: "InternalScope",
+        name: str,
+        key: str,
+        value: any,
+        recursive: bool = False,
+        plugin: str = "DID_COLUMN",
+        *,
+        session: "Session"):
     """
-    Bulk sets metadata for a given did.
+    Add a key:value metadata pair to the did(s) atomically (single plugin handler via a single DB transaction).
 
-    :param scope: The scope name.
+    :param scope: The scope of the DID.
     :param name: The data identifier name.
-    :param meta: The key-value mapping of metadata to set.
-    :param recursive: (optional) Propagate the metadata change recursively to content.
-    :param session: (optional) The database session in use.
+    :param key: Metadata key.
+    :param value: Metadata value.
+    :param recursive: Instruction to propagate the metadata change recursively to content (False by default).
+    :param plugin: The selected backend metadata plugin to handle the operation ("DID_COLUMN" by default)
+    :param session: The database session in use.
     :raises: InvalidMetadata
     """
-    metadata = meta
 
-    unmanaged_keys = list()
-    if not isinstance(metadata, dict):
-        metadata = dict(metadata)
-    metadata_plugin_keys = {metadata_plugin: [] for metadata_plugin in METADATA_PLUGIN_MODULES}
+    # Check for forbidden characters in key. # TODO: Check when something similar is required
+    # for char in RESTRICTED_CHARACTERS:
+    #     if char in key:
+    #         raise exception.InvalidMetadata(f'Restricted character "{char}" found in metadata key. '
+    #                                         f'Reason: {RESTRICTED_CHARACTERS[char]}')
 
-    # Iterate through all keys, sequentially checking if each metadata plugin manages the considered key. If it
-    # does, add it to the list in the plugin's entry in {metadata_plugin_keys}. Note that the order of
-    # [METADATA_PLUGIN_MODULES] means that the key is always checked for existence in the base list first.
-    for key in metadata.keys():
-        # Check for forbidden characters in key.
-        for char in RESTRICTED_CHARACTERS:
-            if char in key:
-                raise exception.InvalidMetadata('Restricted character "{}" found in metadata key. Reason: {}'.format(
-                    char,
-                    RESTRICTED_CHARACTERS[char]
-                ))
-        metadata_is_included = False
-        for metadata_plugin in METADATA_PLUGIN_MODULES:
-            if metadata_plugin.manages_key(key, session=session):
-                metadata_plugin_keys[metadata_plugin].append(key)
-                metadata_is_included = True
-                break
-        if not metadata_is_included:
-            unmanaged_keys.append(key)
-    if unmanaged_keys:
-        raise exception.InvalidMetadata('No plugin manages metadata keys %s on DID %s:%s' % (unmanaged_keys, scope, name))
+    # Sequentially check if each metadata plugin manages this key. Note that the order of [METADATA_PLUGIN_MODULES]
+    # means that the key is always checked for existence in the base list first.
+    metadata_was_set = False
+    for metadata_plugin in METADATA_PLUGIN_MODULES:
+        if metadata_plugin.plugin_name == plugin.lower():
+            # TODO: If we want the option to revert back to default plugin, we could add some kind of validation here.
+            if metadata_plugin.supports_metadata_schema(value):
+                metadata_plugin.set_metadata_atomic(
+                    scope=scope, name=name, key=key, value=value, recursive=recursive, session=session
+                )
+                return
+            else:
+                raise exception.InvalidMetadata('Selected plugin does not support the underlying schema.')
 
-    # For each plugin, set the metadata.
-    for metadata_plugin, keys_managed_by_this_plugin in metadata_plugin_keys.items():
-        if keys_managed_by_this_plugin:
-            this_plugin_metadata = {key: metadata[key] for key in keys_managed_by_this_plugin}
-            metadata_plugin.set_metadata_bulk(scope, name, metadata=this_plugin_metadata, recursive=recursive, session=session)
+    if not metadata_was_set:
+        raise exception.InvalidMetadata(f'No plugin manages metadata key "{key}" for DID "{scope}:{name}"')
 
 
 @transactional_session
-def delete_metadata(scope, name, key, *, session: "Session"):
+def set_metadata_bulk(
+        scope: "InternalScope",
+        name: str,
+        meta: dict[str, Any],
+        recursive: bool = False,
+        plugin: str = "all",
+        *,
+        session: "Session"
+) -> None:
+    """
+    Add metadata entries (key-value pairs) to a DID, with option to perform this recursively to all its children.
+    By default, all plugins are being considered (a single plugin can also be specified).
+
+    :param scope: The scope of the DID.
+    :param name: The data identifier name.
+    :param meta: The key-value mapping of metadata to set.
+    :param recursive: Instruction to propagate the metadata change recursively to content (False by default).
+    :param plugin: The selected backend metadata plugin to handle the operation ("all" by default)
+    :param session: The database session in use.
+    :raises: InvalidMetadata
+    """
+
+    if plugin.lower() != "all":
+        # TODO[DX]: We provide the so-called bulk atomic option (single plugin handler via a single DB transaction)
+        #  which needs to be supported by the plugin. Otherwise, a simple bulk operation could be used instead targeting
+        #  the specified only plugin.
+        set_metadata_bulk_atomic(
+            scope=scope, name=name, meta=meta, recursive=recursive, plugin=plugin, session=session
+        )
+    else:
+        metadata = meta
+
+        unmanaged_keys = list()
+        if not isinstance(metadata, dict):
+            metadata = dict(metadata)
+        metadata_plugin_keys = {metadata_plugin: [] for metadata_plugin in METADATA_PLUGIN_MODULES}
+
+        # Iterate through all first-level keys (i.e. no key-traversing is being performed towards deeper levels),
+        # searching for the first metadata plugin that manages the considered key. If it does, add it to the list in the
+        # plugin's entry in {metadata_plugin_keys}. Note that the order of [METADATA_PLUGIN_MODULES] means that the key
+        # is always checked for existence in the base list first.
+        for key in metadata.keys():
+            # Check for forbidden characters in key.
+            for char in RESTRICTED_CHARACTERS:
+                if char in key:
+                    raise exception.InvalidMetadata(f'Restricted character "{char}" found in metadata key. '
+                                                    f'Reason: {RESTRICTED_CHARACTERS[char]}')
+            metadata_is_included = False
+            for metadata_plugin in METADATA_PLUGIN_MODULES:
+                if metadata_plugin.manages_key(key, session=session):
+                    metadata_plugin_keys[metadata_plugin].append(key)
+                    metadata_is_included = True
+                    break
+            if not metadata_is_included:
+                unmanaged_keys.append(key)
+        if unmanaged_keys:
+            raise exception.InvalidMetadata(f'No plugin manages metadata keys "{unmanaged_keys}" for DID "{scope}:{name}"')
+
+        # For each plugin, set the metadata.
+        for metadata_plugin, keys_managed_by_this_plugin in metadata_plugin_keys.items():
+            if keys_managed_by_this_plugin:
+                this_plugin_metadata = {key: metadata[key] for key in keys_managed_by_this_plugin}
+                metadata_plugin.set_metadata_bulk(
+                    scope, name, metadata=this_plugin_metadata, recursive=recursive, session=session
+                )
+
+
+@transactional_session
+def set_metadata_bulk_atomic(
+        scope: "InternalScope",
+        name: str,
+        meta: dict[str, Any],
+        recursive: bool = False,
+        plugin: str = "DID_COLUMN",
+        *,
+        session: "Session"
+) -> None:
+    """
+    Add metadata entries (key-value pairs) to a DID atomically (single plugin handler via a single DB transaction),
+    and with option to perform that recursively to all its children.
+
+    :param scope: The scope of the DID.
+    :param name: The data identifier name.
+    :param meta: The dictionary holding the key-value pairs.
+    :param recursive: Instruction to propagate the metadata change recursively to content (False by default).
+    :param plugin: The selected backend metadata plugin to handle the operation ("DID_COLUMN" by default)
+    :param session: The database session in use.
+    :raises: InvalidObject: If the selected plugin does not support the underlying schema of the provided meta.
+    :raises: UnsupportedMetadataPlugin: If the specified plugin can not process the provided meta.
+    """
+
+    if not isinstance(meta, dict):
+        meta = dict(meta)
+
+    # Check for forbidden characters in keys. # TODO[DX]: Check when something similar is required.
+    # for key in meta.keys():
+    #     for char in RESTRICTED_CHARACTERS:
+    #         if char in key:
+    #             raise exception.InvalidMetadata(f'Restricted character "{char}" found in metadata key. '
+    #                                             f'Reason: {RESTRICTED_CHARACTERS[char]}')
+
+    # Sequentially check if each metadata plugin manages this key. Note that the order of [METADATA_PLUGIN_MODULES]
+    # means that the key is always checked for existence in the base list first.
+    # TODO[DX]: We should better get the plugin object directly using its provided name instead of iterating through all
+    for metadata_plugin in METADATA_PLUGIN_MODULES:
+        if metadata_plugin.plugin_name == plugin.lower():
+            if metadata_plugin.supports_metadata_schema(meta):
+                metadata_plugin.set_metadata_bulk_atomic(
+                    scope=scope, name=name, meta=meta, recursive=recursive, session=session
+                )
+                return
+            else:
+                raise exception.InvalidObject('Selected plugin does not support the underlying schema.')
+
+    raise exception.UnsupportedMetadataPlugin(f'Metadata plugin "{plugin}" could not process the provided meta.')
+    # TODO[DX!]: Consider the rest of the exceptions coming from called methods
+
+
+@transactional_session
+def delete_metadata(
+        scope,
+        name,
+        key,
+        *,
+        session: "Session"
+) -> None:
     """
     Deletes metadata stored for a given key.
 
-    :param scope: The scope of the did.
+    :param scope: The scope of the DID.
     :param name: The name of the did.
     :param key: Key of the metadata.
+    :param session: The database session in use.
     """
     for metadata_plugin in METADATA_PLUGIN_MODULES:
         if metadata_plugin.manages_key(key, session=session):
@@ -204,7 +339,7 @@ def list_dids(scope=None, filters=None, did_type='collection', ignore_case=False
 
     All filter keys should belong to a single plugin. Queries across plugins are not currently supported.
 
-    :param scope: the scope name.
+    :param scope: The scope of the DID.
     :param filters: dictionary of attributes by which the results should be filtered.
     :param did_type: the type of the did: all(container, dataset, file), collection(dataset or container), dataset, container, file.
     :param ignore_case: ignore case distinctions.

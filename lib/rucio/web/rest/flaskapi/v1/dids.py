@@ -13,9 +13,11 @@
 # limitations under the License.
 
 import ast
+import hashlib
+import json
 from json import dumps
 
-from flask import Flask, Response, request
+from flask import Flask, Response, request, stream_with_context
 
 from rucio.common.exception import (
     AccessDenied,
@@ -34,6 +36,7 @@ from rucio.common.exception import (
     RSENotFound,
     RuleNotFound,
     ScopeNotFound,
+    UnsupportedMetadataPlugin,
     UnsupportedOperation,
     UnsupportedStatus,
 )
@@ -80,35 +83,36 @@ class Scope(ErrorHandlingMethodView):
         """
         ---
         summary: Get Data Identifier
-        description: Return all data identifiers in the given scope.
+        description: Returns all data identifiers in the given scope.
         tags:
           - Data Identifiers
         parameters:
         - name: scope
           in: path
           description: The scope.
+          required: true
           schema:
             type: string
           style: simple
-        requestBody:
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  name:
-                    description: The name of the did.
-                    type: string
-                  recursive:
-                    description: If specified, also returns the child ids recursively.
-                    type: boolean
+        - name: name
+          in: query
+          description: The name of the data identifier (did).
+          required: false
+          schema:
+            type: string
+        - name: recursive
+          in: query
+          description: If true, retrieves child identifiers recursively for non-file types.
+          required: false
+          schema:
+            type: boolean
         responses:
           200:
             description: OK
             content:
               application/x-json-stream:
                 schema:
-                  description: Line separated dictionary of dids.
+                  description: Line-separated dictionary of dids.
                   type: array
                   items:
                     type: object
@@ -142,7 +146,7 @@ class Scope(ErrorHandlingMethodView):
                 for did in scope_list(scope=scope, name=name, recursive=recursive, vo=vo):
                     yield render_json(**did) + '\n'
 
-            recursive = 'recursive' in request.args
+            recursive = request.args.get('recursive', 'false').lower() in ['true', '1']
 
             return try_stream(
                 generate(
@@ -192,7 +196,7 @@ class Search(ErrorHandlingMethodView):
             default: false
         - name: recursive
           in: query
-          description: Recursively list chilred.
+          description: Recursively list children.
           schema:
             type: boolean
         - name: created_before
@@ -736,7 +740,7 @@ class DIDs(ErrorHandlingMethodView):
           401:
             description: Invalid Auth Token
           404:
-            description: Did not found
+            description: DID not found
           409:
             description: Wrong status
         """
@@ -884,7 +888,7 @@ class Attachment(ErrorHandlingMethodView):
           401:
             description: Invalid Auth Token
           404:
-            description: Did not found
+            description: DID not found
           406:
             description: Not acceptable
           409:
@@ -950,7 +954,7 @@ class Attachment(ErrorHandlingMethodView):
           401:
             description: Invalid Auth Token
           404:
-            description: Did not found
+            description: DID not found
         """
         try:
             scope, name = parse_scope_name(scope_name, request.environ.get('vo'))
@@ -1031,7 +1035,7 @@ class AttachmentHistory(ErrorHandlingMethodView):
           401:
             description: Invalid Auth Token
           404:
-            description: Did not found
+            description: DID not found
           406:
             description: Not acceptable
         """
@@ -1131,7 +1135,7 @@ class Files(ErrorHandlingMethodView):
           401:
             description: Invalid Auth Token
           404:
-            description: Did not found
+            description: DID not found
           406:
             description: Not acceptable
         """
@@ -1272,7 +1276,7 @@ class Parents(ErrorHandlingMethodView):
           401:
             description: Invalid Auth Token
           404:
-            description: Did not found
+            description: DID not found
           406:
             description: Not acceptable
         """
@@ -1296,23 +1300,28 @@ class Meta(ErrorHandlingMethodView):
     def get(self, scope_name):
         """
         ---
-        summary: Get metadata
-        description: Get the metadata of a did.
+        summary: Returns all metadata available for a given DID with optional plugin selection.
+        description: >
+          If [plugin] is set to "all", the metadata from all available plugins will be merged (if keys are not unique
+          across plugins, they will be overwritten). If a single [plugin] has been specified, this will be used only.
         tags:
           - Data Identifiers
         parameters:
         - name: scope_name
           in: path
           description: The scope and the name of the did.
+          required: true
           schema:
             type: string
           style: simple
         - name: plugin
           in: query
-          description: The plugin to use.
+          description: The selected plugin to handle the operation.
+          required: false
           schema:
             type: string
             default: DID_COLUMN
+          style: form
         responses:
           200:
             description: OK
@@ -1321,10 +1330,12 @@ class Meta(ErrorHandlingMethodView):
                 schema:
                   description: A data identifier with all attributes.
                   type: object
+          400:
+            description: Bad Request - Invalid metadata plugin specified
           401:
             description: Invalid Auth Token
           404:
-            description: Did not found
+            description: DID not found
           406:
             description: Not acceptable
         """
@@ -1339,12 +1350,17 @@ class Meta(ErrorHandlingMethodView):
             return Response(render_json(**meta), content_type='application/json')
         except DataIdentifierNotFound as error:
             return generate_http_error_flask(404, error)
+        except UnsupportedMetadataPlugin as error:
+            return generate_http_error_flask(400, error)
 
+    @check_accept_header_wrapper_flask(['application/json'])
     def post(self, scope_name):
         """
         ---
-        summary: Add metadata
-        description: Add metadata to a did.
+        summary: Add metadata to a DID utilizing all backend metadata plugins by default.
+        description: >
+          Add metadata entries (key-value pairs) to a DID, with option to perform this recursively to all its children.
+          By default, all plugins are being considered (a single plugin can also be specified).
         tags:
           - Data Identifiers
         parameters:
@@ -1366,9 +1382,13 @@ class Meta(ErrorHandlingMethodView):
                     description: The metadata to add. A dictionary containing the metadata name as key and the value as value.
                     type: object
                   recursive:
-                    description: Flag if the metadata should be applied recirsively to children.
+                    description: Flag if the metadata should be applied recursively to children.
                     type: boolean
                     default: false
+                  plugin:
+                    description: The selected plugin to handle the operation.
+                    type: string
+                    default: "all"
         responses:
           201:
             description: Created
@@ -1377,12 +1397,16 @@ class Meta(ErrorHandlingMethodView):
                 schema:
                   type: string
                   enum: ["Created"]
+          400:
+            description: Invalid request (invalid key, metadata or value provided)
           401:
             description: Invalid Auth Token
           404:
-            description: Not found
+            description: DID not found
           406:
             description: Not acceptable
+          409:
+            description: Metadata already exists
         """
         try:
             scope, name = parse_scope_name(scope_name, request.environ.get('vo'))
@@ -1400,13 +1424,15 @@ class Meta(ErrorHandlingMethodView):
                 issuer=request.environ.get('issuer'),
                 recursive=param_get(parameters, 'recursive', default=False),
                 vo=request.environ.get('vo'),
+                plugin=param_get(parameters, 'plugin', default="all")
             )
+
+        except (KeyNotFound, InvalidMetadata, InvalidValueForKey) as error:
+            return generate_http_error_flask(400, error)
         except DataIdentifierNotFound as error:
             return generate_http_error_flask(404, error)
         except Duplicate as error:
             return generate_http_error_flask(409, error)
-        except (KeyNotFound, InvalidMetadata, InvalidValueForKey) as error:
-            return generate_http_error_flask(400, error)
 
         return "Created", 201
 
@@ -1464,11 +1490,15 @@ class Meta(ErrorHandlingMethodView):
 
 
 class SingleMeta(ErrorHandlingMethodView):
+
+    @check_accept_header_wrapper_flask(['application/json'])
     def post(self, scope_name, key):
         """
         ---
-        summary: Add metadata
-        description: Add metadata to a did.
+        summary: Add single metadata key:value entry to a DID.
+        description: >
+          Add single metadata key:value entry to a DID, with option to perform this recursively to all its children.
+          By default, all plugins are being considered (a single plugin can also be specified).
         tags:
           - Data Identifiers
         parameters:
@@ -1495,6 +1525,14 @@ class SingleMeta(ErrorHandlingMethodView):
                   value:
                     description: The value to set.
                     type: object
+                  recursive:
+                    description: Flag if the metadata should be applied recursively to children.
+                    type: boolean
+                    default: false
+                  plugin:
+                    description: The selected plugin to handle the operation.
+                    type: string
+                    default: "all"
         responses:
           201:
             description: Created
@@ -1503,16 +1541,16 @@ class SingleMeta(ErrorHandlingMethodView):
                 schema:
                   type: string
                   enum: ["Created"]
+          400:
+            description: Invalid request (invalid key, metadata or value provided)
           401:
             description: Invalid Auth Token
           404:
-            description: Did not found
+            description: DID not found
           406:
             description: Not acceptable
           409:
             description: Metadata already exists
-          400:
-            description: Invalid key or value
         """
         try:
             scope, name = parse_scope_name(scope_name, request.environ.get('vo'))
@@ -1531,6 +1569,7 @@ class SingleMeta(ErrorHandlingMethodView):
                 issuer=request.environ.get('issuer'),
                 recursive=param_get(parameters, 'recursive', default=False),
                 vo=request.environ.get('vo'),
+                plugin=param_get(parameters, 'plugin', default="all")
             )
         except DataIdentifierNotFound as error:
             return generate_http_error_flask(404, error)
@@ -1540,6 +1579,91 @@ class SingleMeta(ErrorHandlingMethodView):
             return generate_http_error_flask(400, error)
 
         return 'Created', 201
+
+
+class MetaChunked(ErrorHandlingMethodView):
+    @check_accept_header_wrapper_flask(['application/octet-stream'])
+    def post(self, scope_name: str, key: str):
+        """
+        ---
+        summary: Set metadata using chunked transfer
+        description: Upload potentially large metadata values using binary streaming
+        tags:
+          - Data Identifiers
+        parameters:
+        - name: scope_name
+          in: path
+          description: The scope and name of the did
+          schema:
+            type: string
+          style: simple
+        - name: key
+          in: path
+          description: The metadata key
+          schema:
+            type: string
+        responses:
+          200:
+            description: OK
+          400:
+            description: Invalid request
+          401:
+            description: Invalid Auth Token
+          500:
+            description: Internal Error
+        """
+        try:
+            scope, name = parse_scope_name(scope_name, request.environ.get('vo'))
+        except ValueError as error:
+            return generate_http_error_flask(400, error)
+
+        try:
+            # Get metadata from request stream similar to file upload
+            total_size = int(request.headers.get('Content-Length', 0))
+            if not total_size:
+                raise ValueError('Content-Length is required')
+
+            # Initialize data collection
+            data = bytearray()
+            bytes_received = 0
+
+            # Stream data directly like in file uploads
+            for chunk in request.stream:
+                data.extend(chunk)
+                bytes_received += len(chunk)
+                print(f"Received data: {len(chunk)} bytes. Total: {bytes_received}/{total_size}")  # TODO[DX]: Remove
+
+                if bytes_received > total_size:
+                    raise ValueError('Received more data than Content-Length')
+
+            if bytes_received != total_size:
+                raise ValueError(f'Incomplete data received. Expected {total_size}, got {bytes_received}')
+
+            # Now that we have all data, try to decode and parse JSON
+            try:
+                metadata_json = json.loads(bytes(data).decode('utf-8'))
+                # print("Received metadata:", json.dumps(metadata_json, indent=2))  # TODO[DX]: Remove
+
+                set_metadata(
+                    scope=scope,
+                    name=name,
+                    key=key,
+                    value=metadata_json.get('value'),
+                    issuer=request.environ.get('issuer'),
+                    recursive=metadata_json.get('recursive'),
+                    vo=request.environ.get('vo'),
+                    plugin=metadata_json.get('plugin')
+                )
+                return Response(status=200)
+
+            except json.JSONDecodeError as e:
+                raise ValueError(f'Invalid JSON data: {str(e)}')
+        # TODO[DX]: Update exceptions + docstring + all other endpoints too..
+        except ValueError as error:
+            return generate_http_error_flask(400, error)
+        except Exception as error:
+            print(f"Error processing metadata: {str(error)}")
+            return generate_http_error_flask(500, error)
 
 
 class BulkDIDsMeta(ErrorHandlingMethodView):
@@ -1586,7 +1710,7 @@ class BulkDIDsMeta(ErrorHandlingMethodView):
           401:
             description: Invalid Auth Token
           404:
-            description: Did not found
+            description: DID not found
           406:
             description: Not acceptable
           409:
@@ -1710,7 +1834,7 @@ class BulkMeta(ErrorHandlingMethodView):
           401:
             description: Invalid Auth Token
           404:
-            description: Did not found
+            description: DID not found
           406:
             description: Not acceptable
         """
@@ -1783,7 +1907,7 @@ class AssociatedRules(ErrorHandlingMethodView):
           401:
             description: Invalid Auth Token
           404:
-            description: Did not found
+            description: DID not found
           406:
             description: Not acceptable
         """
@@ -1839,7 +1963,7 @@ class GUIDLookup(ErrorHandlingMethodView):
           401:
             description: Invalid Auth Token
           404:
-            description: Did not found
+            description: DID not found
           406:
             description: Not acceptable
         """
@@ -2149,7 +2273,7 @@ class Follow(ErrorHandlingMethodView):
           401:
             description: Invalid Auth Token
           404:
-            description: Did not found
+            description: DID not found
           406:
             description: Not acceptable
         """
@@ -2170,7 +2294,7 @@ class Follow(ErrorHandlingMethodView):
         """
         ---
         summary: Post follow
-        description: Mark the input DID as being followed by the given account.
+        description: Mark the input did as being followed by the given account.
         tags:
           - Data Identifiers
         parameters:
@@ -2222,7 +2346,7 @@ class Follow(ErrorHandlingMethodView):
         """
         ---
         summary: Delete follow
-        description: Mark the input DID as not followed
+        description: Mark the input did as not followed
         tags:
           - Data Identifiers
         parameters:
@@ -2290,6 +2414,8 @@ def blueprint():
     bp.add_url_rule('/<path:scope_name>/meta', view_func=meta_view, methods=['get', 'post', 'delete'])
     singlemeta_view = SingleMeta.as_view('singlemeta')
     bp.add_url_rule('/<path:scope_name>/meta/<key>', view_func=singlemeta_view, methods=['post', ])
+    meta_chunked_view = MetaChunked.as_view('meta_chunked')
+    bp.add_url_rule('/<path:scope_name>/meta_chunked/<key>', view_func=meta_chunked_view, methods=['post', ])
     bulkdidsmeta_view = BulkDIDsMeta.as_view('bulkdidsmeta')
     bp.add_url_rule('/bulkdidsmeta', view_func=bulkdidsmeta_view, methods=['post', ])
     rules_view = Rules.as_view('rules')

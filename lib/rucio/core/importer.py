@@ -239,7 +239,7 @@ def import_data(data: dict[str, Any], vo: str = 'def', *, session: "Session") ->
     Import data to add and update records in Rucio.
 
     :param data: data to be imported as dictionary.
-    :param session: database session in use.
+    :param session: The database session in use.
     """
     rse_sync_method = config_get('importer', 'rse_sync_method', False, 'edit')
     attr_sync_method = config_get('importer', 'attr_sync_method', False, 'edit')

@@ -91,7 +91,7 @@ class ExternalPostgresJSONDidMeta(DidMetaPlugin):
         else:                                       # managed by Rucio, create a metadata table if it doesn't exist
             self._try_create_metadata_table()
 
-        self.plugin_name = "POSTGRES_JSON"
+        self._plugin_name = "POSTGRES_JSON"
 
     def _try_create_metadata_table(self):
         """
@@ -182,7 +182,7 @@ class ExternalPostgresJSONDidMeta(DidMetaPlugin):
 
         :param scope: The scope name
         :param name: The data identifier name
-        :param session: The database session in use
+        :param session: The database session in use.
         :returns: the metadata for the did
         """
         statement = "SELECT data from {} ".format(self.table) + \
@@ -206,7 +206,7 @@ class ExternalPostgresJSONDidMeta(DidMetaPlugin):
         :param key: the key to be added
         :param value: the value of the key to be added
         :param recursive: recurse into DIDs (not supported)
-        :param session: The database session in use
+        :param session: The database session in use.
         """
         self.set_metadata_bulk(scope=scope, name=name, metadata={key: value}, recursive=recursive, session=session)
 
@@ -218,7 +218,7 @@ class ExternalPostgresJSONDidMeta(DidMetaPlugin):
         :param name: the name of the did
         :param metadata: dictionary of metadata keypairs to be added
         :param recursive: recurse into DIDs (not supported)
-        :param session: The database session in use
+        :param session: The database session in use.
         """
         # upsert metadata
         statement = "INSERT INTO {} (scope, name, vo, data) ".format(self.table) + \
@@ -236,7 +236,7 @@ class ExternalPostgresJSONDidMeta(DidMetaPlugin):
         :param scope: the scope of did
         :param name: the name of the did
         :param key: the key to be deleted
-        :param session: the database session in use
+        :param session: The database session in use.
         """
         statement = "UPDATE {} ".format(self.table) + \
                     "SET data = {}.data - '{}';".format(self.table, key)
@@ -305,12 +305,3 @@ class ExternalPostgresJSONDidMeta(DidMetaPlugin):
 
     def manages_key(self, key, *, session: "Optional[Session]" = None):
         return True
-
-    def get_plugin_name(self):
-        """
-        Returns a unique identifier for this plugin. This can be later used for filtering down results to this
-        plugin only.
-
-        :returns: The name of the plugin
-        """
-        return self.plugin_name

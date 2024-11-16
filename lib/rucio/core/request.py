@@ -259,7 +259,7 @@ def requeue_and_archive(
 
     :param request:               Original request.
     :param source_ranking_update  Boolean. If True, the source ranking is decreased (making the sources less likely to be used)
-    :param session:               Database session to use.
+    :param session: The database session in use.
     :param logger:                Optional decorated logger that can be passed from the calling daemons or servers.
     """
 
@@ -307,7 +307,7 @@ def queue_requests(
     Submit transfer requests on destination RSEs for data identifiers.
 
     :param requests:  List of dictionaries containing request metadata.
-    :param session:   Database session to use.
+    :param session: The database session in use.
     :param logger:    Optional decorated logger that can be passed from the calling daemons or servers.
     :returns:         List of Request-IDs as 32 character hex strings.
     """
@@ -483,7 +483,7 @@ def list_and_mark_transfer_requests_and_source_replicas(
     :param transfertool: The transfer tool as specified in rucio.cfg.
     :param required_source_rse_attrs: Only select source RSEs having these attributes set
     :param ignore_availability: Ignore blocklisted RSEs
-    :param session: Database session to use.
+    :param session: The database session in use.
     :returns: List of RequestWithSources objects.
     """
 
@@ -777,7 +777,7 @@ def get_and_mark_next(
     :param activity_shares:   Activity shares dictionary, with number of requests
     :param include_dependent: If true, includes transfers which have a previous hop dependency on other transfers
     :param transfertool:      The transfer tool as specified in rucio.cfg.
-    :param session:           Database session to use.
+    :param session: The database session in use.
     :returns:                 Request as a dictionary.
     """
     request_type_metric_label = '.'.join(a.name for a in request_type) if isinstance(request_type, list) else request_type.name
@@ -1046,7 +1046,7 @@ def transition_requests_state_if_possible(
 
     :param request_ids:  List of (Request-ID as a 32 character hex string).
     :param new_state:    New state as string.
-    :param session:      Database session to use.
+    :param session: The database session in use.
     :param logger:       Optional decorated logger that can be passed from the calling daemons or servers.
     """
 
@@ -1071,7 +1071,7 @@ def touch_requests_by_rule(
     Update the update time of requests in a rule. Fails silently if no requests on this rule.
 
     :param rule_id:  Rule-ID as a 32 character hex string.
-    :param session:  Database session to use.
+    :param session: The database session in use.
     """
 
     try:
@@ -1104,7 +1104,7 @@ def get_request(
     Retrieve a request by its ID.
 
     :param request_id:  Request-ID as a 32 character hex string.
-    :param session:     Database session to use.
+    :param session: The database session in use.
     :returns:           Request as a dictionary.
     """
 
@@ -1143,7 +1143,7 @@ def get_request_by_did(
     :param name:           The name of the data identifier.
     :param rse_id:         The destination RSE ID of the request.
     :param request_type:   The type of request as rucio.db.sqla.constants.RequestType.
-    :param session:        Database session to use.
+    :param session: The database session in use.
     :returns:              Request as a dictionary.
     """
 
@@ -1192,7 +1192,7 @@ def get_request_history_by_did(
     :param name:           The name of the data identifier.
     :param rse_id:         The destination RSE ID of the request.
     :param request_type:   The type of request as rucio.db.sqla.constants.RequestType.
-    :param session:        Database session to use.
+    :param session: The database session in use.
     :returns:              Request as a dictionary.
     """
 
@@ -1279,7 +1279,7 @@ def archive_request(
     Move a request to the history table.
 
     :param request_id:  Request-ID as a 32 character hex string.
-    :param session:     Database session to use.
+    :param session: The database session in use.
     """
 
     req = get_request(request_id=request_id, session=session)
@@ -1365,7 +1365,7 @@ def cancel_request_did(
     :param name:          Data identifier name as a string.
     :param dest_rse_id:   RSE id as a string.
     :param request_type:  Type of the request.
-    :param session:       Database session to use.
+    :param session: The database session in use.
     :param logger:        Optional decorated logger that can be passed from the calling daemons or servers.
     """
 
@@ -1408,7 +1408,7 @@ def get_sources(
 
     :param request_id:  Request-ID as a 32 character hex string.
     :param rse_id:      RSE ID as a 32 character hex string.
-    :param session:     Database session to use.
+    :param session: The database session in use.
     :returns:           Sources as a dictionary.
     """
 
@@ -1446,7 +1446,7 @@ def get_heavy_load_rses(
     Retrieve heavy load rses.
 
     :param threshold:  Threshold as an int.
-    :param session:    Database session to use.
+    :param session: The database session in use.
     :returns: .
     """
     try:
@@ -2140,7 +2140,7 @@ def release_waiting_requests_per_deadline(
     :param dest_rse_id: The destination RSE id.
     :param source_rse_id: The source RSE id.
     :param deadline: Maximal waiting time in hours until a dataset gets released.
-    :param session: The database session.
+    :param session: The database session in use.
     """
     amount_released_requests = 0
     if deadline:
@@ -2187,7 +2187,7 @@ def release_waiting_requests_per_free_volume(
     :param dest_rse_id: The destination RSE id.
     :param source_rse_id: The source RSE id
     :param volume: The maximum volume in bytes that should be transferred.
-    :param session: The database session.
+    :param session: The database session in use.
     """
 
     dialect = session.bind.dialect.name  # type: ignore
@@ -2258,7 +2258,7 @@ def create_base_query_grouped_fifo(
 
     :param dest_rse_id: The source RSE id to filter on
     :param source_rse_id: The destination RSE id to filter on
-    :param session: The database session.
+    :param session: The database session in use.
     """
     dialect = session.bind.dialect.name  # type: ignore
     if dialect == 'mysql' or dialect == 'sqlite':
@@ -2346,7 +2346,7 @@ def release_waiting_requests_fifo(
     :param activity: The activity.
     :param count: The count to be released.
     :param account: The account name whose requests to release.
-    :param session: The database session.
+    :param session: The database session in use.
     """
 
     dialect = session.bind.dialect.name  # type: ignore
@@ -2417,7 +2417,7 @@ def release_waiting_requests_grouped_fifo(
     :param count: The count to be released. If None, release all waiting requests.
     :param deadline: Maximal waiting time in hours until a dataset gets released.
     :param volume: The maximum volume in bytes that should be transferred.
-    :param session: The database session.
+    :param session: The database session in use.
     """
 
     amount_updated_requests = 0
@@ -2484,7 +2484,7 @@ def release_all_waiting_requests(
     :param source_rse_id: The source rse id.
     :param activity: The activity.
     :param account: The account name whose requests to release.
-    :param session: The database session.
+    :param session: The database session in use.
     """
     try:
         query = update(
@@ -2837,7 +2837,7 @@ def add_monitor_message(
     :param new_state:         The new state of the transfer request
     :param request:           The request to create the message for.
     :param additional_fields: Additional custom fields to be added to the message
-    :param session:           The database session to use.
+    :param session: The database session in use.
     """
 
     if request['request_type']:
@@ -2966,7 +2966,7 @@ def get_source_rse(
 
     :param request_id:  The request_id of the request.
     :param src_url:     The src_url of the request.
-    :param session:     The database session to use.
+    :param session: The database session in use.
     :param logger:      Optional decorated logger that can be passed from the calling daemons or servers.
     """
 

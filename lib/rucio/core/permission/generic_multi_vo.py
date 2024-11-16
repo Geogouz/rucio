@@ -40,7 +40,7 @@ def has_permission(issuer, action, kwargs, *, session: "Optional[Session]" = Non
     :param issuer: Account identifier which issues the command..
     :param action:  The action(API call) called by the account.
     :param kwargs: List of arguments for the action.
-    :param session: The DB session to use
+    :param session: The database session in use.
     :returns: True if account is allowed, otherwise False
     """
     perm = {'add_account': perm_add_account,
@@ -138,7 +138,7 @@ def perm_default(issuer, kwargs, *, session: "Optional[Session]" = None):
 
     :param issuer: Account identifier which issues the command.
     :param kwargs: List of arguments for the action.
-    :param session: The DB session to use
+    :param session: The database session in use.
     :returns: True if account is allowed, otherwise False
     """
     return _is_root(issuer) or has_account_attribute(account=issuer, key='admin', session=session)
@@ -150,7 +150,7 @@ def perm_add_rse(issuer, kwargs, *, session: "Optional[Session]" = None):
 
     :param issuer: Account identifier which issues the command.
     :param kwargs: List of arguments for the action.
-    :param session: The DB session to use
+    :param session: The database session in use.
     :returns: True if account is allowed, otherwise False
     """
     return _is_root(issuer) or has_account_attribute(account=issuer, key='admin', session=session)
@@ -162,7 +162,7 @@ def perm_update_rse(issuer, kwargs, *, session: "Optional[Session]" = None):
 
     :param issuer: Account identifier which issues the command.
     :param kwargs: List of arguments for the action.
-    :param session: The DB session to use
+    :param session: The database session in use.
     :returns: True if account is allowed, otherwise False
     """
     return _is_root(issuer) or has_account_attribute(account=issuer, key='admin', session=session)
@@ -174,7 +174,7 @@ def perm_add_rule(issuer, kwargs, *, session: "Optional[Session]" = None):
 
     :param issuer: Account identifier which issues the command.
     :param kwargs: List of arguments for the action.
-    :param session: The DB session to use
+    :param session: The database session in use.
     :returns: True if account is allowed, otherwise False
     """
     if kwargs['account'] == issuer and not kwargs['locked']:
@@ -190,7 +190,7 @@ def perm_add_subscription(issuer, kwargs, *, session: "Optional[Session]" = None
 
     :param issuer: Account identifier which issues the command.
     :param kwargs: List of arguments for the action.
-    :param session: The DB session to use
+    :param session: The database session in use.
     :returns: True if account is allowed, otherwise False
     """
     if _is_root(issuer) or has_account_attribute(account=issuer, key='admin', session=session):
@@ -204,7 +204,7 @@ def perm_add_rse_attribute(issuer, kwargs, *, session: "Optional[Session]" = Non
 
     :param issuer: Account identifier which issues the command.
     :param kwargs: List of arguments for the action.
-    :param session: The DB session to use
+    :param session: The database session in use.
     :returns: True if account is allowed, otherwise False
     """
     if _is_root(issuer) or has_account_attribute(account=issuer, key='admin', session=session):
@@ -218,7 +218,7 @@ def perm_del_rse_attribute(issuer, kwargs, *, session: "Optional[Session]" = Non
 
     :param issuer: Account identifier which issues the command.
     :param kwargs: List of arguments for the action.
-    :param session: The DB session to use
+    :param session: The database session in use.
     :returns: True if account is allowed, otherwise False
     """
     if _is_root(issuer) or has_account_attribute(account=issuer, key='admin', session=session):
@@ -232,7 +232,7 @@ def perm_del_rse(issuer, kwargs, *, session: "Optional[Session]" = None):
 
     :param issuer: Account identifier which issues the command.
     :param kwargs: List of arguments for the action.
-    :param session: The DB session to use
+    :param session: The database session in use.
     :returns: True if account is allowed, otherwise False
     """
     return _is_root(issuer) or has_account_attribute(account=issuer, key='admin', session=session)
@@ -244,7 +244,7 @@ def perm_add_account(issuer, kwargs, *, session: "Optional[Session]" = None):
 
     :param issuer: Account identifier which issues the command.
     :param kwargs: List of arguments for the action.
-    :param session: The DB session to use
+    :param session: The database session in use.
     :returns: True if account is allowed, otherwise False
     """
     return _is_root(issuer)

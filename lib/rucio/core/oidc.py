@@ -739,7 +739,7 @@ def get_token_for_account_operation(account: str, req_audience: str = None, req_
     :param req_scope: scope requested to be present in the token (e.g. fts:submit-transfer)
     :param admin: If True tokens will be requested for the Rucio admin root account,
                   preferably with the same issuer as the requesting account OIDC identity
-    :param session: DB session in use
+    :param session: The database session in use.
 
     :return: token dictionary or None, throws an exception in case of problems
     """
@@ -1101,7 +1101,7 @@ def refresh_jwt_tokens(total_workers: int, worker_number: int, refreshrate: int 
     :param total_workers:      Number of total workers.
     :param worker_number:      id of the executing worker.
     :param limit:              Maximum number of tokens to refresh per call.
-    :param session:            Database session in use.
+    :param session: The database session in use.
 
     :return: numper of tokens refreshed
     """
@@ -1233,7 +1233,7 @@ def delete_expired_oauthrequests(total_workers: int, worker_number: int, limit: 
     :param total_workers:      Number of total workers.
     :param worker_number:      id of the executing worker.
     :param limit:              Maximum number of oauth request session parameters to delete.
-    :param session:            Database session in use.
+    :param session: The database session in use.
 
     :returns: number of deleted rows
     """
@@ -1306,7 +1306,7 @@ def __get_rucio_jwt_dict(jwt: str, account=None, *, session: "Session"):
     Check token expiration and find default Rucio
     account for token identity.
     :param jwt: JSON Web Token to be inspected
-    :param session: DB session in use
+    :param session: The database session in use.
 
     :returns: Rucio token dictionary, None otherwise
     """

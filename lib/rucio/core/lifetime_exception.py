@@ -51,7 +51,7 @@ def list_exceptions(
 
     :param exception_id: The id of the exception
     :param states:       The states to filter
-    :param session:      The database session in use.
+    :param session: The database session in use.
     """
 
     state_clause = []
@@ -74,7 +74,7 @@ def list_exceptions(
 
 @transactional_session
 def add_exception(
-        dids: "Iterable[dict[str, Any]]",
+        dids: "Sequence[dict[str, Any]]",
         account: 'InternalAccount',
         pattern: Optional[str],
         comments: str,
@@ -90,7 +90,7 @@ def add_exception(
     :param pattern:     The account.
     :param comments:    The comments associated to the exception.
     :param expires_at:  The expiration date of the exception.
-    :param session:     The database session in use.
+    :param session: The database session in use.
 
     returns:            A dictionary with id of the exceptions split by scope, datatype.
     """
@@ -166,7 +166,7 @@ def __add_exception(
     :param comments:               The comments associated to the exception.
     :param expires_at:             The expiration date of the exception.
     :params estimated_volume:      The estimated logical volume of the exception.
-    :param session:                The database session in use.
+    :param session: The database session in use.
 
     returns:                       The id of the exception.
     """
@@ -243,7 +243,7 @@ def update_exception(
 
     :param exception_id:   The id of the exception
     :param state:          The states to filter
-    :param session:        The database session in use.
+    :param session: The database session in use.
     """
     ALLOWED_STATES = (LifetimeExceptionsState.APPROVED, LifetimeExceptionsState.REJECTED)
     if state not in ALLOWED_STATES:
@@ -276,7 +276,7 @@ def define_eol(
     :param scope:    Scope of the DID.
     :param name:     Name of the DID.
     :param rses:     List of RSEs.
-    :param session:  The database session in use.
+    :param session: The database session in use.
     """
     policy = rucio.common.policy.get_policy()
     if policy != 'atlas':

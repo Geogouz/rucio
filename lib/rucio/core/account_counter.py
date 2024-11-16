@@ -40,7 +40,7 @@ def add_counter(
 
     :param rse_id:  The id of the RSE.
     :param account: The account name.
-    :param session: The database session in use
+    :param session: The database session in use.
     """
 
     models.AccountUsage(rse_id=rse_id, account=account, files=0, bytes=0).save(session=session)
@@ -126,7 +126,7 @@ def get_updated_account_counters(
 
     :param total_workers:      Number of total workers.
     :param worker_number:      id of the executing worker.
-    :param session:            Database session in use.
+    :param session: The database session in use.
     :returns:                  List of rse_ids whose rse_counters need to be updated.
     """
 
@@ -153,7 +153,7 @@ def update_account_counter(
 
     :param account:  The account to update.
     :param rse_id:   The rse_id to update.
-    :param session:  Database session in use.
+    :param session: The database session in use.
     """
 
     stmt = select(
@@ -196,7 +196,7 @@ def update_account_counter_history(
 
     :param account:  The account to update.
     :param rse_id:   The rse_id to update.
-    :param session:  Database session in use.
+    :param session: The database session in use.
     """
     stmt = select(
         models.AccountUsage
@@ -216,7 +216,7 @@ def fill_account_counter_history_table(*, session: "Session") -> None:
     """
     Make a snapshot of current counters
 
-    :param session:  Database session in use.
+    :param session: The database session in use.
     """
 
     select_counters_stmt = select(

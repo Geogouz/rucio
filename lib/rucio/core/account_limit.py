@@ -34,7 +34,7 @@ def get_rse_account_usage(rse_id, *, session: "Session"):
     Returns the account limit and usage for all accounts on a RSE.
 
     :param rse_id:   The id of the RSE.
-    :param session:  Database session in use.
+    :param session: The database session in use.
     :return:         List of dictionaries.
     """
     result = []
@@ -94,7 +94,7 @@ def get_global_account_limits(account=None, *, session: "Session"):
     Returns the global account limits for the account.
 
     :param account:  Account to check the limit for.
-    :param session:  Database session in use.
+    :param session: The database session in use.
     :return:         Dict {'MOCK': {'resolved_rses': ['MOCK'], 'limit': 10, 'resolved_rse_ids': [123]}}.
     """
     if account:
@@ -134,7 +134,7 @@ def get_global_account_limit(account, rse_expression, *, session: "Session"):
 
     :param account:         Account to check the limit for.
     :param rse_expression:  RSE expression to check the limit for.
-    :param session:         Database session in use.
+    :param session: The database session in use.
     :return:                Limit in Bytes.
     """
     try:
@@ -160,7 +160,7 @@ def get_local_account_limit(account, rse_id, *, session: "Session"):
 
     :param account:  Account to check the limit for.
     :param rse_id:   RSE id to check the limit for.
-    :param session:  Database session in use.
+    :param session: The database session in use.
     :return:         Limit in Bytes.
     """
     try:
@@ -186,7 +186,7 @@ def get_local_account_limits(account, rse_ids=None, *, session: "Session"):
 
     :param account:  Account to check the limit for.
     :param rse_ids:  List of RSE ids to check the limit for.
-    :param session:  Database session in use.
+    :param session: The database session in use.
     :return:         Dictionary {'rse_id': bytes, ...}.
     """
 
@@ -232,7 +232,7 @@ def set_local_account_limit(account, rse_id, bytes_, *, session: "Session"):
     :param account:  Account to check the limit for.
     :param rse_id:   RSE id to check the limit for.
     :param bytes_:    The limit value, in bytes, to set.
-    :param session:  Database session in use.
+    :param session: The database session in use.
     """
     try:
         stmt = select(
@@ -255,7 +255,7 @@ def set_global_account_limit(account, rse_expression, bytes_, *, session: "Sessi
     :param account:         Account to check the limit for.
     :param rse_expression:  RSE expression to check the limit for.
     :param bytes_:           The limit value, in bytes, to set.
-    :param session:         Database session in use.
+    :param session: The database session in use.
     """
     try:
         stmt = select(
@@ -277,7 +277,7 @@ def delete_local_account_limit(account, rse_id, *, session: "Session"):
 
     :param account:  Account to delete the limit for.
     :param rse_id:   RSE id to delete the limit for.
-    :param session:  Database session in use.
+    :param session: The database session in use.
     :returns:        True if something was deleted; False otherwise.
     """
     try:
@@ -301,7 +301,7 @@ def delete_global_account_limit(account, rse_expression, *, session: "Session"):
 
     :param account:         Account to delete the limit for.
     :param rse_expression:  RSE expression to delete the limit for.
-    :param session:         Database session in use.
+    :param session: The database session in use.
     :returns:               True if something was deleted; False otherwise.
     """
     try:
@@ -325,7 +325,7 @@ def get_local_account_usage(account, rse_id=None, *, session: "Session"):
 
     :param account:  The account to read.
     :param rse_id:   The rse_id to read (If none, get all).
-    :param session:  Database session in use.
+    :param session: The database session in use.
 
     :returns:        List of dicts {'rse_id', 'rse', 'bytes', 'files', 'bytes_limit', 'bytes_remaining'}
     """
@@ -376,7 +376,7 @@ def get_global_account_usage(account, rse_expression=None, *, session: "Session"
 
     :param account:          The account to read.
     :param rse_expression:   The RSE expression (If none, get all).
-    :param session:          Database session in use.
+    :param session: The database session in use.
 
     :returns:                List of dicts {'rse_expression', 'bytes', 'files' 'bytes_limit', 'bytes_remaining'}
     """

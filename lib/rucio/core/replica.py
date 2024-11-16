@@ -556,7 +556,7 @@ def get_bad_replicas_backlog(*, session: "Session"):
     """
     Get the replica backlog by RSE.
 
-    :param session:            The database session in use.
+    :param session: The database session in use.
 
     :returns: a list of dictionary {'rse_id': cnt_bad_replicas}.
     """
@@ -2370,7 +2370,7 @@ def list_and_mark_unlocked_replicas(limit, bytes_=None, rse_id=None, delay_secon
     :param rse_id:                   The rse_id.
     :param delay_seconds:            The delay to query replicas in BEING_DELETED state
     :param only_delete_obsolete      If set to True, will only return the replicas with EPOCH tombstone
-    :param session:                  The database session in use.
+    :param session: The database session in use.
 
     :returns: a list of dictionary replica.
     """
@@ -2519,7 +2519,7 @@ def update_replicas_states(replicas, nowait=False, *, session: "Session"):
 
     :param replicas:        The list of replicas.
     :param nowait:          Nowait parameter for the for_update queries.
-    :param session:         The database session in use.
+    :param session: The database session in use.
     """
 
     for replica in replicas:
@@ -2721,7 +2721,7 @@ def get_and_lock_file_replicas(scope, name, nowait=False, restrict_rses=None, *,
     :param name:           The name of the did.
     :param nowait:         Nowait parameter for the FOR UPDATE statement
     :param restrict_rses:  Possible RSE_ids to filter on.
-    :param session:        The db session in use.
+    :param session: The database session in use.
     :returns:              List of SQLAlchemy Replica Objects
     """
 
@@ -2750,7 +2750,7 @@ def get_source_replicas(scope, name, source_rses=None, *, session: "Session"):
     :param scope:          The scope of the did.
     :param name:           The name of the did.
     :param soruce_rses:    Possible RSE_ids to filter on.
-    :param session:        The db session in use.
+    :param session: The database session in use.
     :returns:              List of SQLAlchemy Replica Objects
     """
 
@@ -2784,7 +2784,7 @@ def get_and_lock_file_replicas_for_dataset(scope, name, nowait=False, restrict_r
     :param restrict_rses:  Possible RSE_ids to filter on.
     :param total_threads:  Total threads
     :param thread_id:      This thread
-    :param session:        The db session in use.
+    :param session: The database session in use.
     :returns:              (files in dataset, replicas in dataset)
     """
     files, replicas = {}, {}
@@ -2887,7 +2887,7 @@ def get_source_replicas_for_dataset(scope, name, source_rses=None,
     :param source_rses:    Possible source RSE_ids to filter on.
     :param total_threads:  Total threads
     :param thread_id:      This thread
-    :param session:        The db session in use.
+    :param session: The database session in use.
     :returns:              (files in dataset, replicas in dataset)
     """
     stmt = select(
@@ -2959,7 +2959,7 @@ def get_replica_atime(replica, *, session: "Session"):
     """
     Get the accessed_at timestamp for a replica. Just for testing.
     :param replicas: List of dictionaries {scope, name, rse_id, path}
-    :param session: Database session to use.
+    :param session: The database session in use.
 
     :returns: A datetime timestamp with the last access time.
     """
@@ -3015,7 +3015,7 @@ def list_dataset_replicas(scope, name, deep=False, *, session: "Session"):
     :param scope: The scope of the dataset.
     :param name: The name of the dataset.
     :param deep: Lookup at the file level.
-    :param session: Database session to use.
+    :param session: The database session in use.
 
     :returns: A list of dictionaries containing the dataset replicas
               with associated metrics and timestamps
@@ -3187,7 +3187,7 @@ def list_dataset_replicas(scope, name, deep=False, *, session: "Session"):
 def list_dataset_replicas_bulk(names_by_intscope, *, session: "Session"):
     """
     :param names_by_intscope: The dictionary of internal scopes pointing at the list of names.
-    :param session: Database session to use.
+    :param session: The database session in use.
 
     :returns: A list of dictionaries containing the dataset replicas
               with associated metrics and timestamps
