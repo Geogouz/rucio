@@ -193,7 +193,7 @@ class ExternalPostgresJSONDidMeta(DidMetaPlugin):
         cur.execute("""
                     SELECT data from %(table)s WHERE scope='%(scope)s' AND name='%(name)s';
                     """,
-                    {'table':self.table, 'scope':scope.internal, 'name':name})
+                    {'table': self.table, 'scope': scope.internal, 'name': name})
         metadata = cur.fetchone()
         cur.close()
 
@@ -232,7 +232,7 @@ class ExternalPostgresJSONDidMeta(DidMetaPlugin):
                     VALUES ('%(scope_external)s', '%(name)s', '%(scope_vo)s', '%(serialized_metadata)s')
                     ON CONFLICT (scope, name) DO UPDATE set data = %(table)s.data || EXCLUDED.data;
                     """,
-                    {'table': self.table, 'scope_external':scope.external, 'name': name,
+                    {'table': self.table, 'scope_external': scope.external, 'name': name,
                      'scope_vo': scope.vo, 'serialized_metadata': json.dumps(metadata)})
         cur.close()
         self.client.commit()
@@ -283,7 +283,6 @@ class ExternalPostgresJSONDidMeta(DidMetaPlugin):
                 "'{}' metadata module does not currently support recursive searches".format(self.plugin_name.lower())
             )
 
-        statement = "SELECT * FROM {} WHERE {} ".format(self.table, postgres_query_str)
         cur = self.client.cursor(row_factory=dict_row)
         if limit:
             cur.execute("SELECT * FROM %s WHERE %s LIMIT %s",

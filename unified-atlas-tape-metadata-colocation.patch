@@ -5,25 +5,25 @@ index 5fb390ada..771234ea6 100644
 @@ -1041,7 +1041,7 @@ class FTS3Transfertool(Transfertool):
              if isinstance(activity_id, int):
                  t_file['scitag'] = self.scitags_exp_id << 6 | activity_id
- 
+
 -        if t_file['metadata']['dst_type'] == 'TAPE':
 +        if t_file['metadata']['dst_type'] == 'TAPE' and rws.dest_rse.attributes.get('enable_archive_metadata'):
              for plugin in self.tape_metadata_plugins:
                  t_file = deep_merge_dict(source=plugin.hints(t_file['metadata']), destination=t_file)
- 
+
 diff --git a/lib/rucio/transfertool/fts3_plugins.py b/lib/rucio/transfertool/fts3_plugins.py
 index b4c5ebe03..3d04dfe39 100644
 --- a/lib/rucio/transfertool/fts3_plugins.py
 +++ b/lib/rucio/transfertool/fts3_plugins.py
 @@ -14,13 +14,16 @@
- 
+
  import json
  import sys
 -from collections.abc import Callable
 -from configparser import NoSectionError
 -from typing import Any, Optional, TypeVar
 +from typing import TYPE_CHECKING, Any, Optional, TypeVar, Union
- 
+
 -from rucio.common.config import config_get_int, config_get_items
 +import rucio.core.did
 +from rucio.common.config import config_get_int
@@ -33,30 +33,30 @@ index b4c5ebe03..3d04dfe39 100644
 +
 +if TYPE_CHECKING:
 +    from collections.abc import Callable, Iterator
- 
+
  FTS3TapeMetadataPluginType = TypeVar('FTS3TapeMetadataPluginType', bound='FTS3TapeMetadataPlugin')
- 
+
 @@ -32,7 +35,7 @@ class FTS3TapeMetadataPlugin(PolicyPackageAlgorithms):
      """
- 
+
      ALGORITHM_NAME = "fts3_tape_metadata_plugins"
 -    _HINTS_NAME = "fts3_plugins_init"
 +    _INIT_FUNC_NAME = "fts3_plugins_init"
      DEFAULT = "def"
- 
+
      def __init__(self, policy_algorithm: str) -> None:
 @@ -50,22 +53,20 @@ class FTS3TapeMetadataPlugin(PolicyPackageAlgorithms):
          if not self._supports(self.ALGORITHM_NAME, policy_algorithm):
              raise ValueError(f'Policy Algorithm {policy_algorithm} not found')
- 
+
 -        if self._supports(self._HINTS_NAME, policy_algorithm):
 -            self._get_one_algorithm(self._HINTS_NAME, name=policy_algorithm)()
 +        if self._supports(self._INIT_FUNC_NAME, policy_algorithm):
 +            init_func = self._get_one_algorithm(self._INIT_FUNC_NAME, name=policy_algorithm)
 +            init_func()
- 
+
          self.set_in_hints = self._get_one_algorithm(self.ALGORITHM_NAME, name=policy_algorithm)
- 
+
      @classmethod
      def _module_init(cls: type[FTS3TapeMetadataPluginType]) -> None:
 -        cls.register(
@@ -66,13 +66,13 @@ index b4c5ebe03..3d04dfe39 100644
          cls.register(cls.DEFAULT, func=lambda x: cls._default(cls, x))  # type: ignore
          cls.register("test", func=lambda x: cls._collocation(cls._test_collocation, x))
 +        cls.register("atlas", func=lambda x: cls._collocation(cls._atlas_collocation, x))
- 
+
      @classmethod
 -    def register(cls: type[FTS3TapeMetadataPluginType], name: str, func: Callable, init_func: Optional[Callable] = None) -> None:
 +    def register(cls: type[FTS3TapeMetadataPluginType], name: str, func: 'Callable', init_func: Optional['Callable'] = None) -> None:
          """
          Register a fts3 transfer plugin
- 
+
 @@ -75,29 +76,7 @@ class FTS3TapeMetadataPlugin(PolicyPackageAlgorithms):
          """
          super()._register(cls.ALGORITHM_NAME, algorithm_dict={name: func})
@@ -101,13 +101,13 @@ index b4c5ebe03..3d04dfe39 100644
 -
 -        return {"scheduling_hints": {"priority": priority}}
 +            super()._register(cls._INIT_FUNC_NAME, algorithm_dict={name: init_func})
- 
+
      @staticmethod
      def _collocation(collocation_func: 'Callable', hints: dict[str, Any]) -> dict[str, dict]:
 @@ -114,6 +93,35 @@ class FTS3TapeMetadataPlugin(PolicyPackageAlgorithms):
      def _test_collocation(**kwargs: dict) -> dict[str, Any]:
          return {"0": "", "1": "", "2": "", "3": ""}
- 
+
 +    @staticmethod
 +    def _atlas_collocation(**hints: dict) -> dict[str, Optional[Union[str, "Iterator[dict[str, Any]]"]]]:
 +        """
@@ -139,7 +139,7 @@ index b4c5ebe03..3d04dfe39 100644
 +
      def _default(self, *hints: dict) -> dict:
          return {}
- 
+
 @@ -139,9 +147,74 @@ class FTS3TapeMetadataPlugin(PolicyPackageAlgorithms):
          :return: Archiving metadata in the format {archive_metadata: {<plugin produced hints>}}
          """
@@ -177,8 +177,8 @@ index b4c5ebe03..3d04dfe39 100644
 +
          self._verify_in_format(hints)
          return {"archive_metadata": hints}
- 
- 
+
+
 +class ActivityBasedTransferPriorityPlugin(FTS3TapeMetadataPlugin):
 +    def __init__(self, policy_algorithm: str = 'activity') -> None:
 +        self.register(
