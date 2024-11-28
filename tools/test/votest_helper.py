@@ -100,7 +100,10 @@ def collect_tests(data: dict, vo: str):
     substitute_keywords = functools.partial(functools.reduce, lambda path, part: path / keyword_path_mapping[part] if part in keyword_path_mapping.keys() else path / part)
     resolve_path_keywords = functools.partial(map, lambda path: substitute_keywords([keyword_path_mapping[Path("rucio_root")]] + [Path(x) for x in Path(path).parts]))
     resolve_paths = functools.partial(map, lambda path: glob.glob(f"{path}/test_*.py") if path.is_dir() else [str(path)])
-    combine_paths = lambda all_paths: itertools.chain.from_iterable(all_paths)
+
+    def combine_paths(all_paths):
+        return itertools.chain.from_iterable(all_paths)
+
     filter_paths = functools.partial(filter, lambda path: Path(path).is_file())
     tests = get_config(data=data, vo=vo, section="tests")
     allowed_paths = set(filter_paths(combine_paths(resolve_paths(resolve_path_keywords(tests.get('allow', []))))))

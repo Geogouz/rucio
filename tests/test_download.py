@@ -155,8 +155,9 @@ def test_overlapping_containers_and_wildcards(rse_factory, did_factory, download
 
     with TemporaryDirectory() as tmp_dir:
         # Verify that wildcard resolution works correctly
-        result = download_client.download_dids([{'did': '%s:%sdataset_*' % (did_factory.default_scope, did_factory.name_prefix), 'base_dir': tmp_dir},
-                                                {'did': container_str, 'base_dir': tmp_dir}])
+        result = download_client.download_dids(
+            [{'did': '%s:%sdataset_*' % (did_factory.default_scope, did_factory.name_prefix), 'base_dir': tmp_dir},
+             {'did': container_str, 'base_dir': tmp_dir}])
         assert len(result) == len(dids)
 
     with TemporaryDirectory() as tmp_dir:
@@ -264,7 +265,8 @@ def test_download_multiple(rse_factory, did_factory, download_client):
         )
 
         # Download with filter
-        result = download_client.download_dids([{'filters': {'guid': item000['guid'], 'scope': scope}, 'base_dir': tmp_dir}])
+        result = download_client.download_dids(
+            [{'filters': {'guid': item000['guid'], 'scope': scope}, 'base_dir': tmp_dir}])
         _check_download_result(
             actual_result=result,
             expected_result=[
@@ -275,7 +277,8 @@ def test_download_multiple(rse_factory, did_factory, download_client):
         )
 
         # Download with wildcard and name
-        result = download_client.download_dids([{'did': '%s:*' % scope, 'filters': {'guid': item100['guid']}, 'base_dir': tmp_dir}])
+        result = download_client.download_dids(
+            [{'did': '%s:*' % scope, 'filters': {'guid': item100['guid']}, 'base_dir': tmp_dir}])
         _check_download_result(
             actual_result=result,
             expected_result=[
@@ -287,7 +290,8 @@ def test_download_multiple(rse_factory, did_factory, download_client):
         )
 
         # Don't create subdirectories by scope
-        result = download_client.download_dids([{'did': '%s:%s.*' % (scope, base_name), 'base_dir': tmp_dir, 'no_subdir': True}])
+        result = download_client.download_dids(
+            [{'did': '%s:%s.*' % (scope, base_name), 'base_dir': tmp_dir, 'no_subdir': True}])
         _check_download_result(
             actual_result=result,
             expected_result=[
@@ -324,7 +328,8 @@ def test_download_multiple(rse_factory, did_factory, download_client):
 
 
 @pytest.mark.dirty
-@pytest.mark.noparallel(reason='uses pre-defined XRD1 RSE, may fails when run in parallel')  # TODO: verify if it really fails
+@pytest.mark.noparallel(
+    reason='uses pre-defined XRD1 RSE, may fails when run in parallel')  # TODO: verify if it really fails
 @skip_rse_tests_with_accounts
 def test_download_from_archive_on_xrd(did_factory, download_client, did_client):
     scope = 'test'
@@ -348,8 +353,10 @@ def test_download_from_archive_on_xrd(did_factory, download_client, did_client):
             scope,
             zip_name,
             [
-                {'scope': scope, 'name': name000, 'bytes': len(data000), 'type': 'FILE', 'adler32': adler000, 'meta': {'guid': str(generate_uuid())}},
-                {'scope': scope, 'name': name001, 'bytes': len(data001), 'type': 'FILE', 'adler32': adler001, 'meta': {'guid': str(generate_uuid())}},
+                {'scope': scope, 'name': name000, 'bytes': len(data000), 'type': 'FILE', 'adler32': adler000,
+                 'meta': {'guid': str(generate_uuid())}},
+                {'scope': scope, 'name': name001, 'bytes': len(data001), 'type': 'FILE', 'adler32': adler001,
+                 'meta': {'guid': str(generate_uuid())}},
             ],
         )
 
@@ -387,7 +394,8 @@ def test_download_from_archive_on_xrd(did_factory, download_client, did_client):
 
         pfn = next(filter(lambda r: name001 in r['did'], result))['sources'][0]['pfn']
         # Download by pfn from the archive
-        result = download_client.download_pfns([{'did': '%s:%s' % (scope, name001), 'pfn': pfn, 'rse': rse, 'base_dir': tmp_dir, 'no_subdir': True}])
+        result = download_client.download_pfns(
+            [{'did': '%s:%s' % (scope, name001), 'pfn': pfn, 'rse': rse, 'base_dir': tmp_dir, 'no_subdir': True}])
         _check_download_result(
             actual_result=result,
             expected_result=[
@@ -420,13 +428,15 @@ def test_download_archive_client_extract(rse_factory, did_factory, download_clie
             tar.add(file_path, arcname=name)
         did_factory.upload_test_file(rse, scope=scope, name=tar_name, path=tar_path)
         did_client.add_files_to_archive(scope, tar_name, [
-            {'scope': scope, 'name': name, 'bytes': len(data), 'type': 'FILE', 'adler32': adler32, 'meta': {'guid': str(generate_uuid())}},
+            {'scope': scope, 'name': name, 'bytes': len(data), 'type': 'FILE', 'adler32': adler32,
+             'meta': {'guid': str(generate_uuid())}},
         ])
 
     with TemporaryDirectory() as tmp_dir:
         with pytest.raises(NoFilesDownloaded):
             # If archive resolution is disabled, the download must fail
-            download_client.download_dids([{'did': '%s:%s' % (scope, name), 'base_dir': tmp_dir, 'no_resolve_archives': True}])
+            download_client.download_dids(
+                [{'did': '%s:%s' % (scope, name), 'base_dir': tmp_dir, 'no_resolve_archives': True}])
 
     with TemporaryDirectory() as tmp_dir:
         result = download_client.download_dids([{'did': '%s:%s' % (scope, name), 'base_dir': tmp_dir}])
@@ -446,7 +456,8 @@ def test_trace_copy_out_and_checksum_validation(vo, rse_factory, did_factory, do
         # Try downloading non-existing did
         traces = []
         with pytest.raises(NoFilesDownloaded):
-            download_client.download_dids([{'did': 'some:randomNonExistingDid', 'base_dir': tmp_dir}], traces_copy_out=traces)
+            download_client.download_dids([{'did': 'some:randomNonExistingDid', 'base_dir': tmp_dir}],
+                                          traces_copy_out=traces)
         assert len(traces) == 1 and traces[0]['clientState'] == 'FILE_NOT_FOUND'
 
         # Download specific DID
@@ -473,23 +484,28 @@ def test_trace_copy_out_and_checksum_validation(vo, rse_factory, did_factory, do
         # Wildcards in did name are not allowed on pfn downloads
         traces = []
         with pytest.raises(InputValidationError):
-            download_client.download_pfns([{'did': '%s:*' % scope, 'pfn': pfn, 'rse': rse, 'base_dir': tmp_dir}], traces_copy_out=traces)
+            download_client.download_pfns([{'did': '%s:*' % scope, 'pfn': pfn, 'rse': rse, 'base_dir': tmp_dir}],
+                                          traces_copy_out=traces)
         assert not traces
 
         # Same pfn, but without wildcard in the did should work
         traces = []
-        download_client.download_pfns([{'did': did_str, 'pfn': pfn, 'rse': rse, 'base_dir': tmp_dir}], traces_copy_out=traces)
+        download_client.download_pfns([{'did': did_str, 'pfn': pfn, 'rse': rse, 'base_dir': tmp_dir}],
+                                      traces_copy_out=traces)
         assert len(traces) == 1 and traces[0]['clientState'] == 'DONE'
 
         # Same pfn. Local file already present. Shouldn't be overwritten.
         traces = []
-        download_client.download_pfns([{'did': did_str, 'pfn': pfn, 'rse': rse, 'base_dir': tmp_dir}], traces_copy_out=traces)
+        download_client.download_pfns([{'did': did_str, 'pfn': pfn, 'rse': rse, 'base_dir': tmp_dir}],
+                                      traces_copy_out=traces)
         assert len(traces) == 1 and traces[0]['clientState'] == 'ALREADY_DONE'
 
         # Provide wrong checksum for validation, the file will be re-downloaded but checksum validation fails
         traces = []
         with pytest.raises(NoFilesDownloaded):
-            download_client.download_pfns([{'did': did_str, 'pfn': pfn, 'rse': rse, 'adler32': 'wrong', 'base_dir': tmp_dir}], traces_copy_out=traces)
+            download_client.download_pfns(
+                [{'did': did_str, 'pfn': pfn, 'rse': rse, 'adler32': 'wrong', 'base_dir': tmp_dir}],
+                traces_copy_out=traces)
         assert len(traces) == 1 and traces[0]['clientState'] == 'FAIL_VALIDATE'
 
     # Switch to a new empty directory
@@ -510,14 +526,16 @@ def test_trace_copy_out_and_checksum_validation(vo, rse_factory, did_factory, do
 
         # Ignore_checksum set. Download works.
         traces = []
-        download_client.download_dids([{'did': did_str, 'base_dir': tmp_dir, 'ignore_checksum': True}], traces_copy_out=traces)
+        download_client.download_dids([{'did': did_str, 'base_dir': tmp_dir, 'ignore_checksum': True}],
+                                      traces_copy_out=traces)
         assert len(traces) == 1 and traces[0]['clientState'] == 'DONE'
 
 
 def test_disable_no_files_download_error(vo, rse_factory, did_factory, download_client):
     rse, _ = rse_factory.make_posix_rse()
     with TemporaryDirectory() as tmp_dir:
-        res = download_client.download_dids([{'did': 'some:randomNonExistingDid', 'base_dir': tmp_dir}], deactivate_file_download_exceptions=True)
+        res = download_client.download_dids([{'did': 'some:randomNonExistingDid', 'base_dir': tmp_dir}],
+                                            deactivate_file_download_exceptions=True)
         print('Downloaded object', res)
         assert res[0]['clientState'] == 'FILE_NOT_FOUND'
 
@@ -551,7 +569,9 @@ def test_nrandom_respected(rse_factory, did_factory, download_client, root_accou
     with TemporaryDirectory() as tmp_dir:
         # If a single item is provided, but it resolves to two datasets, only a single file will be downloaded
         nrandom = 1
-        result = download_client.download_dids([{'did': '%s:%sdataset_*' % (did_factory.default_scope, did_factory.name_prefix), 'nrandom': nrandom, 'base_dir': tmp_dir}])
+        result = download_client.download_dids(
+            [{'did': '%s:%sdataset_*' % (did_factory.default_scope, did_factory.name_prefix),
+              'nrandom': nrandom, 'base_dir': tmp_dir}])
         assert len(result) == nrandom
 
     with TemporaryDirectory() as tmp_dir:
@@ -602,7 +622,8 @@ def test_transfer_timeout(rse_factory, did_factory, download_client):
         # transfer_timeout set. transfer_speed_timeout is ignored.
         with TemporaryDirectory() as tmp_dir:
             mocks_get.clear()
-            download_client.download_dids([{'did': did_str, 'base_dir': tmp_dir, 'transfer_timeout': 5, 'transfer_speed_timeout': 1}])
+            download_client.download_dids(
+                [{'did': did_str, 'base_dir': tmp_dir, 'transfer_timeout': 5, 'transfer_speed_timeout': 1}])
             mocks_get[0].assert_called_with(ANY, ANY, transfer_timeout=5)
 
         # 60s static + 2bytes(file size) at 1Bps = 62s
@@ -662,8 +683,9 @@ def test_download_file_with_impl(rse_factory, did_factory, download_client, mock
     }
     did_factory.upload_client.upload([item])
     did_str = '%s:%s' % (mock_scope, name)
-    with patch('rucio.rse.protocols.%s.Default.get' % impl, side_effect=lambda pfn, dest, **kw: shutil.copy(path, dest)) as mock_get, \
-            patch('rucio.rse.protocols.%s.Default.connect' % impl),\
+    with patch('rucio.rse.protocols.%s.Default.get' % impl,
+               side_effect=lambda pfn, dest, **kw: shutil.copy(path, dest)) as mock_get, \
+            patch('rucio.rse.protocols.%s.Default.connect' % impl), \
             patch('rucio.rse.protocols.%s.Default.close' % impl):
         download_client.download_dids([{'did': did_str, 'impl': impl}])
         mock_get.assert_called()
@@ -720,8 +742,9 @@ def test_download_file_with_supported_protocol_from_config(rse_factory, did_fact
     did_factory.upload_client.upload([item])
     did_str = '%s:%s' % (mock_scope, name)
 
-    with patch('rucio.rse.protocols.%s.Default.get' % supported_impl, side_effect=lambda pfn, dest, **kw: shutil.copy(path, dest)) as mock_get, \
-            patch('rucio.rse.protocols.%s.Default.connect' % supported_impl),\
+    with patch('rucio.rse.protocols.%s.Default.get' % supported_impl,
+               side_effect=lambda pfn, dest, **kw: shutil.copy(path, dest)) as mock_get, \
+            patch('rucio.rse.protocols.%s.Default.connect' % supported_impl), \
             patch('rucio.rse.protocols.%s.Default.close' % supported_impl):
         download_client.download_dids([{'did': did_str, 'impl': supported_impl}])
         mock_get.assert_called()
@@ -735,8 +758,8 @@ def test_download_exclude_tape(rse_factory, did_factory, download_client):
 
     # We can not mock the server core code here, so mock the API
     with patch('rucio.client.rseclient.RSEClient.list_rses', return_value=[{'rse': rse}]), \
-         TemporaryDirectory() as tmp_dir, \
-         pytest.raises(NoFilesDownloaded):
+            TemporaryDirectory() as tmp_dir, \
+            pytest.raises(NoFilesDownloaded):
         download_client.download_dids([{'did': did_str, 'base_dir': tmp_dir}])
 
 

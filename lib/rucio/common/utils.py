@@ -58,6 +58,7 @@ if EXTRA_MODULES['paramiko']:
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
+
     T = TypeVar('T')
     HashableKT = TypeVar('HashableKT')
     HashableVT = TypeVar('HashableVT')
@@ -65,7 +66,6 @@ if TYPE_CHECKING:
     from sqlalchemy.orm import Session
 
     from rucio.common.types import LoggerFunction
-
 
 # HTTP code dictionary. Not complete. Can be extended if needed.
 codes = {
@@ -177,7 +177,10 @@ def all_oidc_req_claims_present(
         required_scope = ""
     if not required_audience:
         required_audience = ""
-    if (isinstance(scope, list) and isinstance(audience, list) and isinstance(required_scope, list) and isinstance(required_audience, list)):
+    if (isinstance(scope, list)
+            and isinstance(audience, list)
+            and isinstance(required_scope, list)
+            and isinstance(required_audience, list)):
         scope = [str(it) for it in scope]
         audience = [str(it) for it in audience]
         required_scope = [str(it) for it in required_scope]
@@ -185,7 +188,10 @@ def all_oidc_req_claims_present(
         req_scope_present = all(elem in scope for elem in required_scope)
         req_audience_present = all(elem in audience for elem in required_audience)
         return req_scope_present and req_audience_present
-    elif (isinstance(scope, str) and isinstance(audience, str) and isinstance(required_scope, str) and isinstance(required_audience, str)):
+    elif (isinstance(scope, str)
+          and isinstance(audience, str)
+          and isinstance(required_scope, str)
+          and isinstance(required_audience, str)):
         scope = str(scope)
         audience = str(audience)
         required_scope = str(required_scope)
@@ -193,7 +199,10 @@ def all_oidc_req_claims_present(
         req_scope_present = all(elem in scope.split(separator) for elem in required_scope.split(separator))
         req_audience_present = all(elem in audience.split(separator) for elem in required_audience.split(separator))
         return req_scope_present and req_audience_present
-    elif (isinstance(scope, list) and isinstance(audience, list) and isinstance(required_scope, str) and isinstance(required_audience, str)):
+    elif (isinstance(scope, list)
+          and isinstance(audience, list)
+          and isinstance(required_scope, str)
+          and isinstance(required_audience, str)):
         scope = [str(it) for it in scope]
         audience = [str(it) for it in audience]
         required_scope = str(required_scope)
@@ -201,7 +210,10 @@ def all_oidc_req_claims_present(
         req_scope_present = all(elem in scope for elem in required_scope.split(separator))
         req_audience_present = all(elem in audience for elem in required_audience.split(separator))
         return req_scope_present and req_audience_present
-    elif (isinstance(scope, str) and isinstance(audience, str) and isinstance(required_scope, list) and isinstance(required_audience, list)):
+    elif (isinstance(scope, str)
+          and isinstance(audience, str)
+          and isinstance(required_scope, list)
+          and isinstance(required_audience, list)):
         scope = str(scope)
         audience = str(audience)
         required_scope = [str(it) for it in required_scope]
@@ -232,7 +244,7 @@ def str_to_date(string: str) -> Optional[datetime.datetime]:
 def val_to_space_sep_str(vallist: list[str]) -> str:
     """ Converts a list of values into a string of space separated values
 
-    :param vallist: the list of values to to convert into string
+    :param vallist: the list of values to convert into string
     :return: the string of space separated values or the value initially passed as parameter
     """
     try:
@@ -240,7 +252,7 @@ def val_to_space_sep_str(vallist: list[str]) -> str:
             return str(" ".join(vallist))
         else:
             return str(vallist)
-    except:
+    except Exception:
         return ''
 
 
@@ -253,7 +265,7 @@ def date_to_str(date: datetime.datetime) -> Optional[str]:
 
 
 class APIEncoder(json.JSONEncoder):
-    """ Propretary JSONEconder subclass used by the json render function.
+    """ Proprietary JSONEncoder subclass used by the json render function.
     This is needed to address the encoding of special values.
     """
 
@@ -263,7 +275,7 @@ class APIEncoder(json.JSONEncoder):
             return date_to_str(obj)
         elif isinstance(obj, (datetime.time, datetime.date)):
             # should not happen since the only supported date-like format
-            # supported at dmain schema level is 'datetime' .
+            # supported at domain schema level is 'datetime' .
             return obj.isoformat()
         elif isinstance(obj, datetime.timedelta):
             return obj.days * 24 * 60 * 60 + obj.seconds
@@ -281,7 +293,8 @@ def render_json(*args, **kwargs) -> str:
     elif isinstance(kwargs, dict):
         data = kwargs
     else:
-        raise ValueError("Error while serializing object to JSON-formatted string: supported input types are list or dict.")
+        raise ValueError(
+            "Error while serializing object to JSON-formatted string: supported input types are list or dict.")
     return json.dumps(data, cls=APIEncoder)
 
 
@@ -395,7 +408,8 @@ class NonDeterministicPFNAlgorithms(PolicyPackageAlgorithms):
         """
         super().__init__()
 
-    def construct_non_deterministic_pfn(self, dsn: str, scope: Optional[str], filename: str, naming_convention: str) -> str:
+    def construct_non_deterministic_pfn(self, dsn: str, scope: Optional[str], filename: str,
+                                        naming_convention: str) -> str:
         """
         Calls the correct algorithm to generate a non-deterministic PFN
         """
@@ -416,14 +430,16 @@ class NonDeterministicPFNAlgorithms(PolicyPackageAlgorithms):
         cls.register('def', cls.construct_non_deterministic_pfn_default)
 
     @classmethod
-    def get_algorithm(cls: type[NonDeterministicPFNAlgorithmsT], naming_convention: str) -> 'Callable[[str, Optional[str], str], str]':
+    def get_algorithm(cls: type[NonDeterministicPFNAlgorithmsT],
+                      naming_convention: str) -> 'Callable[[str, Optional[str], str], str]':
         """
         Looks up a non-deterministic PFN algorithm by name
         """
         return super()._get_one_algorithm(cls._algorithm_type, naming_convention)
 
     @classmethod
-    def register(cls: type[NonDeterministicPFNAlgorithmsT], name: str, fn_construct_non_deterministic_pfn: 'Callable[[str, Optional[str], str], Optional[str]]') -> None:
+    def register(cls: type[NonDeterministicPFNAlgorithmsT], name: str,
+                 fn_construct_non_deterministic_pfn: 'Callable[[str, Optional[str], str], Optional[str]]') -> None:
         """
         Register a new non-deterministic PFN algorithm
         """
@@ -509,7 +525,8 @@ class NonDeterministicPFNAlgorithms(PolicyPackageAlgorithms):
 NonDeterministicPFNAlgorithms._module_init_()
 
 
-def construct_non_deterministic_pfn(dsn: str, scope: Optional[str], filename: str, naming_convention: Optional[str] = None) -> str:
+def construct_non_deterministic_pfn(dsn: str, scope: Optional[str], filename: str,
+                                    naming_convention: Optional[str] = None) -> str:
     """
     Applies non-deterministic PFN convention to the given replica.
     use the naming_convention to call the actual function which will do the job.
@@ -556,7 +573,8 @@ class ScopeExtractionAlgorithms(PolicyPackageAlgorithms):
         """
         super().__init__()
 
-    def extract_scope(self, did: str, scopes: Optional['Sequence[str]'], extract_scope_convention: str) -> 'Sequence[str]':
+    def extract_scope(self, did: str, scopes: Optional['Sequence[str]'],
+                      extract_scope_convention: str) -> 'Sequence[str]':
         """
         Calls the correct algorithm for scope extraction
         """
@@ -578,14 +596,16 @@ class ScopeExtractionAlgorithms(PolicyPackageAlgorithms):
         cls.register('dirac', cls.extract_scope_dirac)
 
     @classmethod
-    def get_algorithm(cls: type[ScopeExtractionAlgorithmsT], extract_scope_convention: str) -> 'Callable[[str, Optional[Sequence[str]]], Sequence[str]]':
+    def get_algorithm(cls: type[ScopeExtractionAlgorithmsT],
+                      extract_scope_convention: str) -> 'Callable[[str, Optional[Sequence[str]]], Sequence[str]]':
         """
         Looks up a scope extraction algorithm by name
         """
         return super()._get_one_algorithm(cls._algorithm_type, extract_scope_convention)
 
     @classmethod
-    def register(cls: type[ScopeExtractionAlgorithmsT], name: str, fn_extract_scope: 'Callable[[str, Optional[Sequence[str]]], Sequence[str]]') -> None:
+    def register(cls: type[ScopeExtractionAlgorithmsT], name: str,
+                 fn_extract_scope: 'Callable[[str, Optional[Sequence[str]]], Sequence[str]]') -> None:
         """
         Registers a new scope extraction algorithm
         """
@@ -637,7 +657,9 @@ def extract_scope(
         default_extract: str = 'def'
 ) -> 'Sequence[str]':
     scope_extraction_algorithms = ScopeExtractionAlgorithms()
-    extract_scope_convention = config_get('common', 'extract_scope', False, None) or config_get('policy', 'extract_scope', False, None)
+    extract_scope_convention = config_get('common', 'extract_scope', False, None) or config_get('policy',
+                                                                                                'extract_scope', False,
+                                                                                                None)
     if extract_scope_convention is None or not ScopeExtractionAlgorithms.supports(extract_scope_convention):
         extract_scope_convention = default_extract
     return scope_extraction_algorithms.extract_scope(did, scopes, extract_scope_convention)
@@ -915,7 +937,9 @@ def parse_did_filter_from_string(input_string: str) -> tuple[dict[str, Any], str
                 if value.upper() in ['ALL', 'COLLECTION', 'CONTAINER', 'DATASET', 'FILE']:  # type: ignore
                     type_ = value.lower()  # type: ignore
                 else:
-                    raise InvalidType('{0} is not a valid type. Valid types are {1}'.format(value, ['ALL', 'COLLECTION', 'CONTAINER', 'DATASET', 'FILE']))
+                    raise InvalidType('{0} is not a valid type. Valid types are {1}'.format(value, ['ALL', 'COLLECTION',
+                                                                                                    'CONTAINER',
+                                                                                                    'DATASET', 'FILE']))
             elif key in ('length.gt', 'length.lt', 'length.gte', 'length.lte', 'length'):
                 try:
                     value = int(value)  # type: ignore
@@ -981,17 +1005,17 @@ def parse_did_filter_from_string_fe(
 
     filters = []
     if input_string:
-        or_groups = list(filter(None, input_string.split(';')))     # split <input_string> into OR clauses
+        or_groups = list(filter(None, input_string.split(';')))  # split <input_string> into OR clauses
         for or_group in or_groups:
             or_group = or_group.strip()
-            and_groups = list(filter(None, or_group.split(',')))    # split <or_group> into AND clauses
+            and_groups = list(filter(None, or_group.split(',')))  # split <or_group> into AND clauses
             and_group_filters = {}
             for and_group in and_groups:
                 and_group = and_group.strip()
                 # tokenise this AND clause using operators as delimiters.
                 tokenisation_regex = "({})".format('|'.join(operators_suffix_LUT.keys()))
                 and_group_split_by_operator = list(filter(None, re.split(tokenisation_regex, and_group)))
-                if len(and_group_split_by_operator) == 3:       # this is a one-sided inequality or expression
+                if len(and_group_split_by_operator) == 3:  # this is a one-sided inequality or expression
                     key, operator, value = [token.strip() for token in and_group_split_by_operator]
 
                     # substitute input operator with the nominal operator defined by the LUT, <operators_suffix_LUT>.
@@ -1008,7 +1032,7 @@ def parse_did_filter_from_string_fe(
                         raise DuplicateCriteriaInDIDFilter(filter_key_full)
                     else:
                         and_group_filters[filter_key_full] = value
-                elif len(and_group_split_by_operator) == 5:     # this is a compound inequality
+                elif len(and_group_split_by_operator) == 5:  # this is a compound inequality
                     value1, operator1, key, operator2, value2 = [token.strip() for token in and_group_split_by_operator]
 
                     # substitute input operator with the nominal operator defined by the LUT, <operators_suffix_LUT>.
@@ -1017,9 +1041,9 @@ def parse_did_filter_from_string_fe(
 
                     filter_key1_full = filter_key2_full = key
                     if operator1_mapped is not None and operator2_mapped is not None:
-                        if operator1_mapped:    # ignore '' operator (maps from equals)
+                        if operator1_mapped:  # ignore '' operator (maps from equals)
                             filter_key1_full = "{}.{}".format(key, operator1_mapped)
-                        if operator2_mapped:    # ignore '' operator (maps from equals)
+                        if operator2_mapped:  # ignore '' operator (maps from equals)
                             filter_key2_full = "{}.{}".format(key, operator2_mapped)
                     else:
                         raise DIDFilterSyntaxError("{} operator not understood.".format(operator_mapped))
@@ -1158,11 +1182,13 @@ def get_thread_with_periodic_running_function(
     :param action: Function, that should run periodically.
     :param graceful_stop: Threading event used to check for graceful stop.
     """
+
     def start():
         while not graceful_stop.is_set():
             starttime = time.time()
             action()
             time.sleep(interval - (time.time() - starttime))
+
     t = threading.Thread(target=start)
     return t
 
@@ -1177,7 +1203,8 @@ def run_cmd_process(cmd: str, timeout: int = 3600) -> tuple[int, str]:
     :return: stdout xor stderr, and errorcode
     """
 
-    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, preexec_fn=os.setsid, universal_newlines=True)
+    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, preexec_fn=os.setsid,
+                               universal_newlines=True)
 
     try:
         stdout, stderr = process.communicate(timeout=timeout)
@@ -1262,6 +1289,7 @@ def setup_logger(
     :param logger_level: if not given, fetched from config.
     :param verbose: verbose option set in bin/rucio
     '''
+
     # helper method for cfg check
     def _force_cfg_log_level(cfg_option: str) -> bool:
         cfg_forced_modules = config_get('logging', cfg_option, raise_exception=False, default=None, clean_cached=True,
@@ -1322,7 +1350,9 @@ def setup_logger(
                     formatter = logging.Formatter(os.environ['RUCIO_LOGGING_FORMAT'])
                 hdlr.setFormatter(formatter)
                 return fnc(*args)
+
             return func
+
         hdlr.emit = emit_decorator(hdlr.emit)
         logger.addHandler(hdlr)
 
@@ -1406,7 +1436,9 @@ class StoreAndDeprecateWarningAction(argparse.Action):
         if option_string and option_string != self.new_option_string:
             # The logger gets typically initialized after the argument parser
             # to set the verbosity of the logger. Thus using simple print to console.
-            print("Warning: The commandline argument {} is deprecated! Please use {} in the future.".format(option_string, self.new_option_string))
+            print(
+                "Warning: The commandline argument {} is deprecated! Please use {} in the future.".format(option_string,
+                                                                                                          self.new_option_string))
 
         setattr(namespace, self.dest, values)
 
@@ -1446,7 +1478,9 @@ class StoreTrueAndDeprecateWarningAction(argparse._StoreConstAction):
         if option_string and option_string != self.new_option_string:
             # The logger gets typically initialized after the argument parser
             # to set the verbosity of the logger. Thus using simple print to console.
-            print("Warning: The commandline argument {} is deprecated! Please use {} in the future.".format(option_string, self.new_option_string))
+            print(
+                "Warning: The commandline argument {} is deprecated! Please use {} in the future.".format(option_string,
+                                                                                                          self.new_option_string))
 
 
 class PriorityQueue:
@@ -1459,6 +1493,7 @@ class PriorityQueue:
 
     [1] https://en.wikipedia.org/wiki/Heap_(data_structure)
     """
+
     class ContainerSlot:
         def __init__(self, position: int, priority: int):
             self.pos = position
@@ -1511,7 +1546,8 @@ class PriorityQueue:
         pos_parent = (pos - 1) // 2
         while pos > 0 and self.container[self.heap[pos]].prio < self.container[self.heap[pos_parent]].prio:
             tmp_item, parent = self.heap[pos], self.heap[pos_parent] = self.heap[pos_parent], self.heap[pos]
-            self.container[tmp_item].pos, self.container[parent].pos = self.container[parent].pos, self.container[tmp_item].pos
+            self.container[tmp_item].pos, self.container[parent].pos = (self.container[parent].pos,
+                                                                        self.container[tmp_item].pos)
 
             pos = pos_parent
             pos_parent = (pos - 1) // 2
@@ -1529,11 +1565,13 @@ class PriorityQueue:
         heap_restored = False
         while not heap_restored:
             # find minimum between item, child1, and child2
-            if pos_child1 < heap_len and self.container[self.heap[pos_child1]].prio < self.container[self.heap[pos]].prio:
+            if (pos_child1 < heap_len
+                    and self.container[self.heap[pos_child1]].prio < self.container[self.heap[pos]].prio):
                 pos_min = pos_child1
             else:
                 pos_min = pos
-            if pos_child2 < heap_len and self.container[self.heap[pos_child2]].prio < self.container[self.heap[pos_min]].prio:
+            if (pos_child2 < heap_len
+                    and self.container[self.heap[pos_child2]].prio < self.container[self.heap[pos_min]].prio):
                 pos_min = pos_child2
 
             if pos_min != pos:
@@ -1640,6 +1678,7 @@ def retrying(
     :param wait_fixed: the amount of time to wait in-between two tries
     :param stop_max_attempt_number: maximum number of allowed attempts
     """
+
     def _decorator(fn):
         @wraps(fn)
         def _wrapper(*args, **kwargs):
@@ -1654,7 +1693,9 @@ def retrying(
                     if not retry_on_exception(e):
                         raise
                 time.sleep(wait_fixed / 1000.0)
+
         return _wrapper
+
     return _decorator
 
 

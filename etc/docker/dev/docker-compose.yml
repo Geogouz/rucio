@@ -1,4 +1,3 @@
-version: "3"
 services:
   rucioclient:
     image: docker.io/rucio/rucio-dev:latest-alma9
