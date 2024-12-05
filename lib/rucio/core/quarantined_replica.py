@@ -35,7 +35,7 @@ def add_quarantined_replicas(rse_id: str, replicas: list[dict[str, Any]], *, ses
 
     :param rse_id:      The rse id.
     :param replicas: A list of dicts with the replica information.
-    :param session:  The database session in use.
+    :param session: The database session in use.
     """
 
     # Exclude files that have a registered replica.  This is a

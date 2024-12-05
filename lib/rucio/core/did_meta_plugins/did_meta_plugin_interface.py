@@ -15,8 +15,6 @@
 from abc import ABCMeta, abstractmethod
 from typing import TYPE_CHECKING, Literal
 
-from rucio.db.sqla.session import transactional_session
-
 if TYPE_CHECKING:
     from collections.abc import Iterator
     from typing import Any, Optional, Union
@@ -31,11 +29,24 @@ class DidMetaPlugin(metaclass=ABCMeta):
     Interface for plugins managing metadata of DIDs
     """
 
+    @abstractmethod
     def __init__(self):
         """
         Initializes the plugin
         """
-        pass
+        self._plugin_name = None
+
+    @property
+    def name(self) -> str:
+        """
+        The getter method for the plugin's name.
+
+        :returns: The standardized (uppercase) name of this plugin.
+        :raises AttributeError: If '_plugin_name' is not defined in the subclass.
+        """
+        if self._plugin_name:
+            return self._plugin_name.lower()
+        raise AttributeError("Subclasses of DidMetaPlugin must define the '_plugin_name' attribute.")
 
     @abstractmethod
     def get_metadata(
@@ -48,7 +59,7 @@ class DidMetaPlugin(metaclass=ABCMeta):
         """
         Get data identifier metadata
 
-        :param scope: The scope name.
+        :param scope: The scope of the DID.
         :param name: The data identifier name.
         :param session: The database session in use.
         """
@@ -68,17 +79,16 @@ class DidMetaPlugin(metaclass=ABCMeta):
         """
         Add metadata to data identifier.
 
-        :param scope: The scope name.
+        :param scope: The scope of the DID.
         :param name: The data identifier name.
         :param key: the key.
         :param value: the value.
-        :param did: The data identifier info.
-        :param recursive: Option to propagate the metadata change to content.
+        :param recursive: Instruction to propagate the metadata change recursively to content (False by default).
         :param session: The database session in use.
         """
         pass
 
-    @transactional_session
+    @abstractmethod
     def set_metadata_bulk(
         self,
         scope: "InternalScope",
@@ -91,11 +101,11 @@ class DidMetaPlugin(metaclass=ABCMeta):
         """
         Add metadata to data identifier in bulk.
 
-        :param scope: The scope name.
+        :param scope: The scope of the DID.
         :param name: The data identifier name.
         :param meta: all key-values to set.
         :type meta: dict
-        :param recursive: Option to propagate the metadata change to content.
+        :param recursive: Instruction to propagate the metadata change recursively to content (False by default).
         :param session: The database session in use.
         """
         for key, value in meta.items():
@@ -113,9 +123,9 @@ class DidMetaPlugin(metaclass=ABCMeta):
         """
         Deletes the metadata stored for the given key.
 
-        :param scope: The scope of the did.
-        :param name: The name of the did.
-        :param key: Key of the metadata.
+        :param scope: The scope of the DID.
+        :param name: The data identifier name.
+        :param key: The key to be deleted.
         :param session: The database session in use.
         """
         pass
@@ -137,7 +147,7 @@ class DidMetaPlugin(metaclass=ABCMeta):
         """
         Search data identifiers
 
-        :param scope: the scope name.
+        :param scope: The scope of the DID.
         :param filters: dictionary of attributes by which the results should be filtered.
         :param did_type: the type of the did: all(container, dataset, file), collection(dataset or container), dataset, container, file.
         :param ignore_case: ignore case distinctions.
@@ -158,8 +168,25 @@ class DidMetaPlugin(metaclass=ABCMeta):
     ) -> bool:
         """
         Returns whether key is managed by this plugin or not.
+
         :param key: Key of the metadata.
         :param session: The database session in use.
-        :returns (Boolean)
+        :returns: (Boolean)
         """
         pass
+
+    # TODO: Add proper decorator
+    def supports_metadata_schema(
+        self,
+        meta: any,
+        *,
+        session: "Optional[Session]" = None
+    ) -> bool:
+        """
+        Checks if this plugin supports the provided metadata schema (only plugins that support schema validation need to override this).
+
+        :param meta: The metadata schema to validate
+        :param session: The database session in use.
+        :returns: True if this plugin supports this metadata schema, False otherwise (default)
+        """
+        return False

@@ -28,7 +28,11 @@ from rucio.db.sqla.session import read_session, stream_session, transactional_se
 from rucio.db.sqla.util import json_implemented
 
 if TYPE_CHECKING:
+    from typing import Optional
+
     from sqlalchemy.orm import Session
+
+    from rucio.common.types import InternalScope
 
 
 class JSONDidMeta(DidMetaPlugin):
@@ -38,7 +42,8 @@ class JSONDidMeta(DidMetaPlugin):
 
     def __init__(self):
         super(JSONDidMeta, self).__init__()
-        self.plugin_name = "JSON"
+
+        self._plugin_name = "JSON"
 
     @read_session
     def get_metadata(self, scope, name, *, session: "Session"):
@@ -63,7 +68,7 @@ class JSONDidMeta(DidMetaPlugin):
             meta = getattr(row, 'meta')
             return json_lib.loads(meta) if session.bind.dialect.name in ['oracle', 'sqlite'] else meta
         except NoResultFound:
-            return {}
+            return {}  # TODO: Is this even possible?
 
     @transactional_session
     def set_metadata(self, scope, name, key, value, recursive=False, *, session: "Session"):
@@ -118,13 +123,20 @@ class JSONDidMeta(DidMetaPlugin):
         row_did_meta.save(session=session, flush=True)
 
     @transactional_session
-    def delete_metadata(self, scope, name, key, *, session: "Session"):
+    def delete_metadata(
+        self,
+        scope: "InternalScope",
+        name: str,
+        key: str,
+        *,
+        session: "Optional[Session]" = None
+    ) -> None:
         """
         Delete a key from the metadata column
 
-        :param scope: the scope of did
-        :param name: the name of the did
-        :param key: the key to be deleted
+        :param scope: The scope name.
+        :param name: The data identifier name.
+        :param key: The key to be deleted.
         :param session: The database session in use.
         """
         if not json_implemented(session=session):
@@ -231,10 +243,3 @@ class JSONDidMeta(DidMetaPlugin):
     @read_session
     def manages_key(self, key, *, session: "Session"):
         return json_implemented(session=session)
-
-    def get_plugin_name(self):
-        """
-        Returns a unique identifier for this plugin. This can be later used for filtering down results to this plugin only.
-        :returns: The name of the plugin.
-        """
-        return self.plugin_name

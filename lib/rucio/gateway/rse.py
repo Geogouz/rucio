@@ -499,7 +499,7 @@ def update_distance(source, destination, distance, issuer, vo='def', *, session:
     :param distance: The new distance to set
     :param issuer: The issuer account.
     :param vo: The VO to act on.
-    :param session: The database session to use.
+    :param session: The database session in use.
     """
     kwargs = {'source': source, 'destination': destination}
     auth_result = permission.has_permission(issuer=issuer, vo=vo, action='update_distance', kwargs=kwargs, session=session)

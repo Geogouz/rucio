@@ -217,7 +217,7 @@ def add_rule(
     :param priority:                   Priority of the rule and the transfers which should be submitted.
     :param split_container:            Should a container rule be split into individual dataset rules.
     :param meta:                       Dictionary with metadata from the WFMS.
-    :param session:                    The database session in use.
+    :param session: The database session in use.
     :param logger:                     Optional decorated logger that can be passed from the calling daemons or servers.
     :returns:                          A list of created replication rule ids.
     :raises:                           InvalidReplicationRule, InsufficientAccountLimit, InvalidRSEExpression, DataIdentifierNotFound, ReplicationRuleCreationTemporaryFailed, InvalidRuleWeight,
@@ -490,7 +490,7 @@ def add_rules(
     :params dids:    List of data identifiers.
     :param rules:    List of dictionaries defining replication rules.
                      {account, copies, rse_expression, grouping, weight, lifetime, locked, subscription_id, source_replica_expression, activity, notify, purge_replicas}
-    :param session:  The database session in use.
+    :param session: The database session in use.
     :param logger:   Optional decorated logger that can be passed from the calling daemons or servers.
     :returns:        Dictionary (scope, name) with list of created rule ids
     :raises:         InvalidReplicationRule, InsufficientAccountLimit, InvalidRSEExpression, DataIdentifierNotFound, ReplicationRuleCreationTemporaryFailed, InvalidRuleWeight,
@@ -799,7 +799,7 @@ def inject_rule(
 
     :param rule_id:    The id of the rule to inject.
     :param new_owner:  The new owner of the rule.
-    :param session:    The database session in use.
+    :param session: The database session in use.
     :param logger:     Optional decorated logger that can be passed from the calling daemons or servers.
     :raises:           InvalidReplicationRule, InsufficientAccountLimit, InvalidRSEExpression, DataId, RSEOverQuota
     """
@@ -1150,7 +1150,7 @@ def delete_rule(
     :param soft:              Only perform a soft deletion.
     :param delete_parent:     Delete rules even if they have a child_rule_id set.
     :param nowait:            Nowait parameter for the FOR UPDATE statement.
-    :param session:           The database session in use.
+    :param session: The database session in use.
     :param ignore_rule_lock:  Ignore any locks on the rule
     :raises:                  RuleNotFound if no Rule can be found.
     :raises:                  UnsupportedOperation if the Rule is locked.
@@ -1250,7 +1250,7 @@ def repair_rule(
     Repair a STUCK replication rule.
 
     :param rule_id:   The rule to repair.
-    :param session:   The database session in use.
+    :param session: The database session in use.
     :param logger:    Optional decorated logger that can be passed from the calling daemons or servers.
     """
 
@@ -1593,7 +1593,7 @@ def update_rule(
 
     :param rule_id:     The rule_id to lock.
     :param options:     Dictionary of options
-    :param session:     The database session in use.
+    :param session: The database session in use.
     :raises:            RuleNotFound if no Rule can be found, InputValidationError if invalid option is used, ScratchDiskLifetimeConflict if wrong ScratchDiskLifetime is used.
     """
 
@@ -1902,7 +1902,7 @@ def reduce_rule(
     :param rule_id:             Rule to be reduced.
     :param copies:              Number of copies of the new rule.
     :param exclude_expression:  RSE Expression of RSEs to exclude.
-    :param session:             The DB Session.
+    :param session: The database session in use.
     :raises:                    RuleReplaceFailed, RuleNotFound
     """
     try:
@@ -1984,7 +1984,7 @@ def move_rule(
     :param rule_id:                    Rule to be moved.
     :param rse_expression:             RSE expression of the new rule.
     :param override:                   Configurations to update for the new rule.
-    :param session:                    The DB Session.
+    :param session: The database session in use.
     :raises:                           RuleNotFound, RuleReplaceFailed, InvalidRSEExpression
     """
     override = override or {}
@@ -2064,7 +2064,7 @@ def re_evaluate_did(
     :param scope:                   The scope of the did to be re-evaluated.
     :param name:                    The name of the did to be re-evaluated.
     :param rule_evaluation_action:  The Rule evaluation action.
-    :param session:                 The database session in use.
+    :param session: The database session in use.
     :raises:                        DataIdentifierNotFound
     """
 
@@ -2122,7 +2122,7 @@ def get_updated_dids(
     :param worker_number:      id of the executing worker.
     :param limit:              Maximum number of dids to return.
     :param blocked_dids:       Blocked dids to filter.
-    :param session:            Database session in use.
+    :param session: The database session in use.
     """
     blocked_dids = blocked_dids or []
     stmt = select(
@@ -2173,7 +2173,7 @@ def get_rules_beyond_eol(
     :param date_check:         The reference date that should be compared to eol_at.
     :param worker_number:      id of the executing worker.
     :param total_workers:      Number of total workers.
-    :param session:            Database session in use.
+    :param session: The database session in use.
     """
     stmt = select(
         models.ReplicationRule.scope,
@@ -2208,7 +2208,7 @@ def get_expired_rules(
     :param worker_number:      id of the executing worker.
     :param limit:              Maximum number of rules to return.
     :param blocked_rules:      List of blocked rules.
-    :param session:            Database session in use.
+    :param session: The database session in use.
     """
 
     blocked_rules = blocked_rules or []
@@ -2258,7 +2258,7 @@ def get_injected_rules(
     :param worker_number:      id of the executing worker.
     :param limit:              Maximum number of rules to return.
     :param blocked_rules:      Blocked rules not to include.
-    :param session:            Database session in use.
+    :param session: The database session in use.
     """
 
     blocked_rules = blocked_rules or []

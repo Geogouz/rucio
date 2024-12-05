@@ -44,7 +44,7 @@ def add_messages(messages: "MessagesListType", *, session: "Session") -> None:
     In the case of nolimit, a placeholder string is written to the NOT NULL payload column.
 
     :param messages: A list of dictionaries {'event_type': str, 'payload': dict}
-    :param session: The database session to use.
+    :param session: The database session in use.
     """
     services = []
     for service in config_get_list('hermes', 'services_list', raise_exception=False, default='activemq,email', session=session):
@@ -89,7 +89,7 @@ def add_message(event_type: str, payload: dict, *, session: "Session") -> None:
 
     :param event_type: The type of the event as a string, e.g., NEW_DID.
     :param payload: The message payload. Will be persisted as JSON.
-    :param session: The database session to use.
+    :param session: The database session in use.
     """
     add_messages([{'event_type': event_type, 'payload': payload}], session=session)
 
@@ -111,7 +111,7 @@ def retrieve_messages(bulk: int = 1000,
     :param event_type: Return only specified event_type. If None, returns everything.
     :param lock: Select exclusively some rows.
     :param old_mode: If True, doesn't return email if event_type is None.
-    :param session: The database session to use.
+    :param session: The database session in use.
 
     :returns messages: List of dictionaries {id, created_at, event_type, payload, services}
     """
@@ -233,7 +233,7 @@ def truncate_messages(*, session: "Session") -> None:
     """
     Delete all stored messages. This is for internal purposes only.
 
-    :param session: The database session to use.
+    :param session: The database session in use.
     """
 
     try:
@@ -254,7 +254,7 @@ def update_messages_services(messages: "MessagesListType", services: str, *, ses
 
     :param messages: The messages to delete as a list of dictionaries.
     :param services: A coma separated string containing the list of services to report to.
-    :param session: The database session to use.
+    :param session: The database session in use.
     """
     message_condition = []
     for message in messages:

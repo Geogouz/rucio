@@ -441,7 +441,7 @@ class FilterEngine:
         The logic for construction of syntax describing a filter for key is dependent on whether the key has been previously coerced to a model attribute (i.e. key
         is a table column).
 
-        :param session: The database session.
+        :param session: The database session in use.
         :param additional_model_attributes: Additional model attributes to retrieve.
         :param additional_filters: Additional filters to be applied to all clauses.
         :param json_column: Column to be checked if filter key has not been coerced to a model attribute. Only valid if engine instantiated with strict_coerce=False.
