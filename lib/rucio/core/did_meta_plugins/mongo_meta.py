@@ -46,28 +46,40 @@ class MongoDidMeta(DidMetaPlugin):
         password: "Optional[str]" = None,
     ):
         super(MongoDidMeta, self).__init__()
-        if host is None:
-            host = config.config_get('metadata', 'mongo_service_host')
-        if port is None:
-            port = config.config_get_int('metadata', 'mongo_service_port')
-        if db is None:
-            db = config.config_get('metadata', 'mongo_db')
-        if collection is None:
-            collection = config.config_get('metadata', 'mongo_collection')
 
-        if user is None and config.config_has_section("metadata"):
-            user = config.config_get("metadata", "mongo_user", default=None)
+        # Validate required parameters.
+        con_params = {
+            'mongo_service_host': host,
+            'mongo_service_port': port,
+            'mongo_db': db,
+            'mongo_collection': collection,
+        }
 
-        if user is not None:
-            if password is None:
-                password = config.config_get("metadata", "mongo_password")
-            auth = "{user}:{password}@".format(user=user, password=password)
-        else:
-            auth = ""
+        for param in con_params:
+            if con_params[param] is None:
+                if config.config_has_option('metadata', param):
+                    con_params[param] = (
+                        config.config_get_int('metadata', param)
+                        if param == 'mongo_service_port'
+                        else config.config_get('metadata', param)
+                    )
+                else:
+                    raise exception.MissingClientParameter(f"Parameter '{param}' not found!")
 
-        self.client = pymongo.MongoClient("mongodb://{auth}{host}:{port}/".format(auth=auth, host=host, port=port))
-        self.db = self.client[db]
-        self.col = self.db[collection]
+        if user is None and config.config_has_option('metadata', 'mongo_user'):
+            user = config.config_get('metadata', 'mongo_user', default=None)
+
+        if password is None and config.config_has_option('metadata', 'mongo_password'):
+            password = config.config_get('metadata', 'mongo_password')
+
+        # Set the auth (fallback to an anonymous connection if either user or password is not defined).
+        auth = "" if not user or not password else f"{user}:{password}@"
+
+        self.client = pymongo.MongoClient(
+            f"mongodb://{auth}{con_params['mongo_service_host']}:{con_params['mongo_service_port']}/"
+        )
+        self.db = self.client[con_params['mongo_db']]
+        self.col = self.db[con_params['mongo_collection']]
 
         self._plugin_name = "MONGO"
 
