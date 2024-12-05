@@ -1372,7 +1372,7 @@ def get_rse_protocols(rse_id, schemes=None, *, session: "Session") -> types.RSES
 
     :param rse_id: The id of the rse.
     :param schemes: a list of schemes to filter by.
-    :param session: The database session.
+    :param session: The database session in use.
 
     :returns: A dict with RSE information and supported protocols
 
@@ -1483,7 +1483,7 @@ def get_rse_info(rse_id, *, session: "Session") -> types.RSESettingsDict:
     a cached call to get_rse_protocols without any schemes set.
 
     :param rse_id: The id of the rse.
-    :param session: The database session.
+    :param session: The database session in use.
     :returns: A dict with RSE information and supported protocols
     """
     key = 'rse_info_%s' % rse_id

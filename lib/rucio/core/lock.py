@@ -43,7 +43,7 @@ def get_dataset_locks(scope: InternalScope, name: str, *, session: "Session") ->
 
     :param scope:          Scope of the dataset.
     :param name:           Name of the dataset.
-    :param session:        The db session.
+    :param session: The database session in use.
     :return:               List of dicts {'rse_id': ..., 'state': ...}
     """
 
@@ -82,7 +82,7 @@ def get_dataset_locks_bulk(dids: "Iterable[dict[str, Any]]", *, session: "Sessio
 
     :param dids:           List of dictionaries {"scope":scope(type:InternalScope), "name":name,
                            "type":did type(DIDType.DATASET or DIDType.CONTAINER)}, "type" is optional
-    :param session:        The db session to use.
+    :param session: The database session in use.
     :return:               Generator of lock_info dicts, may contain duplicates
     """
 
@@ -117,7 +117,7 @@ def get_dataset_locks_by_rse_id(rse_id: str, *, session: "Session") -> "Iterator
     Get the dataset locks of an RSE.
 
     :param rse_id:         RSE id to get the locks from.
-    :param session:        The db session.
+    :param session: The database session in use.
     :return:               List of dicts {'rse_id': ..., 'state': ...}
     """
     stmt = select(
@@ -160,7 +160,7 @@ def get_replica_locks(scope: InternalScope, name: str, nowait: bool = False, res
     :param name:           Name of the did.
     :param nowait:         Nowait parameter for the FOR UPDATE statement.
     :param restrict_rses:  Possible RSE_ids to filter on.
-    :param session:        The db session.
+    :param session: The database session in use.
     :return:               List of dicts {'rse': ..., 'state': ...}
     :raises:               NoResultFound
     """
@@ -192,7 +192,7 @@ def get_replica_locks_for_rule_id(rule_id: str, *, session: "Session") -> list[d
     Get the active replica locks for a rule_id.
 
     :param rule_id:        Filter on rule_id.
-    :param session:        The db session.
+    :param session: The database session in use.
     :return:               List of dicts {'scope':, 'name':, 'rse': ..., 'state': ...}
     :raises:               NoResultFound
     """
@@ -222,7 +222,7 @@ def get_replica_locks_for_rule_id_per_rse(rule_id: str, *, session: "Session") -
     Get the active replica locks for a rule_id per rse.
 
     :param rule_id:        Filter on rule_id.
-    :param session:        The db session.
+    :param session: The database session in use.
     :return:               List of dicts {'rse_id':, 'rse':}
     :raises:               NoResultFound
     """
@@ -258,7 +258,7 @@ def get_files_and_replica_locks_of_dataset(scope: InternalScope, name: str, nowa
     :param only_stuck:     If true, only get STUCK locks.
     :param total_threads:  Total threads
     :param thread_id:      This thread
-    :param session:        The db session.
+    :param session: The database session in use.
     :return:               Dictionary with keys: (scope, name)
                            and as value: [LockObject]
     :raises:               NoResultFound
@@ -338,7 +338,7 @@ def successful_transfer(scope: InternalScope, name: str, rse_id: str, nowait: bo
     :param name:     Name of the did
     :param rse_id:   RSE id
     :param nowait:   Nowait parameter for the for_update queries.
-    :param session:  DB Session.
+    :param session: The database session in use.
     """
 
     stmt = select(
@@ -433,7 +433,7 @@ def failed_transfer(scope: InternalScope, name: str, rse_id: str, error_message:
     :param broken_rule_id:  Id of the rule which will be suspended.
     :param broken_message:  Error message for the suspended rule.
     :param nowait:          Nowait parameter for the for_update queries.
-    :param session:         The database session in use.
+    :param session: The database session in use.
     """
 
     staging_required = get_rse_attribute(rse_id, RseAttr.STAGING_REQUIRED, session=session)

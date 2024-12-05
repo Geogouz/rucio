@@ -64,4 +64,8 @@ fi
 
 update-ca-trust
 
+# Uninstall psycopg2-binary and install psycopg[binary, pool]==3.2.3
+pip uninstall -y psycopg2-binary
+pip install "psycopg[binary, pool]==3.2.3"
+
 exec "$@"

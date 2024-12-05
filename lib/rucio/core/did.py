@@ -135,7 +135,7 @@ def add_did(
     """
     Add data identifier.
 
-    :param scope: The scope name.
+    :param scope: The scope of the DID.
     :param name: The data identifier name.
     :param did_type: The data identifier type.
     :param account: The account owner.
@@ -261,7 +261,7 @@ def attach_dids(
     """
     Append data identifier.
 
-    :param scope: The scope name.
+    :param scope: The scope of the DID.
     :param name: The data identifier name.
     :param dids: The content.
     :param account: The account owner.
@@ -543,13 +543,13 @@ def __add_files_to_dataset(
     """
     Add files to dataset.
 
-    :param parent_did:         the DataIdentifier object of the parent did
-    :param files_temp_table:   Temporary table containing the scope and name of files to add.
-    :param account:            The account owner.
-    :param rse_id:             The RSE id for the replicas.
-    :param ignore_duplicate:   If True, ignore duplicate entries.
-    :param session:            The database session in use.
-    :returns:                  List of files attached (excluding the ones that were already attached to the dataset).
+    :param parent_did: the DataIdentifier object of the parent did
+    :param files_temp_table: Temporary table containing the scope and name of files to add.
+    :param account: The account owner.
+    :param rse_id: The RSE id for the replicas.
+    :param ignore_duplicate: If True, ignore duplicate entries.
+    :param session: The database session in use.
+    :returns: List of files attached (excluding the ones that were already attached to the dataset).
     """
     # Get metadata from dataset
     try:
@@ -781,13 +781,13 @@ def delete_dids(
     """
     Delete data identifiers
 
-    :param dids:          The list of dids to delete.
-    :param account:       The account.
-    :param expire_rules:  Expire large rules instead of deleting them right away. This should only be used in Undertaker mode, as it can be that
-                          the method returns normally, but a did was not deleted; This trusts in the fact that the undertaker will retry an
-                          expired did.
-    :param session:       The database session in use.
-    :param logger:        Optional decorated logger that can be passed from the calling daemons or servers.
+    :param dids: The list of dids to delete.
+    :param account: The account.
+    :param expire_rules: Expire large rules instead of deleting them right away. This should only be used in Undertaker
+                           mode, as it can be that the method returns normally, but a 'DID' was not deleted; This trusts
+                           in the fact that the undertaker will retry an expired did.
+    :param session: The database session in use.
+    :param logger: Optional decorated logger that can be passed from the calling daemons or servers.
     """
     if not dids:
         return
@@ -1162,7 +1162,7 @@ def detach_dids(
     """
     Detach data identifier
 
-    :param scope: The scope name.
+    :param scope: The scope of the DID.
     :param name: The data identifier name.
     :param dids: The content.
     :param session: The database session in use.
@@ -1388,7 +1388,7 @@ def list_content(
     """
     List data identifier contents.
 
-    :param scope: The scope name.
+    :param scope: The scope of the DID.
     :param name: The data identifier name.
     :param session: The database session in use.
     """
@@ -1422,7 +1422,7 @@ def list_content_history(
     """
     List data identifier contents history.
 
-    :param scope: The scope name.
+    :param scope: The scope of the DID.
     :param name: The data identifier name.
     :param session: The database session in use.
     """
@@ -1454,12 +1454,12 @@ def list_parent_dids(
     """
     List parent datasets and containers of a did.
 
-    :param scope:     The scope.
-    :param name:      The name.
-    :param order_by:  List of parameters to order the query by. Possible values: ['scope', 'name', 'did_type', 'created_at'].
-    :param session:   The database session.
-    :returns:         List of dids.
-    :rtype:           Generator.
+    :param scope: The scope of the DID.
+    :param name: The name.
+    :param order_by: List of parameters to order the query by. Possible values: ['scope', 'name', 'did_type', 'created_at'].
+    :param session: The database session in use.
+    :returns: List of dids.
+    :rtype: Generator.
     """
 
     if order_by is None:
@@ -1493,11 +1493,11 @@ def list_all_parent_dids(
     """
     List all parent datasets and containers of a did, no matter on what level.
 
-    :param scope:     The scope.
-    :param name:      The name.
-    :param session:   The database session.
-    :returns:         List of dids.
-    :rtype:           Generator.
+    :param scope: The scope of the DID.
+    :param name: The name.
+    :param session: The database session in use.
+    :returns: List of dids.
+    :rtype: Generator.
     """
 
     stmt = select(
@@ -1636,11 +1636,11 @@ def list_child_datasets(
     """
     List all child datasets of a container.
 
-    :param scope:     The scope.
-    :param name:      The name.
-    :param session:   The database session
-    :returns:         List of dids
-    :rtype:           Generator
+    :param scope: The scope of the DID.
+    :param name: The name.
+    :param session: The database session in use.
+    :returns: List of dids
+    :rtype: Generator
     """
     stmt = list_one_did_childs_stmt(scope, name, did_type=DIDType.DATASET)
     result = []
@@ -1660,9 +1660,9 @@ def bulk_list_files(
     """
     List file contents of a list of data identifier.
 
-    :param dids:       A list of DIDs.
-    :param long:       A boolean to choose if more metadata are returned or not.
-    :param session:    The database session in use.
+    :param dids: A list of DIDs.
+    :param long: A boolean to choose if more metadata are returned or not.
+    :param session: The database session in use.
     """
     for did in dids:
         try:
@@ -1679,10 +1679,10 @@ def list_files(scope: "InternalScope", name: str, long: bool = False, *, session
     """
     List data identifier file contents.
 
-    :param scope:      The scope name.
-    :param name:       The data identifier name.
-    :param long:       A boolean to choose if more metadata are returned or not.
-    :param session:    The database session in use.
+    :param scope: The scope of the DID.
+    :param name: The data identifier name.
+    :param long: A boolean to choose if more metadata are returned or not.
+    :param session: The database session in use.
     """
     try:
         stmt = select(
@@ -1802,7 +1802,7 @@ def scope_list(
     """
     List data identifiers in a scope.
 
-    :param scope: The scope name.
+    :param scope: The scope of the DID.
     :param session: The database session in use.
     :param name: The data identifier name.
     :param recursive: boolean, True or False.
@@ -1908,7 +1908,7 @@ def get_did(scope: "InternalScope", name: str, dynamic_depth: "Optional[DIDType]
     """
     Retrieve a single data identifier.
 
-    :param scope: The scope name.
+    :param scope: The scope of the DID.
     :param name: The data identifier name.
     :param dynamic_depth: the DID type to use as source for estimation of this DIDs length/bytes.
     If set to None, or to a value which doesn't make sense (ex: requesting depth = CONTAINER for a did of type DATASET)
@@ -1938,24 +1938,30 @@ def set_metadata(
     name: str,
     key: str,
     value: Any,
-    did_type: Optional[DIDType] = None,
-    did: Optional["Mapping[str, Any]"] = None,
     recursive: bool = False,
+    plugin: str = "all",
     *,
     session: "Session"
 ) -> None:
     """
-    Add single metadata to a data identifier.
+    Add single metadata key:value entry to a DID.
 
-    :param scope: The scope name.
+    :param scope: The scope of the DID.
     :param name: The data identifier name.
     :param key: the key.
     :param value: the value.
-    :param did: The data identifier info.
-    :param recursive: Option to propagate the metadata change to content.
+    :param recursive: Instruction to propagate the metadata change recursively to content (False by default).
+    :param plugin: The selected backend metadata plugin to handle the operation ("all" by default)
     :param session: The database session in use.
     """
-    did_meta_plugins.set_metadata(scope=scope, name=name, key=key, value=value, recursive=recursive, session=session)
+    if plugin.lower() != "all":
+        did_meta_plugins.set_metadata_atomic(
+            scope=scope, name=name, key=key, value=value, recursive=recursive, plugin=plugin, session=session
+        )
+    else:
+        did_meta_plugins.set_metadata(
+            scope=scope, name=name, key=key, value=value, recursive=recursive, plugin=plugin, session=session
+        )
 
 
 @transactional_session
@@ -1964,38 +1970,47 @@ def set_metadata_bulk(
     name: str,
     meta: "Mapping[str, Any]",
     recursive: bool = False,
+    plugin: str = "all",
     *,
     session: "Session"
 ) -> None:
     """
-    Add metadata to a data identifier.
+    Add metadata entries (key-value pairs) to a DID, with option to perform this recursively to all its children.
+    By default, all plugins are being considered (a single plugin can also be specified).
 
-    :param scope: The scope name.
+    :param scope: The scope of the DID.
     :param name: The data identifier name.
     :param meta: the key-values.
-    :param recursive: Option to propagate the metadata change to content.
+    :param recursive: Instruction to propagate the metadata change recursively to content (False by default).
+    :param plugin: The selected backend metadata plugin to handle the operation ("all" by default)
     :param session: The database session in use.
     """
-    did_meta_plugins.set_metadata_bulk(scope=scope, name=name, meta=meta, recursive=recursive, session=session)
+
+    did_meta_plugins.set_metadata_bulk(
+        scope=scope, name=name, meta=meta, recursive=recursive, plugin=plugin, session=session
+    )
 
 
 @transactional_session
 def set_dids_metadata_bulk(
-    dids: "Iterable[Mapping[str, Any]]",
+    dids: "Sequence[Mapping[str, Any]]",
     recursive: bool = False,
     *,
     session: "Session"
 ) -> None:
     """
-    Add metadata to a list of data identifiers.
+    Add metadata entries (key-value pairs) to a sequence of DIDs,
+    with option to perform this recursively to all their children.
 
     :param dids: A list of dids including metadata.
-    :param recursive: Option to propagate the metadata change to content.
+    :param recursive: Instruction to propagate the metadata change recursively to content (False by default).
     :param session: The database session in use.
     """
 
     for did in dids:
-        did_meta_plugins.set_metadata_bulk(scope=did['scope'], name=did['name'], meta=did['meta'], recursive=recursive, session=session)
+        did_meta_plugins.set_metadata_bulk(
+            scope=did['scope'], name=did['name'], meta=did['meta'], recursive=recursive, session=session
+        )
 
 
 @read_session
@@ -2007,13 +2022,14 @@ def get_metadata(
     session: "Session"
 ) -> dict[str, Any]:
     """
-    Get data identifier metadata
+    Returns a dictionary holding all metadata available for a given DID with optional plugin selection ("all" can be
+    used as a plugin option).
 
-    :param scope: The scope name.
+    :param scope: The scope of the DID.
     :param name: The data identifier name.
+    :param plugin: The selected backend metadata plugin to handle the operation ("DID_COLUMN" by default)
     :param session: The database session in use.
-
-    :returns: List of HARDCODED metadata for did.
+    :returns: Dictionary containing metadata for the DID.
     """
     return did_meta_plugins.get_metadata(scope, name, plugin=plugin, session=session)
 
@@ -2027,10 +2043,10 @@ def list_parent_dids_bulk(
     """
     List parent datasets and containers of a did.
 
-    :param dids:               A list of dids.
-    :param session:            The database session in use.
-    :returns:                  List of dids.
-    :rtype:                    Generator.
+    :param dids: A list of dids.
+    :param session: The database session in use.
+    :returns: List of dids.
+    :rtype: Generator.
     """
     condition = []
     for did in dids:
@@ -2056,16 +2072,19 @@ def list_parent_dids_bulk(
 
 @stream_session
 def get_metadata_bulk(
-    dids: list["Mapping[Any, Any]"],
+    dids: 'Sequence[dict[str, Any]]',
     inherit: bool = False,
     *,
     session: "Session"
 ) -> "Iterator[dict[str, Any]]":
     """
-    Get metadata for a list of dids
-    :param dids:               A list of dids.
-    :param inherit:            A boolean. If set to true, the metadata of the parent are concatenated.
-    :param session:            The database session in use.
+    Returns an iterator of metadata dictionaries for multiple DIDs, with optional inheritance from parent DIDs.
+    When inheritance is enabled, metadata from parent DIDs is included (using the JSON plugin), with child
+    metadata taking precedence. When inheritance is disabled, yields direct DID metadata from the database.
+
+    :param dids: A list of dids.
+    :param inherit: A boolean. If set to true, the metadata of the parent are concatenated.
+    :param session: The database session in use.
     """
     if inherit:
         parent_list = []
@@ -2140,7 +2159,7 @@ def delete_metadata(
     """
     Delete a key from the metadata column
 
-    :param scope: the scope of did
+    :param scope: The scope of the DID.
     :param name: the name of the did
     :param key: the key to be deleted
     """
@@ -2158,10 +2177,10 @@ def set_status(
     """
     Set data identifier status
 
-    :param scope: The scope name.
+    :param scope: The scope of the DID.
     :param name: The data identifier name.
     :param session: The database session in use.
-    :param kwargs:  Keyword arguments of the form status_name=value.
+    :param kwargs: Keyword arguments of the form status_name=value.
     """
     statuses = ['open', ]
     reevaluate_dids_at_close = config_get_bool('subscriptions', 'reevaluate_dids_at_close', raise_exception=False, default=False, session=session)
@@ -2278,7 +2297,7 @@ def list_dids(
     """
     Search data identifiers.
 
-    :param scope: the scope name.
+    :param scope: The scope of the DID.
     :param filters: dictionary of attributes by which the results should be filtered.
     :param did_type: the type of the did: all(container, dataset, file), collection(dataset or container), dataset, container, file.
     :param ignore_case: ignore case distinctions.
@@ -2301,9 +2320,9 @@ def get_did_atime(
 ) -> datetime:
     """
     Get the accessed_at timestamp for a did. Just for testing.
-    :param scope: the scope name.
+    :param scope: The scope of the DID.
     :param name: The data identifier name.
-    :param session: Database session to use.
+    :param session: The database session in use.
 
     :returns: A datetime timestamp with the last access time.
     """
@@ -2325,9 +2344,9 @@ def get_did_access_cnt(
 ) -> int:
     """
     Get the access_cnt for a did. Just for testing.
-    :param scope: the scope name.
+    :param scope: The scope of the DID.
     :param name: The data identifier name.
-    :param session: Database session to use.
+    :param session: The database session in use.
 
     :returns: A datetime timestamp with the last access time.
     """
@@ -2349,7 +2368,7 @@ def get_dataset_by_guid(
     """
     Get the parent datasets for a given GUID.
     :param guid: The GUID.
-    :param session: Database session to use.
+    :param session: The database session in use.
 
     :returns: A did.
     """
@@ -2518,7 +2537,11 @@ def __resolve_bytes_length_events_did(
 
 
 @transactional_session
-def resurrect(dids: "Iterable[Mapping[str, Any]]", *, session: "Session") -> None:
+def resurrect(
+        dids: "Iterable[Mapping[str, Any]]",
+        *,
+        session: "Session"
+) -> None:
     """
     Resurrect data identifiers.
 
@@ -2587,7 +2610,7 @@ def list_archive_content(
     """
     List archive contents.
 
-    :param scope: The archive scope name.
+    :param scope: The scope of the archive.
     :param name: The archive data identifier name.
     :param session: The database session in use.
     """
@@ -2621,7 +2644,7 @@ def add_did_to_followed(
     """
     Mark a did as followed by the given account
 
-    :param scope: The scope name.
+    :param scope: The scope of the DID.
     :param name: The data identifier name.
     :param account: The account owner.
     :param session: The database session in use.
@@ -2673,9 +2696,9 @@ def get_users_following_did(
     session: "Session"
 ) -> "Iterator[dict[str, InternalAccount]]":
     """
-    Return list of users following a did
+    Returns list of users following a DID
 
-    :param scope: The scope name.
+    :param scope: The scope of the DID.
     :param name: The data identifier name.
     :param session: The database session in use.
     """
@@ -2705,7 +2728,7 @@ def remove_did_from_followed(
     """
     Mark a did as not followed
 
-    :param scope: The scope name.
+    :param scope: The scope of the DID.
     :param name: The data identifier name.
     :param account: The account owner.
     :param session: The database session in use.
@@ -2756,7 +2779,7 @@ def trigger_event(
     """
     Records changes occurring in the did to the FollowEvent table
 
-    :param scope: The scope name.
+    :param scope: The scope of the DID.
     :param name: The data identifier name.
     :param event_type: The type of event affecting the did.
     :param payload: Any message to be stored along with the event.

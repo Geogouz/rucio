@@ -67,7 +67,7 @@ def apply_rule_grouping(
     :param rule:               The rule object.
     :param preferred_rse_ids:  Preferred RSE's to select.
     :param source_rses:        RSE ids of eligible source replicas.
-    :param session:            Session of the db.
+    :param session: The database session in use.
     :returns:                  Dict of replicas to create, Dict of locks to create, List of transfers to create
     :raises:                   InsufficientQuota, InsufficientTargetRSEs, RSEOverQuota
     :attention:                This method modifies the contents of the locks and replicas input parameters.
@@ -140,7 +140,7 @@ def repair_stuck_locks_and_apply_rule_grouping(
     :param rseselector:        The RSESelector to be used.
     :param rule:               The rule object.
     :param source_rses:        RSE ids of eligible source_rses.
-    :param session:            Session of the db.
+    :param session: The database session in use.
     :returns:                  List of replicas to create, List of locks to create, List of transfers to create, List of locks to Delete
     :raises:                   InsufficientQuota, InsufficientTargetRSEs
     :attention:                This method modifies the contents of the locks and replicas input parameters.
@@ -202,7 +202,7 @@ def create_transfer_dict(dest_rse_id, request_type, scope, name, rule, lock=None
     :param ds_name:             Dataset the file belongs to.
     :param copy_pin_lifetime:   Lifetime in the case of STAGIN requests.
     :param activity:            Activity to be used.
-    :param session:             Session of the db.
+    :param session: The database session in use.
     :returns:                   Request dictionary.
     """
     attributes = {'activity': activity or rule.activity or 'default',
@@ -254,7 +254,7 @@ def __apply_rule_to_files_none_grouping(
     :param rule:               The rule object.
     :param preferred_rse_ids:  Preferred RSE's to select.
     :param source_rses:        RSE ids of eligible source replicas.
-    :param session:            Session of the db.
+    :param session: The database session in use.
     :returns:                  replicas_to_create, locks_to_create, transfers_to_create
     :raises:                   InsufficientAccountLimit, InsufficientTargetRSEs
     :attention:                This method modifies the contents of the locks and replicas input parameters.
@@ -355,7 +355,7 @@ def __apply_rule_to_files_all_grouping(
     :param rule:               The rule object.
     :param preferred_rse_ids:  Preferred RSE's to select.
     :param source_rses:        RSE ids of eligible source replicas.
-    :param session:            Session of the db.
+    :param session: The database session in use.
     :returns:                  replicas_to_create, locks_to_create, transfers_to_create
     :raises:                   InsufficientQuota, InsufficientTargetRSEs
     :attention:                This method modifies the contents of the locks and replicas input parameters.
@@ -506,7 +506,7 @@ def __apply_rule_to_files_dataset_grouping(
     :param rule:               The rule object.
     :param preferred_rse_ids:  Preferred RSE's to select.
     :param source_rses:        RSE ids of eligible source replicas.
-    :param session:            Session of the db.
+    :param session: The database session in use.
     :returns:                  replicas_to_create, locks_to_create, transfers_to_create
     :raises:                   InsufficientQuota, InsufficientTargetRSEs
     :attention:                This method modifies the contents of the locks and replicas input parameters.
@@ -641,7 +641,7 @@ def __repair_stuck_locks_with_none_grouping(datasetfiles, locks, replicas, sourc
     :param rseselector:        The RSESelector to be used.
     :param rule:               The rule object.
     :param source_rses:        RSE ids of eligible source replicas.
-    :param session:            Session of the db.
+    :param session: The database session in use.
     :param logger:             Optional decorated logger that can be passed from the calling daemons or servers.
     :returns:                  replicas_to_create, locks_to_create, transfers_to_create, locks_to_delete
     :raises:                   InsufficientAccountLimit, InsufficientTargetRSEs
@@ -757,7 +757,7 @@ def __repair_stuck_locks_with_all_grouping(datasetfiles, locks, replicas, source
     :param rseselector:        The RSESelector to be used.
     :param rule:               The rule object.
     :param source_rses:        RSE ids of eligible source replicas.
-    :param session:            Session of the db.
+    :param session: The database session in use.
     :param logger:             Optional decorated logger that can be passed from the calling daemons or servers.
     :returns:                  replicas_to_create, locks_to_create, transfers_to_create, locks_to_delete
     :raises:                   InsufficientAccountLimit, InsufficientTargetRSEs

@@ -46,7 +46,7 @@ class RSESelector:
         :param weight:                Weighting to use.
         :param copies:                Number of copies to create.
         :param ignore_account_limit:  Flag if the quota should be ignored.
-        :param session:               DB Session in use.
+        :param session: The database session in use.
         :raises:                      InvalidRuleWeight, InsufficientAccountLimit, InsufficientTargetRSEs
         """
         self.account = account

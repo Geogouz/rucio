@@ -38,7 +38,7 @@ def vo_exists(vo: str, *, session: "Session") -> bool:
     Verify that the vo exists.
 
     :param vo: The vo to verify.
-    :param session: The db session in use.
+    :param session: The database session in use.
 
     :returns: True if the vo is in the vo table, False otherwise
     """
@@ -59,7 +59,7 @@ def add_vo(vo: str, description: str, email: str, *, session: "Session") -> None
     :param vo: 3-letter unique tag for a VO.
     :param description: Descriptive string for the VO (e.g. Full name).
     :param email: Contact email for the VO.
-    :param session: The db session in use.
+    :param session: The database session in use.
     """
     if not config_get_bool('common', 'multi_vo', raise_exception=False, default=False):
         raise exception.UnsupportedOperation('VO operations cannot be performed in single VO mode.')
@@ -97,7 +97,7 @@ def list_vos(*, session: "Session") -> list[dict[str, Any]]:
     """
     List all the VOs in the db.
 
-    :param session: The db session in use.
+    :param session: The database session in use.
     :returns: List of VO dictionaries.
     """
     if not config_get_bool('common', 'multi_vo', raise_exception=False, default=False):
@@ -126,7 +126,7 @@ def update_vo(vo: str, parameters: dict[str, Any], *, session: "Session") -> Non
 
     :param vo: The VO to update.
     :param parameters: A dictionary with the new properties.
-    :param session: The db session in use.
+    :param session: The database session in use.
     """
     if not config_get_bool('common', 'multi_vo', raise_exception=False, default=False):
         raise exception.UnsupportedOperation('VO operations cannot be performed in single VO mode.')

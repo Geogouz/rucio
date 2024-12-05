@@ -364,6 +364,15 @@ def json_parse(types: tuple, json_loads: "Callable[[str], Any]" = json.loads, **
 
 
 def param_get(parameters: dict[str, Any], name: str, **kwargs) -> Any:
+    """
+    Get a parameter value from a dictionary with support for default values.
+
+    :param parameters: Dictionary containing parameters to search in.
+    :param name: Name of the parameter to retrieve.
+    :param kwargs: Keyword arguments that may include 'default' for fallback value.
+    :returns: The value associated with the parameter name.
+    :raises KeyError: If the parameter is not found and no default value is provided.
+    """
     if 'default' in kwargs:
         return parameters.get(name, kwargs['default'])
     else:

@@ -89,7 +89,7 @@ def get_counter(rse_id, *, session: "Session"):
     Returns current values of the specified counter or raises CounterNotFound if the counter does not exist.
 
     :param rse_id:           The id of the RSE.
-    :param session:          The database session in use.
+    :param session: The database session in use.
     :returns:                A dictionary with total and bytes.
     :raises CounterNotFound: If the counter does not exist.
     :returns:                A dictionary with total and bytes.
@@ -121,7 +121,7 @@ def get_updated_rse_counters(total_workers, worker_number, *, session: "Session"
 
     :param total_workers:      Number of total workers.
     :param worker_number:      id of the executing worker.
-    :param session:            Database session in use.
+    :param session: The database session in use.
     :returns:                  List of rse_ids whose rse_counters need to be updated.
     """
     stmt = select(
@@ -139,7 +139,7 @@ def update_rse_counter(rse_id, *, session: "Session"):
     Read the updated_rse_counters and update the rse_counter.
 
     :param rse_id:   The rse_id to update.
-    :param session:  Database session in use.
+    :param session: The database session in use.
     """
 
     stmt = select(
@@ -176,7 +176,7 @@ def fill_rse_counter_history_table(*, session: "Session"):
     """
     Fill the RSE usage history table with the current usage.
 
-    :param session: Database session in use.
+    :param session: The database session in use.
     """
     RSEUsageHistory = models.RSEUsageHistory
     stmt = select(

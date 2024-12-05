@@ -34,6 +34,8 @@ if TYPE_CHECKING:
 
     from sqlalchemy.orm import Session
 
+    from rucio.common.types import InternalScope
+
 
 class DidColumnMeta(DidMetaPlugin):
     """
@@ -41,14 +43,15 @@ class DidColumnMeta(DidMetaPlugin):
     """
     def __init__(self):
         super(DidColumnMeta, self).__init__()
-        self.plugin_name = "DID_COLUMN"
+
+        self._plugin_name = "DID_COLUMN"
 
     @read_session
     def get_metadata(self, scope, name, *, session: "Session"):
         """
         Get data identifier metadata.
 
-        :param scope: The scope name.
+        :param scope: The scope of the DID.
         :param name: The data identifier name.
         :param session: The database session in use.
         """
@@ -174,7 +177,7 @@ class DidColumnMeta(DidMetaPlugin):
         """
         Search data identifiers.
 
-        :param scope: the scope name.
+        :param scope: The scope of the DID.
         :param filters: dictionary of attributes by which the results should be filtered.
         :param did_type: the type of the did: all(container, dataset, file), collection(dataset or container), dataset, container, file.
         :param ignore_case: ignore case distinctions.
@@ -277,13 +280,22 @@ class DidColumnMeta(DidMetaPlugin):
                     ignore_dids.add(did_full)
                     yield did.name
 
-    def delete_metadata(self, scope, name, key, *, session: "Optional[Session]" = None):
+    @transactional_session
+    def delete_metadata(
+        self,
+        scope: "InternalScope",
+        name: str,
+        key: str,
+        *,
+        session: "Optional[Session]" = None
+    ) -> None:
         """
         Deletes the metadata stored for the given key.
 
-        :param scope: The scope of the did.
-        :param name: The name of the did.
-        :param key: Key of the metadata.
+        :param scope: The scope of the DID.
+        :param name: The data identifier name.
+        :param key: The key to be deleted.
+        :param session: The database session in use.
         """
         raise NotImplementedError('The DidColumnMeta plugin does not currently support deleting metadata.')
 
@@ -322,10 +334,3 @@ class DidColumnMeta(DidMetaPlugin):
         hardcoded_keys = list(set(all_did_table_columns) - set(exclude_did_table_columns)) + additional_keys
 
         return key in hardcoded_keys
-
-    def get_plugin_name(self):
-        """
-        Returns a unique identifier for this plugin. This can be later used for filtering down results to this plugin only.
-        :returns: The name of the plugin.
-        """
-        return self.plugin_name

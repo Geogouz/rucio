@@ -521,7 +521,7 @@ class DIDClient(BaseClient):
 
         :param scope: The scope name.
         :param name: The data identifier name.
-        :param plugin: Backend Metadata plugin the Rucio server should use to query data.
+        :param plugin: The selected backend metadata plugin to handle the operation ("DID_COLUMN" by default)
         """
         path = '/'.join([self.DIDS_BASEURL, quote_plus(scope), quote_plus(name), 'meta'])
         url = build_url(choice(self.list_hosts), path=path)
@@ -569,7 +569,7 @@ class DIDClient(BaseClient):
         :param name: The data identifier name.
         :param key: the key.
         :param value: the value.
-        :param recursive: Option to propagate the metadata change to content.
+        :param recursive: Instruction to propagate the metadata change recursively to content (False by default).
         """
         path = '/'.join([self.DIDS_BASEURL, quote_plus(scope), quote_plus(name), 'meta', key])
         url = build_url(choice(self.list_hosts), path=path)
@@ -594,7 +594,7 @@ class DIDClient(BaseClient):
         :param scope: The scope name.
         :param name: The data identifier name.
         :param meta: the metadata key-values.
-        :param recursive: Option to propagate the metadata change to content.
+        :param recursive: Instruction to propagate the metadata change recursively to content (False by default).
         """
         path = '/'.join([self.DIDS_BASEURL, quote_plus(scope), quote_plus(name), 'meta'])
         url = build_url(choice(self.list_hosts), path=path)
@@ -615,7 +615,7 @@ class DIDClient(BaseClient):
         Set metadata to a list of data identifiers.
 
         :param dids: A list of dids including metadata, i.e. [{'scope': scope1, 'name': name1, 'meta': {key1: value1, key2: value2}] .
-        :param recursive: Option to propagate the metadata update to content.
+        :param recursive: Instruction to propagate the metadata change recursively to content (False by default).
         """
         path = '/'.join([self.DIDS_BASEURL, 'bulkdidsmeta'])
         url = build_url(choice(self.list_hosts), path=path)

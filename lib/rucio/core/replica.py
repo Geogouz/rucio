@@ -2916,7 +2916,7 @@ def get_and_lock_file_replicas(
     :param name:           The name of the did.
     :param nowait:         Nowait parameter for the FOR UPDATE statement
     :param restrict_rses:  Possible RSE_ids to filter on.
-    :param session:        The db session in use.
+    :param session: The database session in use.
     :returns:              List of SQLAlchemy Replica Objects
     """
 
@@ -2951,7 +2951,7 @@ def get_source_replicas(
     :param scope:          The scope of the did.
     :param name:           The name of the did.
     :param soruce_rses:    Possible RSE_ids to filter on.
-    :param session:        The db session in use.
+    :param session: The database session in use.
     :returns:              List of SQLAlchemy Replica Objects
     """
 
@@ -2992,7 +2992,7 @@ def get_and_lock_file_replicas_for_dataset(
     :param restrict_rses:  Possible RSE_ids to filter on.
     :param total_threads:  Total threads
     :param thread_id:      This thread
-    :param session:        The db session in use.
+    :param session: The database session in use.
     :returns:              (files in dataset, replicas in dataset)
     """
     files, replicas = {}, {}
@@ -3101,7 +3101,7 @@ def get_source_replicas_for_dataset(
     :param source_rses:    Possible source RSE_ids to filter on.
     :param total_threads:  Total threads
     :param thread_id:      This thread
-    :param session:        The db session in use.
+    :param session: The database session in use.
     :returns:              (files in dataset, replicas in dataset)
     """
     stmt = select(
@@ -3177,7 +3177,7 @@ def get_replica_atime(
     """
     Get the accessed_at timestamp for a replica. Just for testing.
     :param replicas: List of dictionaries {scope, name, rse_id, path}
-    :param session: Database session to use.
+    :param session: The database session in use.
 
     :returns: A datetime timestamp with the last access time.
     """
@@ -3243,7 +3243,7 @@ def list_dataset_replicas(
     :param scope: The scope of the dataset.
     :param name: The name of the dataset.
     :param deep: Lookup at the file level.
-    :param session: Database session to use.
+    :param session: The database session in use.
 
     :returns: A list of dictionaries containing the dataset replicas
               with associated metrics and timestamps
@@ -3419,7 +3419,7 @@ def list_dataset_replicas_bulk(
 ) -> "Iterator[dict[str, Any]]":
     """
     :param names_by_intscope: The dictionary of internal scopes pointing at the list of names.
-    :param session: Database session to use.
+    :param session: The database session in use.
 
     :returns: A list of dictionaries containing the dataset replicas
               with associated metrics and timestamps

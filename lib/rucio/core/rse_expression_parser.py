@@ -47,7 +47,7 @@ def parse_expression(expression, filter_=None, *, session: "Session"):
 
     :param expression:    RSE expression, e.g: 'CERN|BNL'.
     :param filter_:       Availability filter (dictionary) used for the RSEs. e.g.: {'availability_write': True}
-    :param session:       Database session in use.
+    :param session: The database session in use.
     :returns:             A list of rse dictionaries.
     :raises:              InvalidRSEExpression, RSENotFound, RSEWriteBlocked
     """
@@ -214,7 +214,7 @@ class BaseExpressionElement(metaclass=abc.ABCMeta):
         """
         Resolve the ExpressionElement and return a set of RSE ids
 
-        :param session:  Database session in use
+        :param session: The database session in use.
         :returns:        (Set of RSE ids, Dictionary of RSE dicts)
         :rtype:          (Set of Strings, Dictionary of RSE dicts organized by rse_id)
         """

@@ -89,7 +89,7 @@ def add_files(
     :param ignore_availability: A boolean to ignore blocklisted sites.
     :param parents_metadata: Metadata for selected hierarchy DIDs. (dictionary {'lpn': {key : value}})
     :param vo: The VO to act on
-    :param session: The session used
+    :param session: The database session in use.
     """
     rule_extension_list = []
     attachments = []

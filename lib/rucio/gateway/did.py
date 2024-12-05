@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from copy import deepcopy
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Literal, Optional
 
 import rucio.gateway.permission
 from rucio.common.constants import RESERVED_KEYS
@@ -28,7 +28,7 @@ from rucio.db.sqla.constants import DIDType
 from rucio.db.sqla.session import read_session, stream_session, transactional_session
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Iterator, Mapping, Sequence
+    from collections.abc import Iterator, Mapping, Sequence
 
     from sqlalchemy.orm import Session
 
@@ -37,7 +37,7 @@ if TYPE_CHECKING:
 def list_dids(
     scope: str,
     filters: 'Mapping[Any, Any]',
-    did_type: str = 'collection',
+    did_type: Literal['all', 'collection', 'dataset', 'container', 'file'] = 'collection',
     ignore_case: bool = False,
     limit: Optional[int] = None,
     offset: Optional[int] = None,
@@ -50,14 +50,14 @@ def list_dids(
     """
     List dids in a scope.
 
-    :param scope: The scope name.
+    :param scope: The scope of the DID.
     :param filters: Filter arguments in form supported by the filter engine.
-    :param did_type:  The type of the did: all(container, dataset, file), collection(dataset or container), dataset, container
+    :param did_type: The type of the did: all(container, dataset, file), collection(dataset or container), dataset, container
     :param ignore_case: Ignore case distinctions.
     :param limit: The maximum number of DIDs returned.
     :param offset: Offset number.
     :param long: Long format option to display more information for each DID.
-    :param recursive: Recursively list DIDs content.
+    :param recursive: Recursively list DIDs content ().
     :param vo: The VO to act on.
     :param session: The database session in use.
     """
@@ -97,16 +97,16 @@ def add_did(
     """
     Add data did.
 
-    :param scope: The scope name.
+    :param scope: The scope of the DID.
     :param name: The data identifier name.
     :param did_type: The data identifier type.
     :param issuer: The issuer account.
     :param account: The account owner. If None, then issuer is selected as owner.
     :param statuses: Dictionary with statuses, e.g.g {'monotonic':True}.
-    :meta: Meta-data associated with the data identifier is represented using key/value pairs in a dictionary.
-    :rules: Replication rules associated with the data did. A list of dictionaries, e.g., [{'copies': 2, 'rse_expression': 'TIERS1'}, ].
-    :param lifetime: DID's lifetime (in seconds).
-    :param dids: The content.
+    :param meta: Meta-data associated with the data identifier is represented using key/value pairs in a dictionary.
+    :param rules: Replication rules associated with the data did. A list of dictionaries, e.g., [{'copies': 2, 'rse_expression': 'TIERS1'}, ].
+    :param lifetime: DIDs' lifetime (in seconds).
+    :param dids: A list of DIDs.
     :param rse: The RSE name when registering replicas.
     :param vo: The VO to act on.
     :param session: The database session in use.
@@ -167,7 +167,7 @@ def add_dids(
     """
     Bulk Add did.
 
-    :param dids: A list of dids.
+    :param dids: A list of DIDs.
     :param issuer: The issuer account.
     :param vo: The VO to act on.
     :param session: The database session in use.
@@ -201,13 +201,15 @@ def attach_dids(
     name: str,
     attachment: dict[str, Any],
     issuer: str,
-    vo='def',
+    vo: str = 'def',
     *,
     session: "Session"
 ) -> None:
     """
     Append content to data did.
 
+    :param scope: The scope of the DID.
+    :param name: The data identifier name.
     :param attachment: The attachment.
     :param issuer: The issuer account.
     :param vo: The VO to act on.
@@ -301,9 +303,9 @@ def detach_dids(
     """
     Detach data identifier
 
-    :param scope: The scope name.
+    :param scope: The scope of the DID.
     :param name: The data identifier name.
-    :param dids: The content.
+    :param dids: A list of DIDs.
     :param issuer: The issuer account.
     :param vo: The VO to act on.
     :param session: The database session in use.
@@ -333,7 +335,7 @@ def list_new_dids(
     """
     List recent identifiers.
 
-    :param did_type : The DID type.
+    :param did_type: The DID type.
     :param thread: The assigned thread for this necromancer.
     :param total_threads: The total number of threads of all necromancers.
     :param chunk_size: Number of requests to return per yield.
@@ -357,8 +359,7 @@ def set_new_dids(
     """
     Set/reset the flag new
 
-    :param scope: The scope name.
-    :param name: The data identifier name.
+    :param dids: A list of DIDs.
     :param new_flag: A boolean to flag new DIDs.
     :param vo: The VO to act on.
     :param session: The database session in use.
@@ -380,7 +381,7 @@ def list_content(
     """
     List data identifier contents.
 
-    :param scope: The scope name.
+    :param scope: The scope of the DID.
     :param name: The data identifier name.
     :param vo: The VO to act on.
     :param session: The database session in use.
@@ -397,14 +398,14 @@ def list_content(
 def list_content_history(
     scope: str,
     name: str,
-    vo='def',
+    vo: str = 'def',
     *,
     session: "Session"
 ) -> 'Iterator[dict[str, Any]]':
     """
     List data identifier contents history.
 
-    :param scope: The scope name.
+    :param scope: The scope of the DID.
     :param name: The data identifier name.
     :param vo: The VO to act on.
     :param session: The database session in use.
@@ -420,7 +421,7 @@ def list_content_history(
 
 @stream_session
 def bulk_list_files(
-    dids: 'Iterable[dict[str, Any]]',
+    dids: 'Sequence[dict[str, Any]]',
     long: bool = False,
     vo: str = 'def',
     *,
@@ -429,10 +430,10 @@ def bulk_list_files(
     """
     List file contents of a list of data identifiers.
 
-    :param dids:       A list of DIDs.
-    :param long:       A boolean to choose if more metadata are returned or not.
-    :param vo:         The VO to act on.
-    :param session:    The database session in use.
+    :param dids: A list of DIDs.
+    :param long: A boolean to choose if more metadata are returned or not.
+    :param vo: The VO to act on.
+    :param session: The database session in use.
     """
 
     for did_ in dids:
@@ -454,9 +455,9 @@ def list_files(
     """
     List data identifier file contents.
 
-    :param scope: The scope name.
+    :param scope: The scope of the DID.
     :param name: The data identifier name.
-    :param long:       A boolean to choose if GUID is returned or not.
+    :param long: A boolean to choose if GUID is returned or not.
     :param vo: The VO to act on.
     :param session: The database session in use.
     """
@@ -481,7 +482,7 @@ def scope_list(
     """
     List data identifiers in a scope.
 
-    :param scope: The scope name.
+    :param scope: The scope of the DID.
     :param name: The data identifier name.
     :param recursive: boolean, True or False.
     :param vo: The VO to act on.
@@ -501,11 +502,17 @@ def scope_list(
 
 
 @read_session
-def get_did(scope: str, name: str, dynamic_depth: Optional[DIDType] = None, vo: str = 'def', *, session: "Session") -> "dict[str, Any]":
+def get_did(
+    scope: str,
+    name: str,
+    dynamic_depth: Optional[DIDType] = None,
+    vo: str = 'def',
+    *, session: "Session"
+) -> "dict[str, Any]":
     """
     Retrieve a single data did.
 
-    :param scope: The scope name.
+    :param scope: The scope of the DID.
     :param name: The data identifier name.
     :param dynamic_depth: the DID type to use as source for estimation of this DIDs length/bytes.
     If set to None, or to a value which doesn't make sense (ex: requesting depth = CONTAINER for a did of type DATASET)
@@ -530,23 +537,26 @@ def set_metadata(
     issuer: str,
     recursive: bool = False,
     vo: str = 'def',
+    plugin: str = "all",
     *,
     session: "Session"
 ) -> None:
     """
-    Add metadata to data did.
+    Add single metadata key:value entry to a DID.
 
-    :param scope: The scope name.
+    :param scope: The scope of the DID.
     :param name: The data identifier name.
     :param key: the key.
     :param value: the value.
     :param issuer: The issuer account.
-    :param recursive: Option to propagate the metadata update to content.
+    :param recursive: Instruction to propagate the metadata change recursively to content (False by default).
     :param vo: The VO to act on.
+    :param plugin: The selected backend metadata plugin to handle the operation ("all" by default)
     :param session: The database session in use.
     """
     kwargs = {'scope': scope, 'name': name, 'key': key, 'value': value, 'issuer': issuer}
 
+    # TODO: Rucio is reserving quite many keys. Maybe introduce a resolving mechanism for the conflicts
     if key in RESERVED_KEYS:
         raise AccessDenied('Account %s can not change this metadata value to data identifier %s:%s' % (issuer, scope, name))
 
@@ -555,7 +565,7 @@ def set_metadata(
         raise AccessDenied('Account %s can not add metadata to data identifier %s:%s. %s' % (issuer, scope, name, auth_result.message))
 
     internal_scope = InternalScope(scope, vo=vo)
-    return did.set_metadata(scope=internal_scope, name=name, key=key, value=value, recursive=recursive, session=session)
+    return did.set_metadata(scope=internal_scope, name=name, key=key, value=value, recursive=recursive, plugin=plugin, session=session)
 
 
 @transactional_session
@@ -566,37 +576,45 @@ def set_metadata_bulk(
     issuer: str,
     recursive: bool = False,
     vo: str = 'def',
+    plugin: str = "all",
     *,
     session: "Session"
 ) -> None:
     """
-    Add metadata to data did.
+    Add metadata entries (key-value pairs) to a DID, with option to perform this recursively to all its children.
+    By default, all plugins are being considered (a single plugin can also be specified).
 
-    :param scope: The scope name.
+    :param scope: The scope of the DID.
     :param name: The data identifier name.
-    :param meta: the key-values.
+    :param meta: The dictionary holding the key-value metadata.
     :param issuer: The issuer account.
-    :param recursive: Option to propagate the metadata update to content.
+    :param recursive: Instruction to propagate the metadata change recursively to content (False by default).
     :param vo: The VO to act on.
+    :param plugin: The selected backend metadata plugin to handle the operation ("all" by default)
     :param session: The database session in use.
     """
     kwargs = {'scope': scope, 'name': name, 'meta': meta, 'issuer': issuer}
 
+    # TODO[DX]: Rucio reserves many keys. Introduce maybe a resolving mechanism for conflicts to support both atomic and non-atomic handling plugins.
     for key in meta:
         if key in RESERVED_KEYS:
-            raise AccessDenied('Account %s can not change the value of the metadata key %s to data identifier %s:%s' % (issuer, key, scope, name))
+            raise AccessDenied(f'Account {issuer} can not change the value of the metadata key {key} to data identifier {scope}:{name}')
 
-    auth_result = rucio.gateway.permission.has_permission(issuer=issuer, vo=vo, action='set_metadata_bulk', kwargs=kwargs, session=session)
+    auth_result = rucio.gateway.permission.has_permission(
+        issuer=issuer, vo=vo, action='set_metadata_bulk', kwargs=kwargs, session=session
+    )
     if not auth_result.allowed:
-        raise AccessDenied('Account %s can not add metadata to data identifier %s:%s. %s' % (issuer, scope, name, auth_result.message))
+        raise AccessDenied(f'Account {issuer} can not add metadata to data identifier {scope}:{name}. {auth_result.message}')
 
     internal_scope = InternalScope(scope, vo=vo)
-    return did.set_metadata_bulk(scope=internal_scope, name=name, meta=meta, recursive=recursive, session=session)
+    return did.set_metadata_bulk(
+        scope=internal_scope, name=name, meta=meta, recursive=recursive, plugin=plugin, session=session
+    )
 
 
 @transactional_session
 def set_dids_metadata_bulk(
-    dids: 'Iterable[dict[str, Any]]',
+    dids: 'Sequence[dict[str, Any]]',
     issuer: str,
     recursive: bool = False,
     vo: str = 'def',
@@ -606,9 +624,9 @@ def set_dids_metadata_bulk(
     """
     Add metadata to a list of data identifiers.
 
+    :param dids: A list of DIDs.
     :param issuer: The issuer account.
-    :param dids: A list of dids including metadata.
-    :param recursive: Option to propagate the metadata update to content.
+    :param recursive: Instruction to propagate the metadata change recursively to content (False by default).
     :param vo: The VO to act on.
     :param session: The database session in use.
     """
@@ -627,6 +645,33 @@ def set_dids_metadata_bulk(
     return did.set_dids_metadata_bulk(dids=dids, recursive=recursive, session=session)
 
 
+# TODO[DX]: Implement
+# @read_session
+# def get_metadata_single(
+#     scope: str,
+#     name: str,
+#     key: str,
+#     plugin: str = 'DID_COLUMN',
+#     vo: str = 'def',
+#     *,
+#     session: "Session"
+# ) -> Union[dict[str, Any], list[Any], str, int, float, bool, None]:
+#     """
+#     Fetch the metadata value for a meta-key of a did (depending on the plugin, may include deeply nested objects).
+#
+#     :param scope: The scope of the DID.
+#     :param name: The data identifier name.
+#     :param plugin: The selected backend metadata plugin to handle the operation ("DID_COLUMN" by default)
+#     :param vo: The VO to act on.
+#     :param session: The database session in use.
+#     """
+#
+#     internal_scope = InternalScope(scope, vo=vo)
+#
+#     d = did.get_metadata_single(scope=internal_scope, name=name, key=key, plugin=plugin, session=session)
+#     return gateway_update_return_dict(d, session=session)
+
+
 @read_session
 def get_metadata(
     scope: str,
@@ -637,10 +682,12 @@ def get_metadata(
     session: "Session"
 ) -> dict[str, Any]:
     """
-    Get data identifier metadata
+    Returns a dictionary holding all metadata available for a given DID with optional plugin selection ("all" can be
+    used as a plugin option).
 
-    :param scope: The scope name.
+    :param scope: The scope of the DID.
     :param name: The data identifier name.
+    :param plugin: The selected backend metadata plugin to handle the operation ("DID_COLUMN" by default)
     :param vo: The VO to act on.
     :param session: The database session in use.
     """
@@ -653,17 +700,20 @@ def get_metadata(
 
 @stream_session
 def get_metadata_bulk(
-    dids: 'Iterable[dict[str, Any]]',
+    dids: 'Sequence[dict[str, Any]]',
     inherit: bool = False,
     vo: str = 'def',
     *,
     session: "Session"
 ) -> 'Iterator[dict[str, Any]]':
     """
-    Get metadata for a list of dids
-    :param dids:               A list of dids.
-    :param inherit:            A boolean. If set to true, the metadata of the parent are concatenated.
-    :param vo:                 The VO to act on.
+    Returns an iterator of metadata dictionaries for multiple DIDs, with optional inheritance from parent DIDs.
+    When inheritance is enabled, metadata from parent DIDs is included (using the JSON plugin), with child
+    metadata taking precedence. When inheritance is disabled, yields direct DID metadata from the database.
+
+    :param dids: A list of DIDs.
+    :param inherit: If set to true, the metadata of the parent are concatenated.
+    :param vo: The VO to act on.
     :param session: The database session in use.
     """
 
@@ -687,8 +737,8 @@ def delete_metadata(
     """
     Delete a key from the metadata column
 
-    :param scope: the scope of did
-    :param name: the name of the did
+    :param scope: The scope of the DID.
+    :param name: The data identifier name.
     :param key: the key to be deleted
     :param vo: The VO to act on.
     :param session: The database session in use.
@@ -711,10 +761,10 @@ def set_status(
     """
     Set data identifier status
 
-    :param scope: The scope name.
+    :param scope: The scope of the DID.
     :param name: The data identifier name.
     :param issuer: The issuer account.
-    :param kwargs:  Keyword arguments of the form status_name=value.
+    :param kwargs: Keyword arguments of the form status_name=value.
     :param vo: The VO to act on.
     :param session: The database session in use.
     """
@@ -762,9 +812,9 @@ def list_parent_dids(
     """
     List parent datasets and containers of a did.
 
-    :param scope:   The scope.
-    :param name:    The name.
-    :param vo:      The VO to act on.
+    :param scope: The scope of the DID.
+    :param name: The data identifier name.
+    :param vo: The VO to act on.
     :param session: The database session in use.
     """
 
@@ -795,7 +845,6 @@ def create_did_sample(
     :param input_name: The name of the input DID.
     :param output_scope: The scope of the output dataset.
     :param output_name: The name of the output dataset.
-    :param account: The account.
     :param nbfiles: The number of files to register in the output dataset.
     :param issuer: The issuer account.
     :param vo: The VO to act on.
@@ -817,7 +866,7 @@ def create_did_sample(
 
 @transactional_session
 def resurrect(
-    dids: 'Iterable[dict[str, Any]]',
+    dids: 'Sequence[dict[str, Any]]',
     issuer: str,
     vo: str = 'def',
     *,
@@ -826,7 +875,7 @@ def resurrect(
     """
     Resurrect DIDs.
 
-    :param dids: A list of dids.
+    :param dids: A list of DIDs.
     :param issuer: The issuer account.
     :param vo: The VO to act on.
     :param session: The database session in use.
@@ -854,7 +903,7 @@ def list_archive_content(
     """
     List archive contents.
 
-    :param scope: The archive scope name.
+    :param scope: The scope of the archive.
     :param name: The archive data identifier name.
     :param vo: The VO to act on.
     :param session: The database session in use.
@@ -879,10 +928,11 @@ def add_did_to_followed(
     """
     Mark a did as followed by the given account
 
-    :param scope: The scope name.
+    :param scope: The scope of the DID.
     :param name: The data identifier name.
     :param account: The account owner.
     :param session: The database session in use.
+    :param vo: The VO to act on.
     """
     internal_scope = InternalScope(scope, vo=vo)
     internal_account = InternalAccount(account, vo=vo)
@@ -891,7 +941,7 @@ def add_did_to_followed(
 
 @transactional_session
 def add_dids_to_followed(
-    dids: 'Iterable[Mapping[str, Any]]',
+    dids: 'Sequence[dict[str, Any]]',
     account: str,
     *,
     session: "Session",
@@ -900,9 +950,10 @@ def add_dids_to_followed(
     """
     Bulk mark datasets as followed
 
-    :param dids: A list of dids.
+    :param dids: A list of DIDs.
     :param account: The account owner.
     :param session: The database session in use.
+    :param vo: The VO to act on.
     """
     internal_account = InternalAccount(account, vo=vo)
     return did.add_dids_to_followed(dids=dids, account=internal_account, session=session)
@@ -917,11 +968,12 @@ def get_users_following_did(
     vo: str = 'def'
 ) -> 'Iterator[dict[str, str]]':
     """
-    Return list of users following a did
+    Returns list of users following a DID
 
-    :param scope: The scope name.
+    :param scope: The scope of the DID.
     :param name: The data identifier name.
     :param session: The database session in use.
+    :param vo: The VO to act on.
     """
     internal_scope = InternalScope(scope, vo=vo)
     users = did.get_users_following_did(name=name, scope=internal_scope, session=session)
@@ -943,11 +995,12 @@ def remove_did_from_followed(
     """
     Mark a did as not followed
 
-    :param scope: The scope name.
+    :param scope: The scope of the DID.
     :param name: The data identifier name.
     :param account: The account owner.
-    :param session: The database session in use.
     :param issuer: The issuer account
+    :param session: The database session in use.
+    :param vo: The VO to act on.
     """
     kwargs = {'scope': scope, 'issuer': issuer}
     auth_result = rucio.gateway.permission.has_permission(issuer=issuer, vo=vo, action='remove_did_from_followed', kwargs=kwargs, session=session)
@@ -961,7 +1014,7 @@ def remove_did_from_followed(
 
 @transactional_session
 def remove_dids_from_followed(
-    dids: 'Iterable[Mapping[str, Any]]',
+    dids: 'Sequence[dict[str, Any]]',
     account: str,
     issuer: str,
     *,
@@ -971,9 +1024,11 @@ def remove_dids_from_followed(
     """
     Bulk mark datasets as not followed
 
-    :param dids: A list of dids.
+    :param dids: A list of DIDs.
     :param account: The account owner.
+    :param issuer: The issuer account.
     :param session: The database session in use.
+    :param vo: The VO to act on.
     """
     kwargs = {'dids': dids, 'issuer': issuer}
     auth_result = rucio.gateway.permission.has_permission(issuer=issuer, vo=vo, action='remove_dids_from_followed', kwargs=kwargs, session=session)

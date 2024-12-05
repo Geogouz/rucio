@@ -50,7 +50,7 @@ def get_rse_info(rse=None, vo='def', rse_id=None, session=None) -> types.RSESett
         :param rse: Name of the requested RSE
         :param vo: The VO for the RSE.
         :param rse_id: The id of the rse (use in server mode to avoid db calls)
-        :param session: The eventual database session.
+        :param session: The database session in use.
 
         :returns: a dict object with the following attributes:
                     id                ...     an internal identifier

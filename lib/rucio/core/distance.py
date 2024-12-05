@@ -34,7 +34,7 @@ def add_distance(src_rse_id: str, dest_rse_id: str, distance: Optional[int] = No
     :param src_rse_id: The source RSE ID.
     :param dest_rse_id: The destination RSE ID.
     :param distance: Distance as an integer.
-    :param session: The database session to use.
+    :param session: The database session in use.
     """
 
     try:
@@ -53,7 +53,7 @@ def get_distances(src_rse_id: Optional[str] = None, dest_rse_id: Optional[str] =
 
     :param src_rse_id: The source RSE ID.
     :param dest_rse_id: The destination RSE ID.
-    :param session: The database session to use.
+    :param session: The database session in use.
 
     :returns distance: List of dictionaries.
     """
@@ -88,7 +88,7 @@ def delete_distances(src_rse_id: Optional[str] = None, dest_rse_id: Optional[str
 
     :param src_rse_id: The source RSE ID.
     :param dest_rse_id: The destination RSE ID.
-    :param session: The database session to use.
+    :param session: The database session in use.
     """
 
     if not dest_rse_id or not src_rse_id:
@@ -113,7 +113,7 @@ def update_distances(src_rse_id: Optional[str] = None, dest_rse_id: Optional[str
     :param src_rse_id: The source RSE ID.
     :param dest_rse_id: The destination RSE ID.
     :param distance: The new distance to set
-    :param session: The database session to use.
+    :param session: The database session in use.
     """
     if not dest_rse_id or not src_rse_id:
         return
@@ -151,7 +151,7 @@ def export_distances(vo: str = 'def', *, session: "Session") -> dict[str, Any]:
     """
     Export distances between all the RSEs using RSE ids.
     :param vo: The VO to export.
-    :param session: The database session to use.
+    :param session: The database session in use.
     :returns distance: dictionary of dictionaries with all the distances.
     """
 
