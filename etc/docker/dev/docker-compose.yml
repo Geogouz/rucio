@@ -584,3 +584,8 @@ volumes:
   vol-iam-db-mysql:
   vol-mysql8-mysql:
   vol-postgres-data:
+
+networks:
+  default:
+    driver: bridge
+    name: ${RUCIO_NETWORK_NAME:-rucio-dev-network}
