@@ -441,7 +441,7 @@ class BaseClient:
         time.sleep(sleep_time)
 
     def _send_request(self, url, headers=None, type_='GET', data=None, params=None, stream=False, get_token=False,
-                      cert=None, auth=None, verify=None):
+                      cert=None, auth=None, verify=False):
         """
         Helper method to send requests to the rucio server. Gets a new token and retries if an unauthorized error is returned.
 
