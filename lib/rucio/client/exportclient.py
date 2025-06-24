@@ -49,10 +49,10 @@ class ExportClient(BaseClient):
             A nested dictionary that mirrors the server‑side JSON structure.
             The top‑level keys are:
 
-            **`rses`**:
+            **`rses`**
                 Per‑RSE settings (name, deterministic flag, QoS class, supported protocol, etc.).
 
-            **`distances`**:
+            **`distances`**
                 Pairwise RSE‑to‑RSE distance values (only present when `distance=True`).
 
         Raises
