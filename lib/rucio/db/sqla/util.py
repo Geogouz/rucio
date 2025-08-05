@@ -60,13 +60,16 @@ def build_database() -> None:
 
     schema = config_get('database', 'schema', raise_exception=False, check_config_table=False)
     if schema:
-        print('Schema set in config, trying to create schema:', schema)
-        try:
-            with engine.connect() as conn:
-                with conn.begin():
-                    conn.execute(CreateSchema(schema))
-        except Exception as e:
-            print('Cannot create schema, please validate manually if schema creation is needed, continuing:', e)
+        if engine.dialect.name == 'oracle':
+            logging.info('Assuming schema %s exists on Oracle; skipping creation', schema)
+        else:
+            print('Schema set in config, trying to create schema:', schema)
+            try:
+                with engine.connect() as conn:
+                    with conn.begin():
+                        conn.execute(CreateSchema(schema))
+            except Exception as e:
+                print('Cannot create schema, please validate manually if schema creation is needed, continuing:', e)
 
     models.register_models(engine)
 

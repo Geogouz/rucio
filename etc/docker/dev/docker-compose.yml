@@ -8,8 +8,8 @@ services:
     container_name: dev-rucioclient-1
     image: "docker.io/${DOCKER_REPO:-rucio}/rucio-dev:${RUCIO_DEV_PREFIX:-}${RUCIO_TAG:-latest}"
     platform: linux/amd64
-    entrypoint: ["/rucio_source/etc/docker/dev/rucio/entrypoint.sh"]
-    command: ["sleep", "infinity"]
+    entrypoint: [ "/rucio_source/etc/docker/dev/rucio/entrypoint.sh" ]
+    command: [ "sleep", "infinity" ]
     profiles:
       - client
     volumes:
@@ -38,8 +38,8 @@ services:
     container_name: dev-rucio-1
     image: "docker.io/${DOCKER_REPO:-rucio}/rucio-dev:${RUCIO_DEV_PREFIX:-}${RUCIO_TAG:-latest}"
     platform: linux/amd64
-    entrypoint: ["/rucio_source/etc/docker/dev/rucio/entrypoint.sh"]
-    command: ["httpd","-D","FOREGROUND"]
+    entrypoint: [ "/rucio_source/etc/docker/dev/rucio/entrypoint.sh" ]
+    command: [ "httpd","-D","FOREGROUND" ]
     volumes:
       - ../../certs/rucio_ca.pem:/etc/grid-security/certificates/5fca1cb1.0:ro
       - ../../certs/rucio_ca.pem:/opt/rucio/etc/rucio_ca.pem:ro
@@ -60,7 +60,7 @@ services:
     environment:
       - REQUESTS_CA_BUNDLE=/etc/pki/tls/certs/ca-bundle.crt
       - RUCIO_SOURCE_DIR=/rucio_source
-      - RDBMS
+      - RDBMS=oracle
 
   # ------------------------------------------------------------------
   # Database, MQ, metrics, and other external services
@@ -72,7 +72,7 @@ services:
       - POSTGRES_USER=rucio
       - POSTGRES_DB=rucio
       - POSTGRES_PASSWORD=secret
-    command: ["-c", "fsync=off","-c", "synchronous_commit=off","-c", "full_page_writes=off"]
+    command: [ "-c", "fsync=off","-c", "synchronous_commit=off","-c", "full_page_writes=off" ]
     volumes:
       - vol-ruciodb-data:/var/lib/postgresql/data
 
@@ -129,7 +129,7 @@ services:
       - POSTGRES_USER=rucio
       - POSTGRES_DB=rucio
       - POSTGRES_PASSWORD=rucio
-    command: ["-c", "fsync=off","-c", "synchronous_commit=off","-c", "full_page_writes=off"]
+    command: [ "-c", "fsync=off","-c", "synchronous_commit=off","-c", "full_page_writes=off" ]
     volumes:
       - vol-postgres14-data:/var/lib/postgresql/data
 
@@ -152,19 +152,15 @@ services:
 
   oracle:
     container_name: dev-oracle-1
-    image: docker.io/gvenzl/oracle-xe:18.4.0
+    image: docker.io/gvenzl/oracle-xe:21.3.0
     platform: linux/amd64
     profiles:
       - oracle
     environment:
       - ORACLE_PASSWORD=rucio
-      - ORACLE_ALLOW_REMOTE=true
-      - ORACLE_DISABLE_ASYNCH_IO=true
-      - processes=1000
-      - sessions=1105
-      - transactions=1215
     volumes:
-      - ./oracle_setup.sh:/container-entrypoint-initdb.d/oracle_setup.sh:Z
+      - ./oracle/01_tune_oracle_limits.sql:/container-entrypoint-initdb.d/01_tune_oracle_limits.sql:ro
+      - ./oracle/02_oracle_setup.sh:/container-entrypoint-startdb.d/02_oracle_setup.sh:Z
 
   # ------------------------------------------------------------------
   # FTS and XRootD containers (test RSEs)
@@ -332,7 +328,7 @@ services:
       - vol-minio-data:/data
       - ../../certs/hostcert_minio.pem:/root/.minio/certs/public.crt:Z
       - ../../certs/hostcert_minio.key.pem:/root/.minio/certs/private.key:Z
-    command: ["server", "/data"]
+    command: [ "server", "/data" ]
 
   ssh1:
     container_name: dev-ssh1-1
@@ -376,7 +372,7 @@ services:
       - POSTGRES_USER=rucio
       - POSTGRES_DB=metadata
       - POSTGRES_PASSWORD=secret
-    command: ["-p", "5433"]
+    command: [ "-p", "5433" ]
     volumes:
       - vol-postgres-data:/var/lib/postgresql/data
 
