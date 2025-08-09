@@ -44,6 +44,65 @@ if [ -z "$RDBMS" ]; then
     cp "$CFG_PATH"/rucio_default.cfg $RUCIO_HOME/etc/rucio.cfg
     cp "$CFG_PATH"/alembic_default.ini $RUCIO_HOME/etc/alembic.ini
 
+elif [ "$RDBMS" == "oracle_skip" ]; then
+
+    dnf install -y libnsl libaio;
+
+    # Install Oracle Instant Client
+    if [ ! -d /usr/lib/oracle ]; then
+        IC_VERSION=23.9.0.25.07
+        echo "Installing Oracle Instant Client version ${IC_VERSION}..."
+
+        # ----------- import Oracle GPG key ------------
+        # Taken from https://docs.oracle.com/en/operating-systems/oracle-linux-manager/2.10/admin/OLM210-ADMIN.pdf
+        GPG_KEY_ID=8d8b756f
+        GPG_KEY_FILE=/tmp/oracle-gpg-key
+
+        echo "[INFO] Checking for existing Oracle GPG key (${GPG_KEY_ID})..."
+        if ! rpm -q gpg-pubkey | grep -qi "$GPG_KEY_ID"; then
+            echo "[INFO] Oracle GPG key not found. Downloading and importing..."
+            curl -sSL https://yum.oracle.com/RPM-GPG-KEY-oracle-ol9 -o "$GPG_KEY_FILE"
+            if [ -s "$GPG_KEY_FILE" ]; then
+                rpm --import "$GPG_KEY_FILE"
+                echo "[INFO] Oracle GPG key imported successfully."
+                rm -f "$GPG_KEY_FILE"
+            else
+                echo "[ERROR] Failed to download Oracle GPG key or file is empty."
+                exit 1
+            fi
+        else
+            echo "[INFO] Oracle GPG key already present."
+        fi
+        # ----------------------------------------------
+
+        # --------------- build SERIES -----------------
+        echo "[INFO] Building version series from IC_VERSION=${IC_VERSION}"
+        IFS=. read -r MAJOR UPDATE _ <<<"$IC_VERSION"             # keep only first two fields
+        SERIES=$(printf '%-7s' "${MAJOR}${UPDATE}" | tr ' ' 0)    # right‑pad with 0 → 7 digits
+        echo "[INFO] Using SERIES=${SERIES}"
+        # ----------------------------------------------
+
+        RPM_FILE="oracle-instantclient-basiclite-${IC_VERSION}-1.el9.x86_64.rpm"
+        RPM_URL="https://download.oracle.com/otn_software/linux/instantclient/${SERIES}/${RPM_FILE}"
+        rpm -ivh "$RPM_URL"
+
+        echo "[INFO] Configuring dynamic linker path..."
+        echo "/usr/lib/oracle/${IC_VERSION%.*}/client64/lib" > /etc/ld.so.conf.d/oracle.conf
+        ldconfig
+
+        echo "[INFO] Oracle Instant Client installation completed."
+
+        dnf -y update --nobest && \
+        dnf -y --skip-broken install make gcc krb5-devel xmlsec1-devel xmlsec1-openssl-devel pkg-config libtool-ltdl-devel git && \
+        python3 -m pip --no-cache-dir install --upgrade pip && \
+        python3 -m pip --no-cache-dir install --upgrade setuptools wheel && \
+        python3 -m pip --no-cache-dir install --upgrade -r rucio_source/requirements/requirements.server.txt -r rucio_source/requirements/requirements.dev.txt
+
+    fi
+
+    generate_rucio_cfg "$CFG_PATH"/rucio_oracle.cfg $RUCIO_HOME/etc/rucio.cfg
+    cp "$CFG_PATH"/alembic_oracle.ini $RUCIO_HOME/etc/alembic.ini
+
 elif [ "$RDBMS" == "oracle" ]; then
     generate_rucio_cfg "$CFG_PATH"/rucio_oracle.cfg $RUCIO_HOME/etc/rucio.cfg
     cp "$CFG_PATH"/alembic_oracle.ini $RUCIO_HOME/etc/alembic.ini
