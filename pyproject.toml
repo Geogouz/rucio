@@ -2,12 +2,6 @@
 requires = ["setuptools", "wheel", "packaging"]
 build-backend = "setuptools.build_meta"
 
-[tool.pytest.ini_options]
-pythonpath = [
-  ".",
-  "lib",
-]
-
 [tool.coverage.report]
 exclude_also = [
     "if TYPE_CHECKING:",  # Ignore code in TYPE_CHECKING blocks
