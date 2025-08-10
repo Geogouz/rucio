@@ -14,15 +14,17 @@
 # limitations under the License.
 
 import os
-import os.path
 import sys
 import time
 from json import dumps
+from pathlib import Path
 
 import requests
 
-base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(base_path)
+base_path = Path(__file__).resolve().parents[1]
+normalized = {Path(p).resolve() for p in sys.path}
+if base_path not in normalized:
+    sys.path.append(str(base_path))
 os.chdir(base_path)
 
 

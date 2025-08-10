@@ -19,11 +19,14 @@
 # Verify for default SQLite:
 #   for i in `sqlite3 /tmp/rucio.db ".tables"`; do echo $i:; sqlite3 /tmp/rucio.db "select * from $i"; echo; done
 
-import os.path
+import os
 import sys
+from pathlib import Path
 
-base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(base_path)
+base_path = Path(__file__).resolve().parents[1]
+normalized = {Path(p).resolve() for p in sys.path}
+if base_path not in normalized:
+    sys.path.append(str(base_path))
 os.chdir(base_path)
 
 from rucio.db.sqla.util import build_database, create_base_vo, create_root_account  # noqa: E402
