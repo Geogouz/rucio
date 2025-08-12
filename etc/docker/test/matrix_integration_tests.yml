@@ -9,3 +9,7 @@ suites:
   - integration-test
 image_identifier:
   - integration-test
+services:
+  - storage,externalmetadata,iam
+services:
+  - storage,externalmetadata,iam

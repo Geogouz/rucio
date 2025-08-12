@@ -119,7 +119,7 @@ def main():
         build_args.insert(0, "--download-only")
     images = build_images.build_main(test_matrix, build_args)
 
-    if not images:
+    if not images or not images.get('images'):
         print("Images could not be built", file=sys.stderr)
 
     run_tests(test_matrix, images, args.filter_tests)

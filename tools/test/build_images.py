@@ -49,6 +49,71 @@ def build_images(matrix, script_args):
                               itertools.groupby(sorted(matrix, key=lambda d: d[DIST_KEY]), lambda d: d[DIST_KEY])}
     use_podman = 'USE_PODMAN' in os.environ and os.environ['USE_PODMAN'] == '1'
     images = dict()
+
+    reuse_images = os.environ.get('RUCIO_AUTOTEST_REUSE_IMAGES') == '1'
+
+    runtime_images: dict[str, str] = {}
+    runtime_python_versions = sorted(
+        {case.get('PYTHON', '3.9') for case in matrix if case.get('RUN_HTTPD', True)}
+    )
+
+    if runtime_python_versions:
+        runtime_buildfiles_path = pathlib.Path(script_args.buildfiles_dir)
+        runtime_buildfile = runtime_buildfiles_path / 'runtime.Dockerfile'
+        resolved_runtime_path = runtime_buildfiles_path.resolve()
+        runtime_context_dir = resolved_runtime_path
+        for candidate in (resolved_runtime_path, *resolved_runtime_path.parents):
+            if (candidate / 'setup.py').exists():
+                runtime_context_dir = candidate
+                break
+
+        cache_args = ()
+        if script_args.build_no_cache:
+            cache_args = ('--no-cache', '--pull-always' if use_podman else '--pull')
+
+        env = os.environ.copy()
+        env["DOCKER_BUILDKIT"] = "1"
+
+        for python_version in runtime_python_versions:
+            runtime_tag = f'rucio-dev-ci-runtime:py{python_version}'
+            runtime_images[python_version] = runtime_tag
+
+            if reuse_images:
+                result = subprocess.run(
+                    ('docker', 'image', 'inspect', runtime_tag),
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+                if result.returncode == 0:
+                    print(
+                        f"Runtime image {runtime_tag} already present locally, skipping build",
+                        file=sys.stderr,
+                        flush=True,
+                    )
+                    continue
+
+            if script_args.download_only:
+                continue
+
+            args = (
+                'docker',
+                'build',
+                *cache_args,
+                '--file',
+                str(runtime_buildfile),
+                '--target',
+                'final',
+                '--tag',
+                runtime_tag,
+                '--build-arg',
+                f'PYTHON={python_version}',
+                str(runtime_context_dir),
+            )
+
+            print("Running", " ".join(args), file=sys.stderr, flush=True)
+            subprocess.run(args, stdout=sys.stderr, check=True, env=env)
+            print("Finished building runtime image", runtime_tag, file=sys.stderr, flush=True)
+
     for dist, buildargs_list in distribution_buildargs.items():
         for buildargs in buildargs_list:
             filtered_buildargs = buildargs._asdict()
@@ -65,6 +130,27 @@ def build_images(matrix, script_args):
             imagetag = f'rucio-{image_identifier}:{dist.lower()}{buildargs_tags}'
             if script_args.cache_repo:
                 imagetag = script_args.cache_repo.lower() + '/' + imagetag
+
+            # add image to output so that callers can use it even if we skip
+            images[imagetag] = {DIST_KEY: dist, **buildargs._asdict()}
+
+            # Skip pulling/building if the image is already available locally and
+            # the developer requested to reuse it. This speeds up local
+            # development but does not affect CI where the env var is unset.
+            if reuse_images:
+                result = subprocess.run(
+                    ('docker', 'image', 'inspect', imagetag),
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+                if result.returncode == 0:
+                    print(
+                        f"Image {imagetag} already present locally, skipping build/download",
+                        file=sys.stderr,
+                        flush=True,
+                    )
+                    continue
+
             cache_args = ()
             if script_args.build_no_cache:
                 cache_args = ('--no-cache', '--pull-always' if use_podman else '--pull')
@@ -73,17 +159,28 @@ def build_images(matrix, script_args):
                 print("Running", " ".join(args), file=sys.stderr, flush=True)
                 subprocess.run(args, stdout=sys.stderr, check=False)
 
-            # add image to output
-            images[imagetag] = {DIST_KEY: dist, **buildargs._asdict()}
-
             if script_args.download_only:
                 # skip building
                 continue
 
-            args = ()
-            env = {"DOCKER_BUILDKIT": "1"}
+            env = os.environ.copy()
+            env["DOCKER_BUILDKIT"] = "1"
             if buildargs.IMAGE_IDENTIFIER == 'integration-test':
-                buildfile = pathlib.Path(script_args.buildfiles_dir) / 'alma9.Dockerfile'
+                buildfiles_path = pathlib.Path(script_args.buildfiles_dir)
+                buildfile = buildfiles_path / 'alma9.Dockerfile'
+                # Integration tests require access to the entire project
+                # directory so that the Docker build context contains the
+                # Python packages and configuration files copied in the
+                # Dockerfile.  When buildfiles_dir points to
+                # ``<project>/etc/docker/test`` the build context must be the
+                # project root, otherwise Docker fails to find files such as
+                # ``setup_webui.py`` and ``requirements``.
+                resolved_buildfiles = buildfiles_path.resolve()
+                context_dir = resolved_buildfiles
+                for candidate in (resolved_buildfiles, *resolved_buildfiles.parents):
+                    if (candidate / 'setup.py').exists():
+                        context_dir = candidate
+                        break
                 args = (
                     'docker',
                     'build',
@@ -93,7 +190,7 @@ def build_images(matrix, script_args):
                     '--tag',
                     imagetag,
                     *itertools.chain(*map(lambda x: ('--build-arg', f'{x[0]}={x[1]}'), filtered_buildargs.items())),
-                    f'{script_args.buildfiles_dir}',
+                    str(context_dir),
                 )
             else:
                 # build images for autotest or votest
@@ -121,7 +218,7 @@ def build_images(matrix, script_args):
                 print("Running", " ".join(args), file=sys.stderr, flush=True)
                 subprocess.run(args, stdout=sys.stderr, check=True)
 
-    return images
+    return {"images": images, "runtime_images": runtime_images}
 
 
 def build_arguments(parser):
@@ -189,7 +286,9 @@ def main():
     if script_args.output == 'dict':
         json.dump(images, sys.stdout)
     elif script_args.output == 'list':
-        json.dump(list(images.keys()), sys.stdout)
+        image_tags = list(images.get('images', {}).keys())
+        runtime_tags = list(images.get('runtime_images', {}).values())
+        json.dump(image_tags + runtime_tags, sys.stdout)
 
 
 if __name__ == "__main__":

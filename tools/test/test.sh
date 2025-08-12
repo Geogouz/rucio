@@ -47,10 +47,26 @@ function wait_for_database() {
     done
 }
 
+function should_run_integration_test() {
+    local candidate="$1"
+    if [ -z "${TESTS:-}" ]; then
+        return 0
+    fi
+
+    local selection
+    for selection in ${TESTS}; do
+        if [[ "$candidate" == "$selection" || "$candidate" == *"$selection"* ]]; then
+            return 0
+        fi
+    done
+
+    return 1
+}
+
 if [ "$SUITE" == "client" ]; then
     tools/run_tests.sh -i
 
-    cp "$SOURCE_PATH"/etc/docker/test/extra/rucio_client.cfg "$RUCIO_HOME"/etc/rucio.cfg    
+    cp "$SOURCE_PATH"/etc/docker/test/extra/rucio_client.cfg "$RUCIO_HOME"/etc/rucio.cfg
     srchome
     tools/pytest.sh -v --tb=short tests/test_clients.py tests/test_bin_rucio.py tests/test_module_import.py
 
@@ -108,5 +124,42 @@ elif [ "$SUITE" == "remote_dbs" ] || [ "$SUITE" == "sqlite" ]; then
         tools/run_tests.sh -p
     else
         tools/run_tests.sh
+    fi
+
+elif [ "$SUITE" == "integration-test" ]; then
+    wait_for_database
+    wait_for_httpd
+
+    if [ -f "$SOURCE_PATH/etc/rse-accounts.cfg.template" ]; then
+        cp "$SOURCE_PATH/etc/rse-accounts.cfg.template" "$SOURCE_PATH/etc/rse-accounts.cfg"
+    fi
+
+    tools/run_tests.sh -ir
+    wait_for_httpd
+
+    declare -a integration_tests=(
+        "tests/test_rucio_server.py"
+        "tests/test_upload.py"
+        "tests/test_impl_upload_download.py"
+        "tests/test_rse_protocol_gfal2_impl.py"
+        "tests/test_rse_protocol_xrootd.py"
+        "tests/test_rse_protocol_ssh.py"
+        "tests/test_rse_protocol_rsync.py"
+        "tests/test_rse_protocol_rclone.py"
+        "tests/test_conveyor.py"
+        "tests/test_download.py::test_download_from_archive_on_xrd"
+        "tests/test_did_meta_plugins.py::TestDidMetaMongo"
+        "tests/test_did_meta_plugins.py::TestDidMetaExternalPostgresJSON"
+        "tests/test_did_meta_plugins.py::TestDidMetaElastic"
+    )
+
+    for test_target in "${integration_tests[@]}"; do
+        if should_run_integration_test "$test_target"; then
+            tools/pytest.sh -v --tb=short "$test_target"
+        fi
+    done
+
+    if should_run_integration_test "tests/test_tpc.py"; then
+        tools/pytest.sh -v --tb=short --export-artifacts-from="test_tpc" tests/test_tpc.py
     fi
 fi
