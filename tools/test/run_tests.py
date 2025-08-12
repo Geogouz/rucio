@@ -13,77 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-Test runner used by Rucio's CI/autotest tooling.
-
-GitHub Actions workflows collect matrix entries from ``etc/docker/test/matrix.yml``
-(via :mod:`tools.test.matrix_parser`), resolves runtime images, and pipes a JSON
-payload into this module. From that payload we derive a sequence of *cases*
-(distribution × python version × test suite × database) and execute them either
-as ad-hoc containers or through the development docker-compose stack.
-
-The intent is to centralise all orchestration concerns in a single place so
-that higher level tooling can simply call :func:`run_tests`.
-
-Execution modes
-===============
-Two execution strategies are supported and are selected on a per-case basis:
-
-``RUN_HTTPD`` true (default)
-    Bring up the development compose stack from ``etc/docker/dev/docker-compose.yml``.
-    The ``rucio`` service is temporarily overridden to use the desired runtime image while
-    mounting the working tree, and the tests are triggered via ``docker compose exec``.
-
-``RUN_HTTPD`` false
-    Start a single throw-away container from the resolved image and run ``./tools/test/test.sh``
-    directly. Syntax-only suites use this path as it avoids the httpd/database dependencies.
-
-Environment variables honoured by this module
-=============================================
-``USE_PODMAN``
-    When set to ``"1"`` the runner assumes that the Docker-compatible CLI is
-    provided by Podman. Commands still go through the ``docker`` entrypoint
-    (via Podman's compatibility shim) but we additionally create per-case pods
-    and namespaces to keep networking consistent when running in parallel.
-
-``PARALLEL_AUTOTESTS`` and ``PARALLEL_AUTOTESTS_PROCNUM``
-    Toggle whether cases are executed concurrently (via :class:`multiprocessing.Pool`)
-    and configure the worker pool size.
-
-``PARALLEL_AUTOTESTS_FAILFAST``
-    Instructs the parallel executor to abort remaining
-    cases as soon as one failure is observed.
-
-``COPY_AUTOTEST_LOGS``
-    When using the compose/httpd path, copy the service
-    logs into a per-case directory for later inspection.
-
-``GITHUB_ACTIONS``
-    Injected into every container through :func:`env_args` so downstream
-    scripts can detect whether they run in CI.
-
-The module is structured as a few small helpers:
-
-``main``
-    Reads the JSON payload from ``stdin`` and prepares the ``cases`` and
-    ``images`` structures used by :func:`run_tests`.
-
-``run_tests``
-    Handles parallelism, logging, and success aggregation across cases.
-
-``run_case``
-    Implements the per-case orchestration, deciding between direct execution and compose-based
-    execution, managing pods/namespaces and delegating log capture to the specialised helpers.
-
-``run_test_directly`` and ``run_with_httpd``
-    The low-level primitives that actually launch containers or compose stacks.
-"""
-
+import argparse
 import itertools
 import json
 import multiprocessing
 import os
 import pathlib
+import re
 import shutil
 import subprocess  # noqa: S404 -- subprocess used for external commands
 import sys
@@ -92,26 +28,161 @@ import traceback
 import uuid
 from datetime import datetime
 from tempfile import NamedTemporaryFile
-from typing import TYPE_CHECKING, NoReturn, Optional, Union
+from typing import Optional
 
-import yaml
+REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
+DEFAULT_MATRIX_FILE = REPO_ROOT / 'etc/docker/test/matrix.json'
+DEFAULT_NIGHTLY_MATRIX_FILE = REPO_ROOT / 'etc/docker/test/matrix_nightly.json'
+DEFAULT_VO_MATRIX_FILE = REPO_ROOT / 'etc/docker/test/matrix_vo.json'
+DEFAULT_COMPOSE_FILE = REPO_ROOT / 'etc/docker/dev/docker-compose.yml'
+DEFAULT_TESTS_COMPOSE_FILE = REPO_ROOT / 'etc/docker/dev/docker-compose.tests.yml'
+DEFAULT_RUCIO_TAG = 'latest'
+DEFAULT_INTEGRATION_PROFILES = ('storage', 'externalmetadata', 'iam')
+UNIT_PYTHON_VERSIONS = ('3.9', '3.10', '3.11', '3.12')
+INTEGRATION_CORE_TESTS = (
+    'tests/test_rucio_server.py',
+    'tests/test_upload.py',
+    'tests/test_impl_upload_download.py',
+    'tests/test_rse_protocol_gfal2_impl.py',
+    'tests/test_rse_protocol_xrootd.py',
+    'tests/test_rse_protocol_ssh.py',
+    'tests/test_rse_protocol_rsync.py',
+    'tests/test_rse_protocol_rclone.py',
+    'tests/test_conveyor.py',
+)
+INTEGRATION_POST_TESTS = (
+    'tests/test_reaper.py::test_deletion_with_tokens',
+    'tests/test_download.py::test_download_from_archive_on_xrd',
+    'tests/test_did_meta_plugins.py::TestDidMetaMongo',
+    'tests/test_did_meta_plugins.py::TestDidMetaExternalPostgresJSON',
+    'tests/test_did_meta_plugins.py::TestDidMetaElastic',
+)
+SOURCE_VOLUME_TEMPLATE = (
+    ('', '/rucio_source', ':ro'),
+    ('tools', '/opt/rucio/tools', ':Z'),
+    ('bin', '/opt/rucio/bin', ':Z'),
+    ('lib', '/opt/rucio/lib', ':Z'),
+    ('tests', '/opt/rucio/tests', ':Z'),
+    ('etc/mail_templates', '/opt/rucio/etc/mail_templates', ':Z'),
+    ('etc/automatix.json', '/opt/rucio/etc/automatix.json', ':Z'),
+    ('etc/google-cloud-storage-test.json', '/opt/rucio/etc/google-cloud-storage-test.json', ':Z'),
+    ('etc/idpsecrets.json', '/opt/rucio/etc/idpsecrets.json', ':Z'),
+    ('etc/rse_repository.json', '/opt/rucio/etc/rse_repository.json', ':Z'),
+    ('etc/docker/test/matrix_policy_package_tests.yml', '/opt/rucio/etc/docker/test/matrix_policy_package_tests.yml', ':Z'),
+)
+RUNTIME_IMAGE_ENV_BY_PYTHON = {
+    '3.9': 'RUCIO_CI_RUNTIME_IMAGE_PY39',
+    '3.10': 'RUCIO_CI_RUNTIME_IMAGE_PY310',
+}
+CI_MODE_DEFINITIONS = {
+    'autotest': {
+        'description': 'Workflow-aligned suite: autotest matrix (etc/docker/test/matrix.json)',
+        'kind': 'matrix',
+        'matrix_parse': DEFAULT_MATRIX_FILE,
+    },
+    'autotest-nightly': {
+        'description': 'Workflow-aligned suite: nightly autotest matrix (etc/docker/test/matrix_nightly.json)',
+        'kind': 'matrix',
+        'matrix_parse': DEFAULT_NIGHTLY_MATRIX_FILE,
+    },
+    'vo': {
+        'description': 'Workflow-aligned suite: VO matrix (etc/docker/test/matrix_vo.json)',
+        'kind': 'matrix',
+        'matrix_parse': DEFAULT_VO_MATRIX_FILE,
+    },
+    'integration': {
+        'description': 'Workflow-aligned suite: integration workflow',
+        'kind': 'integration',
+    },
+    'unit': {
+        'description': 'Workflow-aligned suite: unit tests (tests/rucio)',
+        'kind': 'unit',
+    },
+    'all': {
+        'description': 'Workflow-aligned suite: all (autotest + vo + integration + unit)',
+        'kind': 'sequence',
+        'sequence': ('autotest', 'vo', 'integration', 'unit'),
+    },
+}
 
-if TYPE_CHECKING:
-    import io
+
+def ci_mode_choices() -> tuple[str, ...]:
+    return tuple(CI_MODE_DEFINITIONS.keys())
 
 
-def run(*args, check=True, return_stdout=False, env=None) -> Union[NoReturn, 'io.TextIOBase']:
-    """
-    Invoke ``subprocess.run`` with verbose logging and optional capture.
+def ci_mode_metadata() -> list[dict[str, str]]:
+    return [{'mode': mode, 'description': str(config.get('description', ''))} for mode, config in CI_MODE_DEFINITIONS.items() if config.get('description')]
 
-    ``run`` is deliberately verbose: every command is echoed before execution so the CI logs
-    contain the full docker/podman history leading up to a failure. The helper also mirrors
-    :func:`subprocess.run`'s ``check`` semantics and exposes a lightweight ``return_stdout``
-    flag that switches to capturing stdout when the caller needs the produced value.
-    """
+
+def env_enabled(name: str) -> bool:
+    return os.environ.get(name) == '1'
+
+
+def resolved_rucio_tag(cli_value: str) -> str:
+    normalized = cli_value.strip()
+    if normalized:
+        return normalized
+    return os.environ.get('RUCIO_TAG', DEFAULT_RUCIO_TAG)
+
+
+def integration_project_name() -> str:
+    project = os.environ.get('RUCIO_TEST_PROJECT_NAME', 'dev').strip()
+    if not project:
+        return 'dev'
+    if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]*', project):
+        raise RuntimeError(
+            f"Invalid RUCIO_TEST_PROJECT_NAME '{project}'. Allowed: letters, digits, '-' and '_'."
+        )
+    return project
+
+
+def source_volume_mounts() -> list[str]:
+    source_root = pathlib.Path(os.path.abspath(os.curdir))
+    return [
+        f'{source_root if not relative_path else source_root / relative_path}:{container_path}{suffix}'
+        for relative_path, container_path, suffix in SOURCE_VOLUME_TEMPLATE
+    ]
+
+
+def docker_volume_args() -> list[str]:
+    return list(itertools.chain.from_iterable(('-v', mount) for mount in source_volume_mounts()))
+
+
+def default_runtime_image() -> str:
+    return (
+        f"docker.io/{os.environ.get('DOCKER_REPO', 'rucio')}/rucio-dev:"
+        f"{os.environ.get('RUCIO_DEV_PREFIX', '')}{os.environ.get('RUCIO_TAG', DEFAULT_RUCIO_TAG)}"
+    )
+
+
+def load_json_file(path: pathlib.Path):
+    try:
+        return json.loads(path.read_text(encoding='utf-8'))
+    except OSError as error:
+        raise RuntimeError(f"Could not read JSON file '{path}'.") from error
+    except json.JSONDecodeError as error:
+        raise RuntimeError(f"Invalid JSON in '{path}'.") from error
+
+
+def load_matrix_cases(path: pathlib.Path) -> list[dict]:
+    loaded = load_json_file(path)
+    if not isinstance(loaded, list):
+        raise RuntimeError(f"Matrix file '{path}' must contain a JSON list of objects.")
+    if not all(isinstance(entry, dict) for entry in loaded):
+        raise RuntimeError(f"Matrix file '{path}' must contain only JSON objects.")
+    return loaded
+
+
+def plan_unit_python_versions() -> tuple[str, ...]:
+    return UNIT_PYTHON_VERSIONS
+
+
+def run(*args, check=True, return_stdout=False, env=None, cwd: Optional[pathlib.Path] = None) -> Optional[bytes]:
     kwargs = {'check': check, 'stdout': sys.stderr, 'stderr': subprocess.STDOUT}
     if env is not None:
         kwargs['env'] = env
+    if cwd is not None:
+        kwargs['cwd'] = str(cwd)
     if return_stdout:
         kwargs['stderr'] = sys.stderr
         kwargs['stdout'] = subprocess.PIPE
@@ -123,55 +194,18 @@ def run(*args, check=True, return_stdout=False, env=None) -> Union[NoReturn, 'io
 
 
 def env_args(caseenv):
-    """
-    Expand a case environment mapping into CLI ``--env`` fragments.
-
-    ``caseenv`` is derived from the matrix entry and contains the suite name, optional
-    database, and other flags consumed by ``test.sh``. We flatten the mapping into a list
-    ``['--env', 'KEY=value', ...]`` suitable for ``docker/podman run`` while force-injecting
-    ``GITHUB_ACTIONS`` so that downstream shell scripts retain awareness of the CI context
-    even when the surrounding orchestrator is not GitHub Actions.
-    """
-    environment_args = list(itertools.chain(*map(lambda x: ('--env', f'{x[0]}={x[1]}'), caseenv.items())))
-    environment_args.append('--env')
-    environment_args.append('GITHUB_ACTIONS')
-    return environment_args
+    return [*itertools.chain.from_iterable((('--env', f'{k}={v}') for k, v in caseenv.items())), '--env', 'GITHUB_ACTIONS']
 
 
 def matches(small: dict, group: dict):
-    """
-    Return ``True`` when ``group`` contains all key/value pairs from ``small``.
-
-    Image metadata and matrix entries are represented as loose dictionaries. The helper
-    isolates the "does this image satisfy the required characteristics?" check used by
-    :func:`find_image`.
-    """
-    for key in small.keys():
-        if key not in group or small[key] != group[key]:
-            return False
-    return True
+    return all(key in group and small[key] == group[key] for key in small)
 
 
 def stringify_dict(inp: dict):
-    """
-    Coerce mapping keys/values to strings for JSON/YAML consumption.
-
-    The matrix originates from YAML where types may be integers or booleans; container
-    environment variables expect strings, so we normalise to avoid differences between
-    Python/YAML types later in the pipeline.
-    """
     return {str(k): str(v) for k, v in inp.items()}
 
 
 def find_image(images: dict, case: dict):
-    """
-    Return the runtime image tag matching the matrix attributes.
-
-    ``images`` is a mapping of image tags to metadata derived from the JSON payload read in
-    :func:`main`. Each entry describes the image in terms of distribution, Python version, and
-    optional identifiers. The metadata recorded for the image must be a subset of the matrix
-    case so that the case attributes satisfy the requirements encoded by the image.
-    """
     for image, idgroup in images.items():
         if matches(idgroup, case):
             return image
@@ -179,57 +213,19 @@ def find_image(images: dict, case: dict):
 
 
 def case_id(case: dict) -> str:
-    """
-    Generate a human-readable identifier from the matrix attributes.
-
-    The resulting string is used for log file names and stderr prefixes, e.g.
-    ``alma9-py3.9-client-postgres14``.
-    """
     parts = [case["DIST"], 'py' + case["PYTHON"], case["SUITE"], case.get("RDBMS", "")]
     return '-'.join(filter(bool, parts))
 
 
 def case_log(caseid, msg, file=sys.stderr):
-    """
-    Print ``msg`` with the case identifier prefix for consistent logging.
-    """
     print(caseid, msg, file=file, flush=True)
 
 
 def run_tests(cases: list, images: dict, tests: Optional[list[str]] = None):
-    """
-    Execute all matrix cases serially or in parallel.
-
-    Parameters
-    ----------
-    cases:
-        Case dictionaries produced by :mod:`tools.test.matrix_parser`. These contain env
-        variables and flags such as ``RUN_HTTPD`` which choose the orchestration mode.
-    images:
-        Mapping used by :func:`find_image` to resolve cases to container images. When ``runtime_images``
-        are present in the JSON payload, they override the default ``images`` mapping.
-    tests:
-        Optional test selectors forwarded to ``tools/test/test.sh`` and, in turn, to ``tools/run_tests.sh``.
-        When set, the runner drops to a filtered pytest invocation rather than executing the full suite.
-
-    High-level behaviour
-    --------------------
-    * honours ``PARALLEL_AUTOTESTS`` (and related variables) to decide whether
-      to spawn a :class:`multiprocessing.Pool`.
-    * normalises each case environment to strings so it can be passed to the
-      shell wrappers without surprises.
-    * records stdout/stderr for each case in dedicated log files when running
-      in parallel, making it possible to inspect failures after the workers exit.
-    * surfaces worker failures via the ``sys.exit`` calls in :func:`run_case`.
-      Unexpected exceptions caught by :func:`run_case_logger` cause the worker
-      to return ``False`` so ``PARALLEL_AUTOTESTS_FAILFAST`` can stop the pool
-      early; when fail-fast is disabled these errors are left to the logs for
-      later inspection.
-    """
-    use_podman = 'USE_PODMAN' in os.environ and os.environ['USE_PODMAN'] == '1'
-    parallel = 'PARALLEL_AUTOTESTS' in os.environ and os.environ['PARALLEL_AUTOTESTS'] == '1'
-    failfast = 'PARALLEL_AUTOTESTS_FAILFAST' in os.environ and os.environ['PARALLEL_AUTOTESTS_FAILFAST'] == '1'
-    copy_rucio_logs = 'COPY_AUTOTEST_LOGS' in os.environ and os.environ['COPY_AUTOTEST_LOGS'] == '1'
+    use_podman = env_enabled('USE_PODMAN')
+    parallel = env_enabled('PARALLEL_AUTOTESTS')
+    failfast = env_enabled('PARALLEL_AUTOTESTS_FAILFAST')
+    copy_rucio_logs = env_enabled('COPY_AUTOTEST_LOGS')
     logs_dir = pathlib.Path('.autotest')
     if parallel or copy_rucio_logs:
         logs_dir.mkdir(exist_ok=True)
@@ -285,62 +281,38 @@ def run_tests(cases: list, images: dict, tests: Optional[list[str]] = None):
 
 
 def run_case_logger(run_case_kwargs: dict, stdlog=sys.stderr):
-    """
-    Wrap :func:`run_case` to add per-case log files and error reporting.
-
-    The multiprocessing pool cannot share file descriptors with the parent, so we open the
-    log file inside the worker process and temporarily redirect ``sys.stderr``. Any
-    exception is recorded in the case log and translated into ``False`` so the caller can
-    decide whether to abort the run (``FAILFAST``) or continue with the remaining cases.
-    """
     caseid = case_id(run_case_kwargs['caseenv'])
     case_log(caseid, 'started task. Logging to ' + repr(stdlog))
     defaultstderr = sys.stderr
     startmsg = f'{("=" * 80)}\nStarting test case {caseid}\n  at {datetime.now().isoformat()}\n{"=" * 80}\n'
-    if isinstance(stdlog, pathlib.PurePath):
-        with open(str(stdlog), 'a') as logfile:
-            logfile.write(startmsg)
-            logfile.flush()
-            sys.stderr = logfile
-            try:
-                run_case(**run_case_kwargs)
-            except Exception:
-                traceback.print_exc(file=sys.stderr)
-                case_log(caseid, f'errored with {sys.exc_info()[0].__name__}: {sys.exc_info()[1]}', file=defaultstderr)
-                return False
-            finally:
-                sys.stderr = defaultstderr
-    else:
-        sys.stderr = stdlog
+
+    def run_logged_case(log_target) -> bool:
+        sys.stderr = log_target
         try:
-            print(startmsg, file=sys.stderr)
             run_case(**run_case_kwargs)
+            return True
         except Exception:
             traceback.print_exc(file=sys.stderr)
             case_log(caseid, f'errored with {sys.exc_info()[0].__name__}: {sys.exc_info()[1]}', file=defaultstderr)
             return False
         finally:
             sys.stderr = defaultstderr
-    case_log(caseid, 'completed successfully!')
-    return True
+
+    if isinstance(stdlog, pathlib.PurePath):
+        with open(str(stdlog), 'a') as logfile:
+            logfile.write(startmsg)
+            logfile.flush()
+            success = run_logged_case(logfile)
+    else:
+        print(startmsg, file=stdlog)
+        success = run_logged_case(stdlog)
+
+    if success:
+        case_log(caseid, 'completed successfully!')
+    return success
 
 
 def run_case(caseenv, image, use_podman, use_namespace, use_httpd, copy_rucio_logs, logs_dir: pathlib.Path, tests: list[str]):
-    """
-    Run a single matrix case using the requested container orchestration.
-
-    ``run_case`` normalises all per-case decisions before delegating to the execution primitives.
-    Responsibilities include:
-
-    * invoking ``docker image ls`` upfront so connectivity issues with the
-      container runtime surface before any orchestration begins.
-    * creating/tearing down Podman pods or namespaces when parallel execution
-      would otherwise result in conflicting container names.
-    * dispatching to :func:`run_test_directly` or :func:`run_with_httpd`
-      depending on ``RUN_HTTPD``.
-    * forwarding log-copy requests to :func:`run_with_httpd` and converting the boolean
-      success back into the ``sys.exit`` contract expected by the outer control flow.
-    """
     if use_namespace:
         namespace = str(uuid.uuid4())
         namespace_args = ['--namespace', namespace]
@@ -348,8 +320,6 @@ def run_case(caseenv, image, use_podman, use_namespace, use_httpd, copy_rucio_lo
     else:
         namespace_args = []
         namespace_env = {}
-
-    run('docker', 'image', 'ls', image)
 
     pod = ""
     if use_podman:
@@ -367,7 +337,6 @@ def run_case(caseenv, image, use_podman, use_namespace, use_httpd, copy_rucio_lo
             success = run_with_httpd(
                 caseenv=caseenv,
                 image=image,
-                namespace_args=namespace_args,
                 namespace_env=namespace_env,
                 copy_rucio_logs=copy_rucio_logs,
                 logs_dir=logs_dir,
@@ -401,57 +370,28 @@ def run_test_directly(
         namespace_args: list[str],
         tests: list[str],
 ):
-    """
-    Execute the suite by invoking ``tools/test/test.sh`` directly.
-
-    The direct path keeps orchestration costs low. We start a single container, mount the
-    relevant parts of the repository (``/rucio_source`` plus ``/opt/rucio/{tools,bin,lib,tests}``)
-    and then execute the shell helper that performs dependency installation, bootstrapping,
-    and pytest execution. Additional matrix-provided environment variables are passed in via
-    ``--env`` flags and optional ``tests`` selectors are surfaced through the ``TESTS`` variable.
-
-    Returns
-    -------
-    bool
-        ``True`` on success, ``False`` on failure (the caller will handle logging and exiting).
-    """
     pod_net_arg = ['--pod', pod] if use_podman else []
-    scripts_to_run = ' && '.join(
-        [
-            # Install Rucio directly from the mounted source
-            'ln -sf pyproject.server.toml pyproject.toml',
-            'pip install --no-cache-dir -e /rucio_source',
-            # Change to the source directory so that relative paths work
-            'cd /rucio_source',
-            './tools/test/test.sh' + (' -p' if tests else ''),
-        ]
-    )
+    scripts_to_run = ' && '.join([
+        'rm -rf /tmp/rucio_source',
+        'mkdir -p /tmp/rucio_source',
+        'cp -a /rucio_source/. /tmp/rucio_source/',
+        'cd /tmp/rucio_source',
+        'ln -sf pyproject.server.toml pyproject.toml',
+        'pip install --no-cache-dir -e /tmp/rucio_source',
+        'RUCIO_SOURCE_DIR=/tmp/rucio_source python3 tools/test/suite_runner.py --run-suite-from-env',
+    ])
 
     try:
         if tests:
-            caseenv = dict(caseenv)
-            caseenv['TESTS'] = ' '.join(tests)
+            caseenv = {**caseenv, 'TESTS': ' '.join(tests)}
 
-        # Running rucio container from given image with special entrypoint
         run(
             'docker',
             *namespace_args,
             'run',
             '--rm',
             *pod_net_arg,
-            # Mount the source code from the PR as writable
-            '-v', f"{os.path.abspath(os.curdir)}:/rucio_source",
-            '-v', f"{os.path.abspath(os.curdir)}/tools:/opt/rucio/tools:Z",
-            '-v', f"{os.path.abspath(os.curdir)}/bin:/opt/rucio/bin:Z",
-            '-v', f"{os.path.abspath(os.curdir)}/lib:/opt/rucio/lib:Z",
-            '-v', f"{os.path.abspath(os.curdir)}/tests:/opt/rucio/tests:Z",
-            # Mount specific etc subdirectories instead of the entire etc to keep certificates (Copying the entire etc overrides the certificates)
-            '-v', f"{os.path.abspath(os.curdir)}/etc/mail_templates:/opt/rucio/etc/mail_templates:Z",
-            '-v', f"{os.path.abspath(os.curdir)}/etc/automatix.json:/opt/rucio/etc/automatix.json:Z",
-            '-v', f"{os.path.abspath(os.curdir)}/etc/google-cloud-storage-test.json:/opt/rucio/etc/google-cloud-storage-test.json:Z",
-            '-v', f"{os.path.abspath(os.curdir)}/etc/idpsecrets.json:/opt/rucio/etc/idpsecrets.json:Z",
-            '-v', f"{os.path.abspath(os.curdir)}/etc/rse_repository.json:/opt/rucio/etc/rse_repository.json:Z",
-            '-v', f"{os.path.abspath(os.curdir)}/etc/docker/test/matrix_policy_package_tests.yml:/opt/rucio/etc/docker/test/matrix_policy_package_tests.yml:Z",
+            *docker_volume_args(),
             *(env_args(caseenv)),
             image,
             'sh',
@@ -473,160 +413,552 @@ def run_test_directly(
 def run_with_httpd(
         caseenv: dict[str, str],
         image: str,
-        namespace_args: list[str],
         namespace_env: dict[str, str],
         copy_rucio_logs: bool,
         logs_dir: pathlib.Path,
         tests: list[str],
 ) -> bool:
-    """
-    Execute a test case by overlaying the development docker-compose stack.
+    if not DEFAULT_TESTS_COMPOSE_FILE.exists():
+        raise RuntimeError(f"Docker Compose tests override file not found at '{DEFAULT_TESTS_COMPOSE_FILE}'.")
 
-    The httpd-enabled suites require the full service stack (web server, daemons, databases).
-    We therefore:
-
-    * render a temporary compose override file that replaces the ``rucio``
-      service image and mounts the repository checkout.
-    * start the stack via ``docker compose up``
-      (optionally scoped by the requested ``RDBMS`` profile).
-    * ``docker compose exec`` into the running ``rucio`` container
-      to trigger ``./tools/test/test.sh``.
-    * optionally collect container logs into ``logs_dir`` for later analysis
-      before tearing everything down with ``docker compose down``.
-
-    The ``namespace_args``/``namespace_env`` parameters keep the interface consistent with Podman
-    invocations where ``docker`` commands are wrapped in ``podman --namespace <name>``.
-
-    Returns
-    -------
-    bool
-        ``True`` when the suite completes successfully, ``False`` otherwise.
-    """
-
-    with (NamedTemporaryFile() as compose_override_file):
-        compose_override_content = yaml.dump({
-            'services': {
-                'rucio': {
-                    'image': image,
-                    'environment': [f'{k}={v}' for k, v in caseenv.items()],
-                    'working_dir': '/rucio_source',
-                    'entrypoint': ['/rucio_source/etc/docker/dev/rucio/entrypoint.sh'],
-                    'volumes': [
-                        # Mount the current source code from the PR as writable
-                        f"{os.path.abspath(os.curdir)}:/rucio_source",
-                        f"{os.path.abspath(os.curdir)}/tools:/opt/rucio/tools:Z",
-                        f"{os.path.abspath(os.curdir)}/bin:/opt/rucio/bin:Z",
-                        f"{os.path.abspath(os.curdir)}/lib:/opt/rucio/lib:Z",
-                        f"{os.path.abspath(os.curdir)}/tests:/opt/rucio/tests:Z",
-                        # Mount specific etc subdirectories
-                        f"{os.path.abspath(os.curdir)}/etc/mail_templates:/opt/rucio/etc/mail_templates:Z",
-                        f"{os.path.abspath(os.curdir)}/etc/automatix.json:/opt/rucio/etc/automatix.json:Z",
-                        f"{os.path.abspath(os.curdir)}/etc/google-cloud-storage-test.json:/opt/rucio/etc/google-cloud-storage-test.json:Z",
-                        f"{os.path.abspath(os.curdir)}/etc/idpsecrets.json:/opt/rucio/etc/idpsecrets.json:Z",
-                        f"{os.path.abspath(os.curdir)}/etc/rse_repository.json:/opt/rucio/etc/rse_repository.json:Z",
-                        f"{os.path.abspath(os.curdir)}/etc/docker/test/matrix_policy_package_tests.yml:/opt/rucio/etc/docker/test/matrix_policy_package_tests.yml:Z",
-                    ],
-                },
-                'ruciodb': {
-                    'profiles': ['donotstart'],
-                }
-            }
-        })
-        print("Overriding docker compose configuration with: \n", compose_override_content, flush=True)
-        with open(compose_override_file.name, 'w') as f:
-            f.write(compose_override_content)
-
-        rdbms = caseenv.get('RDBMS', '')
-        project = os.urandom(8).hex()
-        compose_env = os.environ.copy()
-        compose_env.update(namespace_env)
-        rucio_container = f'{project}-rucio-1'
-        compose_env['RUCIO_HTTPD_CONTAINER_NAME'] = rucio_container
-        compose_env['RUCIO_INFLUXDB_CONTAINER_NAME'] = f'{project}-influxdb-1'
-        compose_env['RUCIO_GRAPHITE_CONTAINER_NAME'] = f'{project}-graphite-1'
-        compose_env['RUCIO_ELASTICSEARCH_CONTAINER_NAME'] = f'{project}-elasticsearch-1'
-        compose_env['RUCIO_ACTIVEMQ_CONTAINER_NAME'] = f'{project}-activemq-1'
-        compose_env['RUCIO_WEB1_CONTAINER_NAME'] = f'{project}-web1-1'
-        rdbms_container_env = {
-            'postgres14': 'RUCIO_POSTGRES14_CONTAINER_NAME',
-            'mysql8': 'RUCIO_MYSQL8_CONTAINER_NAME',
-            'oracle': 'RUCIO_ORACLE_CONTAINER_NAME',
-        }
-        rdbms_env = rdbms_container_env.get(rdbms)
-        if rdbms_env:
-            compose_env[rdbms_env] = f'{project}-{rdbms}-1'
-        up_down_args = (
-            '--file', 'etc/docker/dev/docker-compose.yml',
-            '--file', compose_override_file.name,
-            '--profile', rdbms,
+    rdbms = caseenv.get('RDBMS', '')
+    project = os.urandom(8).hex()
+    compose_env = os.environ.copy()
+    compose_env.update(namespace_env)
+    compose_env.update(caseenv)
+    compose_env['RUCIO_IMAGE'] = image
+    compose_env['RUCIO_SOURCE_MOUNT_MODE'] = ':ro'
+    up_down_args = [
+        '--file', str(DEFAULT_COMPOSE_FILE),
+        '--file', str(DEFAULT_TESTS_COMPOSE_FILE),
+    ]
+    if rdbms:
+        up_down_args.extend(['--profile', rdbms])
+    compose_cmd = ['docker', 'compose', '-p', project, *up_down_args]
+    try:
+        run(*compose_cmd, 'up', '-d', env=compose_env)
+        run(
+            *compose_cmd,
+            'exec',
+            '-T',
+            'rucio',
+            'bash',
+            '-lc',
+            (
+                'set -euo pipefail; '
+                'rm -rf /tmp/rucio_source; '
+                'mkdir -p /tmp/rucio_source; '
+                'cp -a /rucio_source/. /tmp/rucio_source/; '
+                'cd /tmp/rucio_source; '
+                'ln -sf pyproject.server.toml pyproject.toml; '
+                'pip install --no-cache-dir -e /tmp/rucio_source'
+            ),
         )
-        try:
-            # Start docker compose
-            run('docker', 'compose', '-p', project, *up_down_args, 'up', '-d', env=compose_env)
+        suite_env = list(itertools.chain.from_iterable(('-e', f'{k}={v}') for k, v in caseenv.items()))
+        suite_env.extend(['-e', 'RUCIO_SOURCE_DIR=/tmp/rucio_source'])
+        if tests:
+            suite_env.extend(['-e', f"TESTS={' '.join(tests)}"])
+        run(
+            *compose_cmd,
+            'exec',
+            '-T',
+            *suite_env,
+            'rucio',
+            'bash',
+            '-lc',
+            'cd /tmp/rucio_source && python3 tools/test/suite_runner.py --run-suite-from-env',
+        )
+        return True
+    except subprocess.CalledProcessError as error:
+        print(
+            f"** Process '{error.cmd}' exited with code {error.returncode}",
+            {**caseenv, "IMAGE": image},
+            file=sys.stderr,
+            flush=True,
+        )
+    finally:
+        run(*compose_cmd, 'logs', 'rucio', check=False)
+        if copy_rucio_logs:
+            try:
+                if logs_dir.exists():
+                    shutil.rmtree(logs_dir)
+                container_id_raw = run(*compose_cmd, 'ps', '-q', 'rucio', return_stdout=True, check=False)
+                container_id = (container_id_raw or b'').decode().strip()
+                if container_id:
+                    run('docker', 'cp', f'{container_id}:/var/log', str(logs_dir))
+            except Exception:
+                print(
+                    "** Error on retrieving logs for",
+                    {**caseenv, "IMAGE": image},
+                    '\n',
+                    traceback.format_exc(),
+                    '\n**',
+                    file=sys.stderr,
+                    flush=True,
+                )
+        run(*compose_cmd, 'down', '-t', '30', check=False, env=compose_env)
+    return False
 
-            # Install Rucio directly from the mounted source
-            run('docker', *namespace_args, 'exec', rucio_container, 'ln', '-sf', 'pyproject.server.toml', 'pyproject.toml')
-            run('docker', *namespace_args, 'exec', rucio_container, 'pip', 'install', '--no-cache-dir', '-e', '/rucio_source')
 
-            # Running test.sh
-            if tests:
-                tests_env = ('--env', 'TESTS=' + ' '.join(tests))
-                tests_arg = ('-p', )
-            else:
-                tests_env = ()
-                tests_arg = ()
+def current_git_sha() -> str:
+    git = shutil.which('git')
+    if not git:
+        return 'unknown'
+    proc = subprocess.run(
+        [git, 'rev-parse', 'HEAD'],
+        cwd=REPO_ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        text=True,
+        check=False,
+    )
+    if proc.returncode != 0:
+        return 'unknown'
+    return proc.stdout.strip() or 'unknown'
 
-            run('docker', *namespace_args, 'exec', *tests_env, rucio_container, './tools/test/test.sh', *tests_arg)
 
-            # if everything went through without an exception, mark this case as a success
-            return True
-        except subprocess.CalledProcessError as error:
-            print(
-                f"** Process '{error.cmd}' exited with code {error.returncode}",
-                {**caseenv, "IMAGE": image},
-                file=sys.stderr,
-                flush=True,
-            )
-        finally:
-            run('docker', *namespace_args, 'logs', rucio_container, check=False)
-            if copy_rucio_logs:
-                try:
-                    if logs_dir.exists():
-                        shutil.rmtree(logs_dir)
-                    run('docker', *namespace_args, 'cp', f'{rucio_container}:/var/log', str(logs_dir))
-                except Exception:
-                    print(
-                        "** Error on retrieving logs for",
-                        {**caseenv, "IMAGE": image},
-                        '\n',
-                        traceback.format_exc(),
-                        '\n**',
-                        file=sys.stderr,
-                        flush=True,
-                    )
-            run('docker', 'compose', '-p', project, *up_down_args, 'down', '-t', '30', check=False, env=compose_env)
-        return False
+def resolve_image_digest(image: str) -> str:
+    docker = shutil.which('docker')
+    if not docker:
+        return 'unavailable (docker not found)'
+    proc = subprocess.run(
+        [docker, 'image', 'inspect', image, '--format', '{{index .RepoDigests 0}}'],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        text=True,
+        check=False,
+    )
+    if proc.returncode != 0:
+        return 'unavailable (image not present locally)'
+    digest = proc.stdout.strip()
+    return digest or 'unavailable (no repo digest metadata)'
+
+
+def ensure_docker_ready() -> None:
+    if not shutil.which('docker'):
+        raise RuntimeError("Required command 'docker' is not available.")
+    run('docker', 'info')
+
+
+def parse_cli_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description=(
+            "Run workflow-aligned CI suites/modes, print workflow matrices, and execute explicit JSON payloads."
+        )
+    )
+    parser.add_argument('--print-matrix', action='store_true', help='Print parsed matrix JSON from --matrix-file.')
+    parser.add_argument('--print-nightly-matrix', action='store_true', help='Print parsed nightly matrix JSON.')
+    parser.add_argument('--matrix-file', type=pathlib.Path, default=DEFAULT_MATRIX_FILE, help='Input matrix file (JSON list of objects).')
+    parser.add_argument('--print-unit-python-versions', action='store_true', help='Print unit test python versions JSON array.')
+    parser.add_argument('--print-unit-test-matrix', action='store_true', help='Print unit workflow matrix JSON object.')
+    parser.add_argument('--run-matrix-case', default='', help='Run one matrix case from a JSON object.')
+    parser.add_argument('--run-payload-json', default='', help='Run explicit payload JSON object.')
+    parser.add_argument('--list-modes', action='store_true', help='Print CI mode metadata JSON.')
+    parser.add_argument('--print-resolved-ci-images', action='store_true', help='Print resolved CI runtime images JSON.')
+    parser.add_argument(
+        '--mode',
+        choices=ci_mode_choices(),
+        help='CI suite mode for local workflow-aligned runs.',
+    )
+    parser.add_argument('--filter', default='', help='Optional pytest filter expression.')
+    parser.add_argument('--runtime-image-py39', default='', help='Runtime image for Python 3.9 matrix entries.')
+    parser.add_argument('--runtime-image-py310', default='', help='Runtime image for Python 3.10 matrix entries.')
+    parser.add_argument('--integration-runtime-image', default='', help='Runtime image for integration suites.')
+    parser.add_argument('--rucio-tag', default='', help=f"Tag used for sidecar images in docker-compose (default: {DEFAULT_RUCIO_TAG}).")
+    return parser.parse_args()
+
+
+def detect_compose_command() -> list[str]:
+    docker = shutil.which('docker')
+    if docker and subprocess.run([docker, 'compose', 'version'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False).returncode == 0:
+        return [docker, 'compose']
+    docker_compose = shutil.which('docker-compose')
+    if docker_compose:
+        return [docker_compose]
+    raise RuntimeError("Neither 'docker-compose' nor 'docker compose' is available.")
+
+
+def run_payload(obj: dict) -> None:
+    cases = (obj["matrix"],) if isinstance(obj["matrix"], dict) else obj["matrix"]
+
+    if "runtime_images" in obj:
+        runtime_images = obj["runtime_images"]
+        images = {
+            runtime_images[python_version]: {"PYTHON": python_version}
+            for case in cases
+            for python_version in [case.get("PYTHON", "3.9")]
+            if python_version in runtime_images
+        }
+    else:
+        images = obj["images"]
+
+    tests = obj.get("tests") or []
+    if isinstance(tests, str):
+        tests = [tests]
+
+    run_tests(cases, images, tests=tests)
+
+
+def parse_json_object(raw_value: str, option_name: str) -> dict:
+    try:
+        loaded = json.loads(raw_value)
+    except json.JSONDecodeError as error:
+        raise RuntimeError(f"Invalid JSON for {option_name}.") from error
+    if not isinstance(loaded, dict):
+        raise RuntimeError(f"{option_name} expects a JSON object.")
+    return loaded
+
+
+def run_matrix_case(case: dict, filter_expr: str, runtime_image_py39: str, runtime_image_py310: str) -> None:
+    py39_image, py310_image, _ = resolved_ci_images(runtime_image_py39, runtime_image_py310, '')
+    payload = {
+        'matrix': case,
+        'runtime_images': runtime_images_for_cases([case], py39_image, py310_image),
+    }
+    if filter_expr:
+        payload['tests'] = [filter_expr]
+    run_payload(payload)
+
+
+def runtime_image_for_python(
+    python_version: str,
+    runtime_image_py39: str,
+    runtime_image_py310: str,
+    default_image: str,
+) -> str:
+    selected_env_name = RUNTIME_IMAGE_ENV_BY_PYTHON.get(python_version)
+    if selected_env_name == 'RUCIO_CI_RUNTIME_IMAGE_PY310':
+        return runtime_image_py310
+    if selected_env_name == 'RUCIO_CI_RUNTIME_IMAGE_PY39':
+        return runtime_image_py39
+    return default_image
+
+
+def runtime_images_for_cases(cases: list[dict], runtime_image_py39: str, runtime_image_py310: str) -> dict[str, str]:
+    default_image = default_runtime_image()
+    python_versions = {str(case.get('PYTHON', '3.9')) for case in cases}
+    return {
+        python_version: runtime_image_for_python(
+            python_version=python_version,
+            runtime_image_py39=runtime_image_py39,
+            runtime_image_py310=runtime_image_py310,
+            default_image=default_image,
+        )
+        for python_version in sorted(python_versions)
+    }
+
+
+def build_payload(matrix: list[dict], runtime_image_py39: str, runtime_image_py310: str, tests: list[str]) -> dict:
+    payload = {
+        'matrix': matrix,
+        'runtime_images': runtime_images_for_cases(matrix, runtime_image_py39, runtime_image_py310),
+    }
+    if tests:
+        payload['tests'] = tests
+    return payload
+
+
+def run_unit_tests_in_image(image: str, filter_expr: str) -> None:
+    pytest_cmd: list[str] = ['python3', '-m', 'pytest', 'tests/rucio']
+    if filter_expr:
+        pytest_cmd.extend(['-k', filter_expr])
+    run(
+        'docker',
+        'run',
+        '--rm',
+        '-v',
+        f'{REPO_ROOT}:/rucio_source',
+        '-w',
+        '/rucio_source',
+        image,
+        *pytest_cmd,
+    )
+
+
+def integration_init_script() -> str:
+    return """
+set -e
+rm -rf /tmp/rucio_source
+mkdir -p /tmp/rucio_source
+cp -a /rucio_source/. /tmp/rucio_source/
+cd /tmp/rucio_source
+cp etc/rse-accounts.cfg.template /opt/rucio/etc/rse-accounts.cfg
+cp etc/rse-accounts.cfg.template /opt/rucio/etc/rse-accounts.cfg.template
+cp etc/rse_repository.json /opt/rucio/etc/rse_repository.json
+cp etc/rclone-init.cfg /opt/rucio/etc/rclone-init.cfg
+ln -sf pyproject.server.toml pyproject.toml
+ln -sf /root/.ssh/ruciouser_sshkey /root/.ssh/id_rsa 2>/dev/null || true
+ln -sf /root/.ssh/ruciouser_sshkey.pub /root/.ssh/id_rsa.pub 2>/dev/null || true
+pip install --no-cache-dir -e /tmp/rucio_source
+RUCIO_SOURCE_DIR=/tmp/rucio_source tools/run_tests.sh -ir
+""".strip()
+
+
+def remove_project_db_volume(project: str) -> None:
+    volume_name = f'{project}_vol-ruciodb-data'
+    attached_containers_raw = run(
+        'docker',
+        'ps',
+        '-aq',
+        '--filter',
+        f'volume={volume_name}',
+        check=False,
+        return_stdout=True,
+    ) or b''
+    attached_containers = [container_id for container_id in attached_containers_raw.decode().splitlines() if container_id]
+    if attached_containers:
+        run('docker', 'rm', '-f', *attached_containers, check=False)
+    run('docker', 'volume', 'rm', '-f', volume_name, check=False)
+
+
+def run_integration_pytest(compose_exec_args: list[str], *pytest_args: str, context: str) -> None:
+    cmd = [
+        *compose_exec_args,
+        '-w',
+        '/tmp/rucio_source',
+        '-e',
+        'RUCIO_SOURCE_DIR=/tmp/rucio_source',
+        'rucio',
+        'tools/pytest.sh',
+        '-v',
+        '--tb=short',
+        *pytest_args,
+    ]
+    try:
+        run(*cmd)
+    except subprocess.CalledProcessError as error:
+        print(f"::error::Integration pytest step failed: {context}", file=sys.stderr, flush=True)
+        print(f"::group::Integration debug rerun: {context}", file=sys.stderr, flush=True)
+        run(
+            *compose_exec_args,
+            '-w',
+            '/tmp/rucio_source',
+            '-e',
+            'RUCIO_SOURCE_DIR=/tmp/rucio_source',
+            'rucio',
+            'tools/pytest.sh',
+            '-vv',
+            '--tb=long',
+            '-x',
+            '-rA',
+            *pytest_args,
+            check=False,
+        )
+        print("::endgroup::", file=sys.stderr, flush=True)
+        raise error
+
+
+def run_integration_suite(runtime_image: str, filter_expr: str) -> None:
+    compose_cmd = detect_compose_command()
+    if not DEFAULT_COMPOSE_FILE.exists():
+        raise RuntimeError(f"Docker Compose file not found at '{DEFAULT_COMPOSE_FILE}'.")
+
+    project = integration_project_name()
+    compose_env = os.environ.copy()
+    compose_env['RUCIO_SOURCE_MOUNT_MODE'] = ':ro'
+
+    compose_profiles_args = list(itertools.chain.from_iterable(('--profile', profile) for profile in DEFAULT_INTEGRATION_PROFILES))
+    pull_compose_files_args = ['--file', str(DEFAULT_COMPOSE_FILE)]
+    compose_files_args = ['--file', str(DEFAULT_COMPOSE_FILE)]
+    compose_project_args = ['-p', project]
+    tmp_override = None
+
+    if runtime_image:
+        with NamedTemporaryFile(mode='w', suffix='.yml', delete=False) as override:
+            override.write(f"services:\n  rucio:\n    image: {runtime_image}\n")
+            tmp_override = override.name
+        compose_files_args.extend(['--file', tmp_override])
+
+    should_skip_pull = env_enabled('RUCIO_AUTOTEST_REUSE_IMAGES')
+
+    try:
+        run(*compose_cmd, *compose_project_args, *compose_files_args, *compose_profiles_args, 'down', check=False, env=compose_env)
+        print(f"** Resetting '{project}_vol-ruciodb-data' before integration startup", file=sys.stderr, flush=True)
+        remove_project_db_volume(project)
+        if not should_skip_pull:
+            run(*compose_cmd, *compose_project_args, *pull_compose_files_args, *compose_profiles_args, 'pull', env=compose_env)
+
+        compose_env['DEV_PROFILES'] = ','.join(DEFAULT_INTEGRATION_PROFILES)
+        run(*compose_cmd, *compose_project_args, *compose_files_args, *compose_profiles_args, 'up', '-d', env=compose_env)
+        compose_exec_args = [*compose_cmd, *compose_project_args, *compose_files_args, *compose_profiles_args, 'exec', '-T']
+
+        run(*compose_exec_args, 'rucio', 'bash', '-c', integration_init_script())
+
+        if filter_expr:
+            run_integration_pytest(compose_exec_args, '-k', filter_expr, context=f"-k {filter_expr}")
+            return
+
+        for target in INTEGRATION_CORE_TESTS:
+            run_integration_pytest(compose_exec_args, target, context=target)
+
+        run_integration_pytest(compose_exec_args, '--export-artifacts-from=test_tpc', 'tests/test_tpc.py', context='tests/test_tpc.py')
+        fts_log_file = run(*compose_exec_args, 'rucio', 'cat', '/tmp/test_tpc.artifact', return_stdout=True).decode().replace('\r', '').strip()
+        if not fts_log_file:
+            raise RuntimeError(f"Could not read /tmp/test_tpc.artifact from 'rucio' service in project '{project}'")
+
+        run(
+            *compose_exec_args,
+            'fts',
+            '/bin/bash',
+            '-c',
+            f"shopt -s nullglob; files=({fts_log_file}); (( ${{#files[@]}} )) && grep -Fq '3rd pull' \"${{files[@]}}\"",
+        )
+
+        for target in INTEGRATION_POST_TESTS:
+            run_integration_pytest(compose_exec_args, target, context=target)
+    finally:
+        run(*compose_cmd, *compose_project_args, *compose_files_args, *compose_profiles_args, 'logs', 'rucio', check=False)
+        run(*compose_cmd, *compose_project_args, *compose_files_args, *compose_profiles_args, 'down', check=False, env=compose_env)
+        if tmp_override:
+            try:
+                pathlib.Path(tmp_override).unlink(missing_ok=True)
+            except TypeError:
+                if pathlib.Path(tmp_override).exists():
+                    pathlib.Path(tmp_override).unlink()
+
+
+def resolved_ci_images(runtime_image_py39: str, runtime_image_py310: str, integration_runtime_image: str) -> tuple[str, str, str]:
+    default_image = default_runtime_image()
+    py39_image = runtime_image_py39 or os.environ.get('RUCIO_CI_RUNTIME_IMAGE_PY39', default_image)
+    py310_image = runtime_image_py310 or os.environ.get('RUCIO_CI_RUNTIME_IMAGE_PY310', default_image)
+    integration_image = integration_runtime_image or os.environ.get('RUCIO_INTEGRATION_RUNTIME_IMAGE', default_image)
+    return py39_image, py310_image, integration_image
+
+
+def run_mode(
+    mode: str,
+    filter_expr: str,
+    runtime_image_py39: str,
+    runtime_image_py310: str,
+    integration_runtime_image: str,
+    rucio_tag: str,
+) -> None:
+    py39_image, py310_image, integration_image = resolved_ci_images(runtime_image_py39, runtime_image_py310, integration_runtime_image)
+    tests = [filter_expr] if filter_expr else []
+    git_sha = current_git_sha()
+
+    print(
+        (
+            f"** CI mode context: mode={mode} git_sha={git_sha} filter={filter_expr or '<none>'} "
+            f"test_project={integration_project_name()} rucio_tag={rucio_tag}"
+        ),
+        file=sys.stderr,
+        flush=True,
+    )
+    print(
+        f"** CI runtime images: py39={py39_image} ({resolve_image_digest(py39_image)}), "
+        f"py310={py310_image} ({resolve_image_digest(py310_image)}), "
+        f"integration={integration_image} ({resolve_image_digest(integration_image)})",
+        file=sys.stderr,
+        flush=True,
+    )
+
+    stack = [mode]
+    while stack:
+        selected_mode = stack.pop()
+        mode_cfg = CI_MODE_DEFINITIONS.get(selected_mode)
+        if not mode_cfg:
+            raise RuntimeError(f"Unsupported mode '{selected_mode}'.")
+
+        mode_kind = mode_cfg.get('kind')
+        if mode_kind == 'matrix':
+            matrix_file = mode_cfg.get('matrix_parse')
+            if not isinstance(matrix_file, pathlib.Path):
+                raise RuntimeError(f"Mode '{selected_mode}' has no matrix parser configuration.")
+            matrix = load_matrix_cases(matrix_file)
+            run_payload(build_payload(matrix, py39_image, py310_image, tests))
+            continue
+
+        if mode_kind == 'integration':
+            run_integration_suite(integration_image, filter_expr)
+            continue
+
+        if mode_kind == 'unit':
+            run_unit_tests_in_image(py39_image, filter_expr)
+            continue
+
+        if mode_kind == 'sequence':
+            sequence = mode_cfg.get('sequence')
+            if not sequence:
+                raise RuntimeError(f"Mode '{selected_mode}' has no sequence configuration.")
+            stack.extend(reversed([str(nested_mode) for nested_mode in sequence]))
+            continue
+
+        raise RuntimeError(f"Unsupported kind '{mode_kind}' for mode '{selected_mode}'.")
 
 
 def main():
-    """
-    Entry point for GitHub Actions workflows.
-    """
-    obj = json.load(sys.stdin)
-    cases = (obj["matrix"],) if isinstance(obj["matrix"], dict) else obj["matrix"]
+    args = parse_cli_args()
+    os.chdir(REPO_ROOT)
+    os.environ['RUCIO_TAG'] = resolved_rucio_tag(args.rucio_tag)
 
-    # Use runtime images if provided
-    if "runtime_images" in obj:
-        images = {}
-        for case in cases:
-            python_version = case.get("PYTHON", "3.9")
-            if python_version in obj["runtime_images"]:
-                images[obj["runtime_images"][python_version]] = {"PYTHON": python_version}
-    else:
-        # Fallback to old behavior (Keeping this here in case we need to change testing startegy in the future)
-        images = obj["images"]
+    if args.print_matrix:
+        print(json.dumps(load_matrix_cases(args.matrix_file)))
+        return
 
-    run_tests(cases, images)
+    if args.print_nightly_matrix:
+        print(json.dumps(load_matrix_cases(DEFAULT_NIGHTLY_MATRIX_FILE)))
+        return
+
+    if args.print_unit_python_versions:
+        print(json.dumps(list(plan_unit_python_versions())))
+        return
+
+    if args.print_unit_test_matrix:
+        print(json.dumps({'python-version': list(plan_unit_python_versions())}))
+        return
+
+    if args.list_modes:
+        print(json.dumps(ci_mode_metadata()))
+        return
+
+    if args.print_resolved_ci_images:
+        py39_image, py310_image, integration_image = resolved_ci_images(
+            runtime_image_py39=args.runtime_image_py39,
+            runtime_image_py310=args.runtime_image_py310,
+            integration_runtime_image=args.integration_runtime_image,
+        )
+        print(json.dumps({
+            'default': default_runtime_image(),
+            'py39': py39_image,
+            'py310': py310_image,
+            'integration': integration_image,
+            'rucio_tag': os.environ['RUCIO_TAG'],
+        }))
+        return
+
+    if args.mode:
+        ensure_docker_ready()
+        run_mode(
+            mode=args.mode,
+            filter_expr=args.filter,
+            runtime_image_py39=args.runtime_image_py39,
+            runtime_image_py310=args.runtime_image_py310,
+            integration_runtime_image=args.integration_runtime_image,
+            rucio_tag=os.environ['RUCIO_TAG'],
+        )
+        return
+
+    if args.run_matrix_case:
+        case = parse_json_object(args.run_matrix_case, '--run-matrix-case')
+        ensure_docker_ready()
+        run_matrix_case(
+            case=case,
+            filter_expr=args.filter,
+            runtime_image_py39=args.runtime_image_py39,
+            runtime_image_py310=args.runtime_image_py310,
+        )
+        return
+
+    if args.run_payload_json:
+        payload = parse_json_object(args.run_payload_json, '--run-payload-json')
+        ensure_docker_ready()
+        run_payload(payload)
+        return
+
+    raise RuntimeError(
+        "No execution command specified. Use --mode, --run-matrix-case, or --run-payload-json."
+    )
 
 
 if __name__ == "__main__":

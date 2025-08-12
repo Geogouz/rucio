@@ -1,0 +1,61 @@
+name: Prepare runtime image
+description: Log in to GHCR and build a local runtime image when required.
+
+inputs:
+  build-locally:
+    description: Whether the runtime image should be built locally.
+    required: true
+  python-version:
+    description: Python version used for the runtime image build.
+    required: true
+  runtime-image:
+    description: Runtime image tag to build.
+    required: true
+  github-token:
+    description: GitHub token used for GHCR login.
+    required: true
+  login-continue-on-error:
+    description: Continue if GHCR login fails.
+    required: false
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Docker Buildx
+      if: ${{ inputs.build-locally == 'true' }}
+      uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+    - name: Login to GitHub Container Registry
+      uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ inputs.github-token }}
+      continue-on-error: ${{ inputs.login-continue-on-error == 'true' }}
+
+    - name: Compute cache key suffix
+      if: ${{ inputs.build-locally == 'true' }}
+      id: cache
+      shell: bash
+      run: echo "py_suffix=$(echo '${{ inputs.python-version }}' | tr -d '.')" >> "$GITHUB_OUTPUT"
+
+    - name: Set repository variable
+      if: ${{ inputs.build-locally == 'true' }}
+      id: repo
+      shell: bash
+      run: echo "repo=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+    - name: Build runtime image locally
+      if: ${{ inputs.build-locally == 'true' }}
+      uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+      with:
+        context: .
+        file: etc/docker/test/runtime.Dockerfile
+        target: final
+        build-args: |
+          PYTHON=${{ inputs.python-version }}
+        push: false
+        tags: ${{ inputs.runtime-image }}
+        outputs: type=docker
+        cache-from: type=registry,ref=ghcr.io/${{ steps.repo.outputs.repo }}/rucio-dev-runtime:py${{ steps.cache.outputs.py_suffix }}-buildcache

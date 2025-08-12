@@ -1,0 +1,88 @@
+[
+    {
+        "DIST": "alma9",
+        "PYTHON": "3.9",
+        "IMAGE_IDENTIFIER": "autotest",
+        "SUITE": "client",
+        "RDBMS": "postgres14"
+    },
+    {
+        "DIST": "alma9",
+        "PYTHON": "3.9",
+        "IMAGE_IDENTIFIER": "autotest",
+        "SUITE": "remote_dbs",
+        "RDBMS": "oracle"
+    },
+    {
+        "DIST": "alma9",
+        "PYTHON": "3.9",
+        "IMAGE_IDENTIFIER": "autotest",
+        "SUITE": "remote_dbs",
+        "RDBMS": "mysql8"
+    },
+    {
+        "DIST": "alma9",
+        "PYTHON": "3.9",
+        "IMAGE_IDENTIFIER": "autotest",
+        "SUITE": "remote_dbs",
+        "RDBMS": "postgres14"
+    },
+    {
+        "DIST": "alma9",
+        "PYTHON": "3.9",
+        "IMAGE_IDENTIFIER": "autotest",
+        "SUITE": "sqlite",
+        "RDBMS": "sqlite"
+    },
+    {
+        "DIST": "alma9",
+        "PYTHON": "3.9",
+        "IMAGE_IDENTIFIER": "autotest",
+        "SUITE": "multi_vo",
+        "RDBMS": "postgres14",
+        "RUCIO_HOME": "/opt/rucio/etc/multi_vo/tst"
+    },
+    {
+        "DIST": "alma9",
+        "PYTHON": "3.10",
+        "IMAGE_IDENTIFIER": "autotest",
+        "SUITE": "client",
+        "RDBMS": "postgres14"
+    },
+    {
+        "DIST": "alma9",
+        "PYTHON": "3.10",
+        "IMAGE_IDENTIFIER": "autotest",
+        "SUITE": "remote_dbs",
+        "RDBMS": "oracle"
+    },
+    {
+        "DIST": "alma9",
+        "PYTHON": "3.10",
+        "IMAGE_IDENTIFIER": "autotest",
+        "SUITE": "remote_dbs",
+        "RDBMS": "mysql8"
+    },
+    {
+        "DIST": "alma9",
+        "PYTHON": "3.10",
+        "IMAGE_IDENTIFIER": "autotest",
+        "SUITE": "remote_dbs",
+        "RDBMS": "postgres14"
+    },
+    {
+        "DIST": "alma9",
+        "PYTHON": "3.10",
+        "IMAGE_IDENTIFIER": "autotest",
+        "SUITE": "sqlite",
+        "RDBMS": "sqlite"
+    },
+    {
+        "DIST": "alma9",
+        "PYTHON": "3.10",
+        "IMAGE_IDENTIFIER": "autotest",
+        "SUITE": "multi_vo",
+        "RDBMS": "postgres14",
+        "RUCIO_HOME": "/opt/rucio/etc/multi_vo/tst"
+    }
+]

@@ -30,6 +30,30 @@ Next, startup the Rucio development environment with docker-compose. There are t
 
 *Note: if you are running with SELinux enabled, you might run into problems. Check troubleshooting with SELinux on the help pages of your container runtime environment.*
 
+Minimal local interface
+~~~~~~~~~~~~~~~~~~~~~~~
+
+For local workflows, you can use ``tools/dev.py`` instead of manually chaining compose commands::
+
+    # Start unprofiled services in project "dev"
+    ./tools/dev.py up --project dev
+
+    # Start storage and IAM profiles with local ports exposed
+    ./tools/dev.py up --project dev --profile storage,iam --ports
+
+    # Run local suite in isolated project "dev-test"
+    ./tools/dev.py test local --project dev-test
+
+    # Bootstrap and show collected tests before choosing what to run
+    ./tools/dev.py test local --project dev-test --list-tests
+
+    # Run workflow-aligned CI matrix from local checkout
+    ./tools/dev.py test ci --project dev-test --mode autotest
+
+    # Tear down and clean test volumes
+    ./tools/dev.py down --project dev
+    ./tools/dev.py clean --project dev-test --autotest-volumes
+
 Using the standard environment
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -45,7 +69,7 @@ This should show you a few running containers: the Rucio server, the PostgreSQL 
 
 Finally, you can jump into the container with::
 
-    docker exec -it dev-rucio-1 /bin/bash
+    docker compose --project-name dev --file etc/docker/dev/docker-compose.yml exec rucio /bin/bash
 
 To verify that everything is in order, you can now either run the full unit tests or only set up the database. Running the full testing suite takes ~10 minutes::
 
@@ -130,13 +154,13 @@ To see your changes in action the recommended way is to jump twice into the cont
 
 From your host, get a separate Terminal 1 (the Rucio "server log show")::
 
-    docker exec -it dev-rucio-1 /bin/bash
+    docker compose --project-name dev --file etc/docker/dev/docker-compose.yml exec rucio /bin/bash
     logshow
 
 
 Terminal 1 can now be left open, and then from your host go into a new Terminal 2 (the "interactive" terminal)::
 
-    docker exec -it dev-rucio-1 /bin/bash
+    docker compose --project-name dev --file etc/docker/dev/docker-compose.yml exec rucio /bin/bash
     rucio whoami
 
 
@@ -144,7 +168,7 @@ The command will output in Terminal 2, and at the same time the server debug out
 
 The same `logshow` is also available in the FTS container::
 
-    docker exec -it dev-fts-1 /bin/bash
+    docker compose --project-name dev --file etc/docker/dev/docker-compose.yml exec fts /bin/bash
     logshow
 
 

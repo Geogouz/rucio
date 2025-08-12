@@ -1,0 +1,14 @@
+services:
+  rucio:
+    image: ${RUCIO_IMAGE:-docker.io/rucio/rucio-dev:latest}
+    volumes:
+      - ../../../etc/mail_templates:/opt/rucio/etc/mail_templates:Z
+      - ../../../etc/automatix.json:/opt/rucio/etc/automatix.json:Z
+      - ../../../etc/google-cloud-storage-test.json:/opt/rucio/etc/google-cloud-storage-test.json:Z
+      - ../../../etc/idpsecrets.json:/opt/rucio/etc/idpsecrets.json:Z
+      - ../../../etc/rse_repository.json:/opt/rucio/etc/rse_repository.json:Z
+      - ../../../etc/docker/test/matrix_policy_package_tests.yml:/opt/rucio/etc/docker/test/matrix_policy_package_tests.yml:Z
+
+  ruciodb:
+    profiles:
+      - donotstart

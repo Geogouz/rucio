@@ -1,0 +1,18 @@
+[
+    {
+        "POLICY": "atlas",
+        "DIST": "alma9",
+        "RDBMS": "postgres14",
+        "PYTHON": "3.9",
+        "SUITE": "votest",
+        "IMAGE_IDENTIFIER": "votest-atlas"
+    },
+    {
+        "POLICY": "belleii",
+        "DIST": "alma9",
+        "RDBMS": "postgres14",
+        "PYTHON": "3.9",
+        "SUITE": "votest",
+        "IMAGE_IDENTIFIER": "votest-belleii"
+    }
+]
