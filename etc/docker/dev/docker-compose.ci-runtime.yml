@@ -1,0 +1,7 @@
+services:
+  rucio:
+    image: ${RUCIO_CI_RUNTIME_IMAGE}
+    pull_policy: never
+  rucioclient:
+    image: ${RUCIO_CI_RUNTIME_IMAGE}
+    pull_policy: never

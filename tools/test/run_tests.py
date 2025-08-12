@@ -66,11 +66,51 @@ def stringify_dict(inp: dict):
     return {str(k): str(v) for k, v in inp.items()}
 
 
-def find_image(images: dict, case: dict):
+def infer_case_image(case: dict, runtime_images: dict[str, str]):
+    identifier = case.get("IMAGE_IDENTIFIER")
+    dist = case.get("DIST")
+    if not identifier or not dist:
+        raise RuntimeError("Could not determine default image for case " + str(case))
+
+    suite = case.get("SUITE")
+    # Dedicated VO-specific images are not published.  Reuse the
+    # autotest image which is available for all matrix combinations so
+    # that the workflow can pull a valid container from the registry.
+    if suite == "votest":
+        identifier = "autotest"
+
+    repo_prefix = os.environ.get("RUCIO_AUTOTEST_IMAGE_CACHE_REPO", "")
+    if not repo_prefix:
+        runtime_image = next(iter(runtime_images.values()), "")
+        if runtime_image:
+            runtime_repo = runtime_image.split(":", 1)[0]
+            repo_prefix = runtime_repo.rsplit("/", 1)[0]
+
+    if not repo_prefix:
+        repo_prefix = "ghcr.io/rucio/rucio"
+
+    python_version = case.get("PYTHON")
+    python_suffix = ""
+    if python_version:
+        python_suffix = "-python" + str(python_version).lower()
+
+    return f"{repo_prefix}/rucio-{str(identifier).lower()}:{str(dist).lower()}{python_suffix}"
+
+
+def find_image(images: dict, case: dict, runtime_images: dict[str, str]):
     for image, idgroup in images.items():
         if matches(idgroup, case):
             return image
-    raise RuntimeError("Could not find image for case " + str(case))
+    fallback = infer_case_image(case, runtime_images)
+    print(
+        "** Using inferred image",
+        fallback,
+        "for case",
+        case,
+        file=sys.stderr,
+        flush=True,
+    )
+    return fallback
 
 
 def case_id(case: dict) -> str:
@@ -82,7 +122,7 @@ def case_log(caseid, msg, file=sys.stderr):
     print(caseid, msg, file=file, flush=True)
 
 
-def run_tests(cases: list, images: dict, tests: Optional[list[str]] = None):
+def run_tests(cases: list, images_bundle, tests: Optional[list[str]] = None):
     use_podman = 'USE_PODMAN' in os.environ and os.environ['USE_PODMAN'] == '1'
     parallel = 'PARALLEL_AUTOTESTS' in os.environ and os.environ['PARALLEL_AUTOTESTS'] == '1'
     failfast = 'PARALLEL_AUTOTESTS_FAILFAST' in os.environ and os.environ['PARALLEL_AUTOTESTS_FAILFAST'] == '1'
@@ -91,11 +131,23 @@ def run_tests(cases: list, images: dict, tests: Optional[list[str]] = None):
     if parallel or copy_rucio_logs:
         logs_dir.mkdir(exist_ok=True)
 
+    if isinstance(images_bundle, dict) and 'images' in images_bundle:
+        images = images_bundle['images']
+        runtime_images = images_bundle.get('runtime_images', {})
+    else:
+        images = images_bundle
+        runtime_images = {}
+
     def gen_case_kwargs(case: dict):
         use_httpd = case.get('RUN_HTTPD', True)
+        caseenv = stringify_dict(case)
+        services_value = caseenv.get('SERVICES')
+        if services_value:
+            caseenv.setdefault('DEV_PROFILES', services_value)
         return {
-            'caseenv': stringify_dict(case),
-            'image': find_image(images=images, case=case),
+            'caseenv': caseenv,
+            'image': find_image(images=images, case=case, runtime_images=runtime_images),
+            'runtime_image': runtime_images.get(case.get('PYTHON', '3.9')),
             'use_podman': use_podman,
             'use_namespace': use_podman and parallel,
             'use_httpd': use_httpd,
@@ -174,7 +226,17 @@ def run_case_logger(run_case_kwargs: dict, stdlog=sys.stderr):
     return True
 
 
-def run_case(caseenv, image, use_podman, use_namespace, use_httpd, copy_rucio_logs, logs_dir: pathlib.Path, tests: list[str]):
+def run_case(
+    caseenv,
+    image,
+    runtime_image,
+    use_podman,
+    use_namespace,
+    use_httpd,
+    copy_rucio_logs,
+    logs_dir: pathlib.Path,
+    tests: list[str],
+):
     if use_namespace:
         namespace = str(uuid.uuid4())
         namespace_args = ['--namespace', namespace]
@@ -184,6 +246,8 @@ def run_case(caseenv, image, use_podman, use_namespace, use_httpd, copy_rucio_lo
         namespace_env = {}
 
     run('docker', 'image', 'ls', image)
+    if runtime_image and runtime_image != image:
+        run('docker', 'image', 'ls', runtime_image)
 
     pod = ""
     if use_podman:
@@ -201,6 +265,7 @@ def run_case(caseenv, image, use_podman, use_namespace, use_httpd, copy_rucio_lo
             success = run_with_httpd(
                 caseenv=caseenv,
                 image=image,
+                runtime_image=runtime_image,
                 namespace_args=namespace_args,
                 namespace_env=namespace_env,
                 copy_rucio_logs=copy_rucio_logs,
@@ -292,6 +357,7 @@ def run_test_directly(
 def run_with_httpd(
     caseenv: dict[str, str],
     image: str,
+    runtime_image: Optional[str],
     namespace_args: list[str],
     namespace_env: dict[str, str],
     copy_rucio_logs: bool,
@@ -300,10 +366,16 @@ def run_with_httpd(
 ) -> bool:
 
     with (NamedTemporaryFile() as compose_override_file):
-        compose_override_content = yaml.dump({
+        compose_image = runtime_image or image
+        if runtime_image and runtime_image != image:
+            print(
+                f"* Using runtime image '{runtime_image}' for docker compose (test image '{image}' kept for metadata)",
+                flush=True,
+            )
+        compose_override = {
             'services': {
                 'rucio': {
-                    'image': image,
+                    'image': compose_image,
                     'environment': [f'{k}={v}' for k, v in caseenv.items()],
                     'working_dir': '/rucio_source',
                     'entrypoint': ['/rucio_source/etc/docker/dev/rucio/entrypoint.sh'],
@@ -323,21 +395,35 @@ def run_with_httpd(
                         f"{os.path.abspath(os.curdir)}/etc/docker/test/matrix_policy_package_tests.yml:/opt/rucio/etc/docker/test/matrix_policy_package_tests.yml:Z",
                     ],
                 },
-                'ruciodb': {
-                    'profiles': ['donotstart'],
-                }
             }
-        })
+        }
+
+        rdbms = caseenv.get('RDBMS', '')
+        if rdbms:
+            compose_override['services']['ruciodb'] = {'profiles': ['donotstart']}
+
+        compose_override_content = yaml.dump(compose_override)
         print("Overriding docker compose configuration with: \n", compose_override_content, flush=True)
         with open(compose_override_file.name, 'w') as f:
             f.write(compose_override_content)
 
-        rdbms = caseenv.get('RDBMS', '')
         project = os.urandom(8).hex()
+        compose_profiles = []
+        if rdbms:
+            compose_profiles.append(rdbms)
+
+        services_value = caseenv.get('SERVICES', '')
+        if services_value:
+            compose_profiles.extend([
+                service
+                for service in map(str.strip, services_value.split(','))
+                if service
+            ])
+
         up_down_args = (
             '--file', 'etc/docker/dev/docker-compose.yml',
             '--file', compose_override_file.name,
-            '--profile', rdbms,
+            *itertools.chain.from_iterable(('--profile', profile) for profile in compose_profiles),
         )
 
         rucio_container = 'dev-rucio-1'
@@ -391,19 +477,15 @@ def run_with_httpd(
 def main():
     obj = json.load(sys.stdin)
     cases = (obj["matrix"],) if isinstance(obj["matrix"], dict) else obj["matrix"]
-    
-    # Use runtime images if provided
-    if "runtime_images" in obj:
-        images = {}
-        for case in cases:
-            python_version = case.get("PYTHON", "3.9")
-            if python_version in obj["runtime_images"]:
-                images[obj["runtime_images"][python_version]] = {"PYTHON": python_version}
+
+    if "images" in obj or "runtime_images" in obj:
+        images_bundle = {
+            key: value for key, value in obj.items() if key in {"images", "runtime_images"}
+        }
     else:
-        # Fallback to old behavior (Keeping this here in case we need to change testing startegy in the future)
-        images = obj["images"]
-    
-    run_tests(cases, images)
+        images_bundle = obj
+
+    run_tests(cases, images_bundle)
 
 
 if __name__ == "__main__":
