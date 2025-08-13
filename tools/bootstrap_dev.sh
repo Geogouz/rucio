@@ -43,7 +43,8 @@
 #         -t, --test <N>
 #       This option must NOT be combined with -p/--profile, as the tests will manage
 #       Docker Compose on their own depending on what they need. Combine with
-#       -f, --filter <PYTEST_FILTER> to run only specific tests within the suite.
+#       -f, --filter <PYTEST_FILTER> to run only specific tests within the suite, or with
+#       -c, --cache-use to reuse cached test images (to ensure local code changes are applied).
 #
 #    4. (Optional) Enables local port mappings (127.0.0.1:<port>:<container_port>) via:
 #         -x, --expose-ports
@@ -57,10 +58,10 @@
 # Usage:
 #   ./tools/bootstrap_dev.sh [--release <TAG> | --latest | --master]
 #                            [--profile [<NAME>] ...]
-#                            [--test <N>] [--filter <PYTEST_FILTER>]
+#                            [--test <N>] [--filter <PYTEST_FILTER>] [--cache-use]
 #                            [--expose-ports]
 #                            [--help]
-#   (You can also use the short forms: -r <TAG>, -l, -m, -p <NAME>, -t <N>, -f <PYTEST_FILTER>, -x)
+#   (You can also use the short forms: -r <TAG>, -l, -m, -p <NAME>, -t <N>, -f <PYTEST_FILTER>, -c, -x, -h)
 #
 # Examples:
 #   1) Check out a specific release (37.4.0) and start the dev environment including the "storage" profile:
@@ -97,6 +98,11 @@
 #        ./tools/bootstrap_dev.sh --test 9 --filter tests/test_scope.py::test_scope_duplicate
 #     or:
 #        ./tools/bootstrap_dev.sh -t 9 -f tests/test_scope.py::test_scope_duplicate
+#
+#   8) Reuse cached autotest images when running a test:
+#        ./tools/bootstrap_dev.sh --test 9 --cache-use
+#     or:
+#        ./tools/bootstrap_dev.sh -t 9 -c
 # ---------------------------------------------------------------------------
 
 set -euo pipefail
@@ -135,6 +141,8 @@ Other:
   -f, --filter <PYTEST_FILTER>
                         When running tests with -t/--test, limit execution to
                         tests matching the given pytest filter.
+  -c, --cache-use       When running tests, reuse cached test images if available instead
+                        of rebuilding to ensure local code changes have been applied.
   -h, --help            Show this message and exit.
 
 Notes:
@@ -153,6 +161,7 @@ Notes:
      containers using it will be removed to guarantee a clean database.
   8) The -f/--filter option can be used with -t/--test to pass any pytest-style
      filter such as 'tests/file.py::TestClass::test_method' to run a subset of tests.
+  9) The -c/--cache-use option skips rebuilding test images during tests if a cached version exists.
 
 Examples:
   $0 --release 37.4.0 --profile storage
@@ -161,6 +170,7 @@ Examples:
   $0 --master
   $0 --profile
   $0 --test 9 --filter tests/test_scope.py::test_scope_duplicate
+  $0 --test 9 --cache-use
 EOF
 
 gather_tests
@@ -398,6 +408,9 @@ function gather_tests() {
         desc+=")"
 
         cmd="$RUCIO_REPO_ROOT/tools/run_autotests.sh --build -d ${dist} --py ${py} --suite ${suite}"
+        if $REUSE_AUTOTEST_IMAGES; then
+          cmd="RUCIO_AUTOTEST_REUSE_IMAGES=1 $cmd"
+        fi
         if [[ -n "$db" ]]; then
           cmd+=" --db ${db}"
         fi
@@ -545,9 +558,14 @@ fi
 SPECIFIED_RELEASE=""
 USE_MASTER="false"
 USE_LATEST="false"
-PROFILES=()           # Named profiles
-ANY_PROFILE_ARG=false # Will be set true if -p/--profile is used at all
-EXPOSE_PORTS=false    # Track whether we want to expose ports
+PROFILES=()                 # Named profiles
+ANY_PROFILE_ARG=false       # Will be set true if -p/--profile is used at all
+EXPOSE_PORTS=false          # Track whether we want to expose ports
+PYTEST_FILTER=""            # Optional pytest filter for selected tests
+REUSE_AUTOTEST_IMAGES=false # Reuse cached test images if available
+if [[ "${RUCIO_AUTOTEST_REUSE_IMAGES:-}" == "1" ]]; then
+  REUSE_AUTOTEST_IMAGES=true
+fi
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -598,6 +616,10 @@ while [[ $# -gt 0 ]]; do
       EXPOSE_PORTS=true
       shift
       ;;
+    -c|--cache-use)
+      REUSE_AUTOTEST_IMAGES=true
+      shift
+      ;;
     -t|--test)
       if [[ -z "${2:-}" || "${2:0:1}" == "-" ]]; then
         echo "ERROR: Option '$1' requires a test number."; exit 1
@@ -632,8 +654,14 @@ if [[ "$#" -gt 0 ]]; then
 fi
 
 # Ensure filter is only used when a test is selected
-if [[ -n "$PYTEST_FILTER" && -z "$SELECTED_TEST" ]]; then
+if [[ -n "${PYTEST_FILTER:-}" && -z "$SELECTED_TEST" ]]; then
   echo "ERROR: --filter/-f must be used together with --test/-t." >&2
+  exit 1
+fi
+
+# Ensure cache reuse is only used when a test is selected
+if [[ "$REUSE_AUTOTEST_IMAGES" == true && -z "$SELECTED_TEST" ]]; then
+  echo "ERROR: --cache-use/-c must be used together with --test/-t." >&2
   exit 1
 fi
 
