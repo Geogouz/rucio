@@ -150,6 +150,12 @@ FROM rucio-runtime as final
     WORKDIR /opt/rucio
     RUN cp -r /usr/local/src/rucio/{lib,bin,tools,etc,tests} ./
 
+    # Ensure the runtime imports the *source tree* under /opt/rucio,
+    # not the wheel that was installed into site-packages earlier.
+    # We keep dependencies from the prior install; this just switches rucio itself to -e.
+    RUN /opt/venv/bin/pip uninstall -y rucio || true && \
+        /opt/venv/bin/pip install --no-deps -e '/usr/local/src/rucio[oracle,postgresql,mysql,kerberos,saml,dev]'
+
     RUN ldconfig
 
     CMD ["httpd","-D","FOREGROUND"]
