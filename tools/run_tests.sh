@@ -46,6 +46,7 @@ function usage {
 
 alembic="true"
 iterations=1
+fresh_db=""
 
 while getopts h2cpkilrstauxc opt
 do
@@ -130,12 +131,17 @@ else
         rm -f /tmp/rucio.db
     fi
 
-    tools/reset_database.py
+    # Fully purge and rebuild the database schema to avoid leftover objects
+    # from previous runs (e.g. PostgreSQL enums) which might break alembic
+    # migrations when reusing an existing database volume.
+    tools/reset_database.py --purge-build
 
     if [ $? != 0 ]; then
         echo 'Failed to reset the database!'
         exit 1
     fi
+
+    fresh_db="true"
 
     if [ -f /tmp/rucio.db ]; then
         echo 'Disable SQLite database access restriction'
@@ -144,11 +150,27 @@ else
 fi
 
 if test ${alembic}; then
-    echo 'Running full alembic migration'
-    ALEMBIC_CONFIG="$RUCIO_HOME/etc/alembic.ini" tools/alembic_migration.sh
-    if [ $? != 0 ]; then
-        echo 'Failed to run alembic migration!'
-        exit 1
+    if test ${fresh_db}; then
+        echo 'Database freshly built; skipping alembic migration'
+    else
+        # Only run the alembic downgrade/upgrade cycle when the database schema
+        # is out of date. This avoids re-running migrations on a fresh schema and
+        # prevents failures when an existing database volume is reused.
+        PYTHONPATH=lib python3 - <<'PY'
+import sys
+from rucio.db.sqla.util import is_old_db
+sys.exit(0 if is_old_db() else 1)
+PY
+        if [ $? -eq 0 ]; then
+            echo 'Running full alembic migration'
+            ALEMBIC_CONFIG="$RUCIO_HOME/etc/alembic.ini" tools/alembic_migration.sh
+            if [ $? != 0 ]; then
+                echo 'Failed to run alembic migration!'
+                exit 1
+            fi
+        else
+            echo 'Database already up-to-date; skipping alembic migration'
+        fi
     fi
 fi
 

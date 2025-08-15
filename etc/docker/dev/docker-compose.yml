@@ -167,8 +167,6 @@ services:
     container_name: dev-oracle-1
     image: docker.io/gvenzl/oracle-xe:18.4.0
     platform: linux/amd64
-    profiles:
-      - oracle
     environment:
       - ORACLE_PASSWORD=rucio
     volumes:
