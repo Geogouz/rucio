@@ -22,7 +22,10 @@ from json import dumps
 import requests
 
 base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(base_path)
+# Import the repository's 'lib/rucio' before any site-packages version
+lib_path = os.path.join(base_path, "lib")
+if lib_path not in sys.path:
+    sys.path.insert(0, lib_path)
 os.chdir(base_path)
 
 
@@ -35,7 +38,6 @@ from rucio.common.utils import extract_scope  # noqa: E402
 from rucio.core.account import add_account_attribute  # noqa: E402
 from rucio.core.vo import map_vo  # noqa: E402
 from rucio.gateway.vo import add_vo  # noqa: E402
-from rucio.tests.common import is_influxdb_available  # noqa: E402
 from rucio.tests.common_server import reset_config_table  # noqa: E402
 
 
@@ -150,8 +152,3 @@ if __name__ == '__main__':
 
     if os.getenv('POLICY') == 'belleii':
         belleii_bootstrap(client)
-
-    if is_influxdb_available():
-        response = create_influxdb_database()
-        if response.status_code != 201:
-            print('Failed to create rucio database in influxDB : %s' % response.text)

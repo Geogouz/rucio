@@ -18,7 +18,6 @@ from hashlib import sha256
 from os import urandom
 from typing import TYPE_CHECKING, Any, Optional, TypeVar, Union
 
-import sqlalchemy
 from alembic import command, op
 from alembic.config import Config
 from dogpile.cache.api import NoValue
@@ -34,6 +33,7 @@ from rucio import alembicrevision
 from rucio.common.cache import MemcacheRegion
 from rucio.common.config import config_get, config_get_list
 from rucio.common.constants import DEFAULT_VO
+from rucio.common.logging import setup_logging
 from rucio.common.schema import get_schema_value
 from rucio.common.types import InternalAccount, LoggerFunction
 from rucio.common.utils import generate_uuid
@@ -52,21 +52,26 @@ if TYPE_CHECKING:
     DeclarativeObj = TypeVar('DeclarativeObj')
 
 REGION = MemcacheRegion(expiration_time=600, memcached_expire_time=3660)
+LOG = logging.getLogger(__name__)
 
 
 def build_database() -> None:
-    """ Applies the schema to the database. Run this command once to build the database. """
+    """Applies the schema to the database. Run this command once to build the database."""
+    setup_logging()
     engine = get_engine()
 
     schema = config_get('database', 'schema', raise_exception=False, check_config_table=False)
     if schema:
-        print('Schema set in config, trying to create schema:', schema)
-        try:
-            with engine.connect() as conn:
-                with conn.begin():
-                    conn.execute(CreateSchema(schema))
-        except Exception as e:
-            print('Cannot create schema, please validate manually if schema creation is needed, continuing:', e)
+        if engine.dialect.name == 'oracle':
+            LOG.info('Assuming schema %s exists on Oracle; skipping creation', schema)
+        else:
+            print('Schema set in config, trying to create schema:', schema)
+            try:
+                with engine.connect() as conn:
+                    with conn.begin():
+                        conn.execute(CreateSchema(schema))
+            except Exception as e:
+                print('Cannot create schema, please validate manually if schema creation is needed, continuing:', e)
 
     models.register_models(engine)
 
@@ -98,38 +103,126 @@ def purge_db() -> None:
     as it handles cyclical constraints between tables.
     Ref. https://github.com/sqlalchemy/sqlalchemy/wiki/DropEverything
     """
+    setup_logging()
     engine = get_engine()
+    dialect = engine.dialect.name
 
-    # the transaction only applies if the DB supports
-    # transactional DDL, i.e. Postgresql, MS SQL Server
+    try:
+        # Transactional DDL where supported; commits on success, rolls back on error.
+        with engine.begin() as conn:
+            inspector: Union["Inspector", PGInspector] = inspect(conn)
 
-    with engine.connect() as conn:
+            # Resolve target schema from config (may be None / default schema)
+            target_schema = config_get('database', 'schema', raise_exception=False)
+            # For Oracle, normalize the *inspection* schema to uppercase (users/schemas are usually uppercase)
+            inspection_schema = target_schema
+            if dialect == 'oracle' and target_schema:
+                inspection_schema = target_schema.upper()
 
-        inspector: Union["Inspector", PGInspector] = inspect(conn)
+            LOG.info(
+                "purge_db: starting purge (dialect=%s, target_schema=%s)",
+                dialect, target_schema or "<default>",
+            )
 
-        for tname, fkcs in reversed(
-                inspector.get_sorted_table_and_fkc_names(schema='*')):
-            if tname:
-                drop_table_stmt = DropTable(Table(tname, MetaData(), schema='*'))
-                conn.execute(drop_table_stmt)
-            elif fkcs:
-                if not engine.dialect.supports_alter:
-                    continue
-                for tname, fkc in fkcs:
-                    fk_constraint = ForeignKeyConstraint((), (), name=fkc)
-                    Table(tname, MetaData(), fk_constraint)
-                    drop_constraint_stmt = DropConstraint(fk_constraint)
-                    conn.execute(drop_constraint_stmt)
+            # Oracle safety guard: never touch SYS/SYSTEM
+            if dialect == 'oracle':
+                if not target_schema:
+                    # If schema not configured, use the current user
+                    result = conn.execute(text('SELECT USER FROM dual'))
+                    target_schema = result.scalar()
+                    inspection_schema = target_schema.upper()
+                    LOG.debug(
+                        "purge_db: resolved Oracle target schema to current user %s",
+                        target_schema,
+                    )
+                ts_norm = (target_schema or '').strip('"').lower()
+                if ts_norm in {'sys', 'system'}:
+                    LOG.error(
+                        "purge_db: refusing to purge Oracle schema '%s'",
+                        target_schema,
+                    )
+                    raise RuntimeError(
+                        f"Refusing to purge Oracle schema '{target_schema}'. "
+                        "Use a dedicated application user."
+                    )
 
-        schema = config_get('database', 'schema', raise_exception=False)
-        if schema:
-            conn.execute(DropSchema(schema, cascade=True))
+            # Gather tables and FK constraints in dependency order
+            pairs = inspector.get_sorted_table_and_fkc_names(schema=inspection_schema)
+            LOG.info(
+                "purge_db: discovered %d items to drop in schema %s",
+                len(pairs),
+                inspection_schema or "<default>",
+            )
 
-        if engine.dialect.name == 'postgresql':
-            if not isinstance(inspector, PGInspector):
-                raise ValueError('expected a PGInspector')
-            for enum in inspector.get_enums(schema='*'):
-                sqlalchemy.Enum(**enum).drop(bind=conn)
+            # Drop everything in reverse dependency order
+            for tname, fkcs in reversed(pairs):
+                if tname:
+                    fqtn = f"{inspection_schema}.{tname}" if inspection_schema else tname
+                    LOG.debug("purge_db: dropping table %s", fqtn)
+                    drop_table_stmt = DropTable(Table(tname, MetaData(), schema=inspection_schema))
+                    conn.execute(drop_table_stmt)
+                elif fkcs:
+                    if not engine.dialect.supports_alter:
+                        LOG.debug(
+                            "purge_db: dialect %s does not support ALTER; skipping FK drops",
+                            dialect,
+                        )
+                        continue
+                    for t_table, fkc in fkcs:
+                        LOG.debug(
+                            "purge_db: dropping FK constraint %s on table %s",
+                            fkc, t_table,
+                        )
+                        fk_constraint = ForeignKeyConstraint((), (), name=fkc)
+                        Table(t_table, MetaData(), fk_constraint)
+                        drop_constraint_stmt = DropConstraint(fk_constraint)
+                        conn.execute(drop_constraint_stmt)
+
+            # Drop the schema itself where it makes sense.
+            # - PostgreSQL supports `DROP SCHEMA ... CASCADE`.
+            # - MySQL does not support CASCADE on DROP SCHEMA (it's an alias for DROP DATABASE)
+            #   and the test user typically does not have privileges to drop the database;
+            #   for MySQL we therefore keep the database and only drop tables above.
+            # - Oracle handled separately.
+            if target_schema and dialect not in ('oracle', 'mysql'):
+                # Only drop if the schema actually exists; otherwise skip gracefully.
+                existing_schemas = set(inspector.get_schema_names())
+                if inspection_schema in existing_schemas:
+                    if dialect == 'postgresql':
+                        LOG.info("purge_db: dropping schema %s (CASCADE)", target_schema)
+                        conn.execute(DropSchema(target_schema, cascade=True))
+                    else:
+                        LOG.info("purge_db: dropping schema %s", target_schema)
+                        conn.execute(DropSchema(target_schema))
+                else:
+                    LOG.info("purge_db: schema %s does not exist; skipping drop", target_schema)
+
+            # PostgreSQL: drop any leftover ENUM types across ALL schemas
+            if dialect == 'postgresql':
+                if not isinstance(inspector, PGInspector):
+                    raise ValueError('expected a PGInspector')
+                from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
+                enums = inspector.get_enums(schema='*')
+                if enums:
+                    LOG.info(
+                        "purge_db: dropping %d PostgreSQL ENUM types across all schemas",
+                        len(enums),
+                    )
+                for enum in enums:
+                    LOG.debug(
+                        "purge_db: dropping ENUM %s.%s",
+                        enum.get('schema'), enum.get('name'),
+                    )
+                    PG_ENUM(name=enum["name"], schema=enum["schema"]).drop(
+                        bind=conn, checkfirst=True
+                    )
+
+            LOG.info("purge_db: purge completed successfully (dialect=%s)", dialect)
+
+    except Exception:
+        # Ensure we get a stack trace with context in the logs
+        LOG.exception("purge_db: failure during purge (dialect=%s)", dialect)
+        raise
 
 
 def create_base_vo() -> None:
@@ -153,16 +246,17 @@ def create_root_account() -> None:
     up_id = config_get('bootstrap', 'userpass_identity', default='ddmlab')
     up_pwd = config_get('bootstrap', 'userpass_pwd', default='secret')
     up_email = config_get('bootstrap', 'userpass_email', default='ph-adp-ddm-lab@cern.ch')
-    x509_id = config_get('bootstrap', 'x509_identity', default='emailAddress=ph-adp-ddm-lab@cern.ch,CN=DDMLAB Client Certificate,OU=PH-ADP-CO,O=CERN,ST=Geneva,C=CH')
+    x509_id = config_get('bootstrap', 'x509_identity',
+                         default='emailAddress=ph-adp-ddm-lab@cern.ch,CN=DDMLAB Client Certificate,OU=PH-ADP-CO,O=CERN,ST=Geneva,C=CH')
     x509_email = config_get('bootstrap', 'x509_email', default='ph-adp-ddm-lab@cern.ch')
     gss_id = config_get('bootstrap', 'gss_identity', default='ddmlab@CERN.CH')
     gss_email = config_get('bootstrap', 'gss_email', default='ph-adp-ddm-lab@cern.ch')
     ssh_id = config_get('bootstrap', 'ssh_identity',
                         default='ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq5LySllrQFpPL614sulXQ7wnIr1aGhGtl8b+HCB/'
-                        '0FhMSMTHwSjX78UbfqEorZV16rXrWPgUpvcbp2hqctw6eCbxwqcgu3uGWaeS5A0iWRw7oXUh6ydn'
-                        'Vy89zGzX1FJFFDZ+AgiZ3ytp55tg1bjqqhK1OSC0pJxdNe878TRVVo5MLI0S/rZY2UovCSGFaQG2'
-                        'iLj14wz/YqI7NFMUuJFR4e6xmNsOP7fCZ4bGMsmnhR0GmY0dWYTupNiP5WdYXAfKExlnvFLTlDI5'
-                        'Mgh4Z11NraQ8pv4YE1woolYpqOc/IMMBBXFniTT4tC7cgikxWb9ZmFe+r4t6yCDpX4IL8L5GOQ== ddmlab'
+                                '0FhMSMTHwSjX78UbfqEorZV16rXrWPgUpvcbp2hqctw6eCbxwqcgu3uGWaeS5A0iWRw7oXUh6ydn'
+                                'Vy89zGzX1FJFFDZ+AgiZ3ytp55tg1bjqqhK1OSC0pJxdNe878TRVVo5MLI0S/rZY2UovCSGFaQG2'
+                                'iLj14wz/YqI7NFMUuJFR4e6xmNsOP7fCZ4bGMsmnhR0GmY0dWYTupNiP5WdYXAfKExlnvFLTlDI5'
+                                'Mgh4Z11NraQ8pv4YE1woolYpqOc/IMMBBXFniTT4tC7cgikxWb9ZmFe+r4t6yCDpX4IL8L5GOQ== ddmlab'
                         )
     ssh_email = config_get('bootstrap', 'ssh_email', default='ph-adp-ddm-lab@cern.ch')
 
@@ -173,7 +267,8 @@ def create_root_account() -> None:
     else:
         access = 'root'
 
-    account = models.Account(account=InternalAccount(access, DEFAULT_VO), account_type=AccountType.SERVICE, status=AccountStatus.ACTIVE)
+    account = models.Account(account=InternalAccount(access, DEFAULT_VO), account_type=AccountType.SERVICE,
+                             status=AccountStatus.ACTIVE)
 
     salt = urandom(255)
     salted_password = salt + up_pwd.encode()
@@ -183,29 +278,34 @@ def create_root_account() -> None:
     associations = []
 
     if up_id and up_pwd:
-        identity1 = models.Identity(identity=up_id, identity_type=IdentityType.USERPASS, password=hashed_password, salt=salt, email=up_email)
-        iaa1 = models.IdentityAccountAssociation(identity=identity1.identity, identity_type=identity1.identity_type, account=account.account, is_default=True)
+        identity1 = models.Identity(identity=up_id, identity_type=IdentityType.USERPASS, password=hashed_password,
+                                    salt=salt, email=up_email)
+        iaa1 = models.IdentityAccountAssociation(identity=identity1.identity, identity_type=identity1.identity_type,
+                                                 account=account.account, is_default=True)
         identities.append(identity1)
         associations.append(iaa1)
 
     # X509 authentication
     if x509_id and x509_email:
         identity2 = models.Identity(identity=x509_id, identity_type=IdentityType.X509, email=x509_email)
-        iaa2 = models.IdentityAccountAssociation(identity=identity2.identity, identity_type=identity2.identity_type, account=account.account, is_default=True)
+        iaa2 = models.IdentityAccountAssociation(identity=identity2.identity, identity_type=identity2.identity_type,
+                                                 account=account.account, is_default=True)
         identities.append(identity2)
         associations.append(iaa2)
 
     # GSS authentication
     if gss_id and gss_email:
         identity3 = models.Identity(identity=gss_id, identity_type=IdentityType.GSS, email=gss_email)
-        iaa3 = models.IdentityAccountAssociation(identity=identity3.identity, identity_type=identity3.identity_type, account=account.account, is_default=True)
+        iaa3 = models.IdentityAccountAssociation(identity=identity3.identity, identity_type=identity3.identity_type,
+                                                 account=account.account, is_default=True)
         identities.append(identity3)
         associations.append(iaa3)
 
     # SSH authentication
     if ssh_id and ssh_email:
         identity4 = models.Identity(identity=ssh_id, identity_type=IdentityType.SSH, email=ssh_email)
-        iaa4 = models.IdentityAccountAssociation(identity=identity4.identity, identity_type=identity4.identity_type, account=account.account, is_default=True)
+        iaa4 = models.IdentityAccountAssociation(identity=identity4.identity, identity_type=identity4.identity_type,
+                                                 account=account.account, is_default=True)
         identities.append(identity4)
         associations.append(iaa4)
 
@@ -323,7 +423,8 @@ def list_oracle_global_temp_tables(session: "Session") -> list[str]:
     """
     Retrieve the list of global temporary tables in oracle
     """
-    global_temp_tables = config_get_list('core', 'oracle_global_temp_tables', raise_exception=False, check_config_table=False, default='')
+    global_temp_tables = config_get_list('core', 'oracle_global_temp_tables', raise_exception=False,
+                                         check_config_table=False, default='')
     if global_temp_tables:
         return [t.upper() for t in global_temp_tables]
 
@@ -378,7 +479,7 @@ def _create_temp_table(
     if not primary_key:
         primary_key = columns[0]
     if not hasattr(primary_key, '__iter__'):
-        primary_key = (primary_key, )
+        primary_key = (primary_key,)
 
     oracle_table_is_global = False
     if session.bind.dialect.name == 'oracle':
@@ -421,7 +522,8 @@ def _create_temp_table(
         oracle_global_name if oracle_table_is_global else name,
         base.metadata,
         *columns,
-        schema=models.BASE.metadata.schema if oracle_table_is_global else None,  # Temporary tables exist in a special schema, so a schema name cannot be given when creating a temporary table
+        schema=models.BASE.metadata.schema if oracle_table_is_global else None,
+        # Temporary tables exist in a special schema, so a schema name cannot be given when creating a temporary table
         **additional_kwargs,
     )
 
@@ -482,7 +584,8 @@ class TempTableManager:
             logger: LoggerFunction = logging.log
     ) -> type["DeclarativeObj"]:
         idx = self.next_idx_to_use.setdefault(name, 0)
-        table = _create_temp_table(f'{name}_{idx}', *columns, primary_key=primary_key, session=self.session, logger=logger)
+        table = _create_temp_table(f'{name}_{idx}', *columns, primary_key=primary_key, session=self.session,
+                                   logger=logger)
         self.next_idx_to_use[name] = idx + 1
         return table
 

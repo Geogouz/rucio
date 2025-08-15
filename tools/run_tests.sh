@@ -130,7 +130,10 @@ else
         rm -f /tmp/rucio.db
     fi
 
-    tools/reset_database.py
+    # Fully purge and rebuild the database schema to avoid leftover objects
+    # from previous runs (e.g. PostgreSQL enums) which might break alembic
+    # migrations when reusing an existing database volume.
+    tools/reset_database.py --purge-build
 
     if [ $? != 0 ]; then
         echo 'Failed to reset the database!'

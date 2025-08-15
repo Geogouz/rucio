@@ -23,7 +23,10 @@ import os.path
 import sys
 
 base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(base_path)
+# Import the repository's 'lib/rucio' before any site-packages version
+lib_path = os.path.join(base_path, "lib")
+if lib_path not in sys.path:
+    sys.path.insert(0, lib_path)
 os.chdir(base_path)
 
 from rucio.db.sqla.util import build_database, create_base_vo, create_root_account  # noqa: E402

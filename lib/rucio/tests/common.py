@@ -61,21 +61,25 @@ def is_influxdb_available(
     1. Try /health           → 200 + JSON["status"] == "pass"
     2. Fallback to /ping     → 204
     """
+    print(f"Checking InfluxDB availability at {url}")
     try:
         r = requests.get(f"{url}/health", timeout=timeout)
+        print(f"InfluxDB /health responded with {r.status_code} and body: {r.text}", r.status_code, r.text)
         if r.status_code == 200 and r.json().get("status") == "pass":
             return True
-        else:
-            print(f"InfluxDB is not running healthy at {url}.")
-            return False
-    except requests.RequestException:
+        print(f"InfluxDB is not running healthy at {url}.")
+        return False
+    except requests.RequestException as e:
         # /health failed or is not available (pre‑1.8)
-        pass
+        print(f"Failed to query InfluxDB /health at {url}: {e}")
 
     try:
-        return requests.get(f"{url}/ping", timeout=timeout).status_code == 204
-    except requests.RequestException:
-        print(f"InfluxDB is not reachable at {url}.")
+        print(f"Falling back to /ping for InfluxDB at {url}")
+        r = requests.get(f"{url}/ping", timeout=timeout)
+        print(f"InfluxDB /ping responded with {r.status_code}")
+        return r.status_code == 204
+    except requests.RequestException as e:
+        print(f"InfluxDB is not reachable at {url}: {e}")
         return False
 
 
@@ -93,23 +97,28 @@ def is_elasticsearch_available(
     """
     _status_level = {"red": 1, "yellow": 2, "green": 3}
 
+    print(f"Checking Elasticsearch availability at {url}")
     try:
         r = requests.get(f"{url}/_cluster/health", timeout=timeout)
+        print(f"Elasticsearch /_cluster/health responded with {r.status_code} and body: {r.text}")
         if r.status_code == 200:
             status = r.json().get("status")
             if status and _status_level[status] >= _status_level[min_status]:
                 return True
             print(f"Elasticsearch health is {status!r}, below threshold {min_status!r}.")
             return False
-    except requests.RequestException:
+    except requests.RequestException as e:
         # Either not reachable or /_cluster/health not yet available
-        pass
+        print(f"Failed to query Elasticsearch /_cluster/health at {url}: {e}")
 
     # Very old nodes or boot‑strapping clusters: fall back to a simple HEAD /
     try:
-        return requests.head(url, timeout=timeout).status_code == 200
-    except requests.RequestException:
-        print(f"Elasticsearch is not reachable at {url}.")
+        print(f"Falling back to HEAD request for Elasticsearch at {url}")
+        r = requests.head(url, timeout=timeout)
+        print(f"Elasticsearch HEAD / responded with {r.status_code}")
+        return r.status_code == 200
+    except requests.RequestException as e:
+        print(f"Elasticsearch is not reachable at {url}: {e}")
         return False
 
 
