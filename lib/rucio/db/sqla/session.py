@@ -30,13 +30,15 @@ from sqlalchemy.exc import DatabaseError, DisconnectionError, OperationalError, 
 from sqlalchemy.orm import DeclarativeBase, Session, scoped_session, sessionmaker
 from sqlalchemy.pool import NullPool, Pool, QueuePool, SingletonThreadPool
 
-from rucio.common.config import config_get
+from rucio.common.config import config_get, config_get_bool
 from rucio.common.exception import DatabaseException, InputValidationError, RucioException
 from rucio.common.extra import import_extras
 from rucio.common.utils import retrying
 from rucio.db.sqla.constants import DatabaseOperationType
 
 EXTRA_MODULES = import_extras(['MySQLdb', 'pymysql'])
+
+LOG = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
@@ -70,7 +72,6 @@ DEFAULT_SCHEMA_NAME = config_get(DATABASE_SECTION, 'schema',
                                  raise_exception=False, default=None, check_config_table=False)
 _METADATA = MetaData(schema=DEFAULT_SCHEMA_NAME)
 _MAKER, _ENGINE, _LOCK = None, None, Lock()
-
 
 SQLA_CONFIG_POOLCLASS_MAPPING = {
     'queuepool': QueuePool,
@@ -210,20 +211,60 @@ def get_engine() -> 'Engine':
     global _ENGINE
     if not _ENGINE:
         sql_connection = config_get(DATABASE_SECTION, 'default', check_config_table=False)
+
         config_params = [('pool_size', int), ('max_overflow', int), ('pool_timeout', int),
                          ('pool_recycle', int), ('echo', int), ('echo_pool', str),
                          ('pool_reset_on_return', str), ('use_threadlocal', int),
                          ('poolclass', _get_engine_poolclass)]
+
         params = {}
+
         if 'mysql' in sql_connection:
             conv = mysql_convert_decimal_to_float(pymysql=sql_connection.startswith('mysql+pymysql'))
             params['connect_args'] = {'conv': conv}
+        elif 'oracle' in sql_connection:
+            use_thick = config_get_bool(
+                DATABASE_SECTION,
+                'oracle_thick_client',
+                raise_exception=False,
+                default=True,
+                check_config_table=False,
+            )
+            lib_dir = config_get(
+                DATABASE_SECTION,
+                'oracle_client_lib_dir',
+                raise_exception=False,
+                default=None,
+                check_config_table=False,
+            )
+
+            try:
+                import oracledb  # pylint: disable=import-error
+
+                if use_thick:
+                    try:
+                        oracledb.init_oracle_client(lib_dir=lib_dir)  # noqa: F821
+                    except Exception as err:
+                        LOG.warning('Could not start Oracle thick mode; falling back to thin: %s', err)
+                else:
+                    LOG.info('Oracle thin mode selected via configuration')
+
+                LOG.warning(
+                    'Oracle client running in %s mode%s',
+                    'thin' if oracledb.is_thin_mode() else 'thick',  # noqa: F821
+                    f' (lib_dir={lib_dir})' if lib_dir else '',
+                )
+            except Exception as err:
+                LOG.warning('Could not configure Oracle client: %s', err)
+
         for param, param_type in config_params:
             try:
                 params[param] = param_type(config_get(DATABASE_SECTION, param, check_config_table=False))
             except Exception:
                 pass
+
         _ENGINE = create_engine(sql_connection, **params)
+
         if 'mysql' in sql_connection:
             event.listen(_ENGINE, 'checkout', mysql_ping_listener)
         elif 'postgresql' in sql_connection:
@@ -462,6 +503,7 @@ def stream_session(function: "Callable[P, R]"):
                     yield row
             except Exception:
                 raise
+
     return _update_session_wrapper(new_funct, function)
 
 
