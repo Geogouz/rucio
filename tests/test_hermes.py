@@ -68,7 +68,9 @@ class MyListener:
                 ("messaging-hermes", "username", "hermes"),
                 ("messaging-hermes", "password", "supersecret"),
                 ("messaging-hermes", "nonssl_port", 61613),
-                ("messaging-hermes", "send_email", False),
+                ("messaging-hermes", "send_email", True),
+                ("messaging-hermes", "smtp_host", "testing.host"),
+                ("messaging-hermes", "smtp_port", 1234),
             ]
         },
         {
@@ -83,9 +85,9 @@ class MyListener:
                 ("messaging-hermes", "username", "hermes"),
                 ("messaging-hermes", "password", "supersecret"),
                 ("messaging-hermes", "nonssl_port", 61613),
-                ("messaging-hermes", "send_email", False),
-                ("messaging-hermes", "smtp-host", "testing.host"),
-                ("messaging-hermes", "smtp-port", 1234),
+                ("messaging-hermes", "send_email", True),
+                ("messaging-hermes", "smtp_host", "testing.host"),
+                ("messaging-hermes", "smtp_port", 1234),
             ]
         }
     ],
@@ -189,7 +191,11 @@ def test_hermes(core_config_mock, caches_mock, monkeypatch):
         smtp_mock = MagicMock()
         m.setattr(hermes.smtplib, "SMTP", smtp_mock)
         hermes.hermes(once=True)
-        smtp_mock.assert_called_with(host="testing.host", port=1234)
+        smtp_host = config_get("messaging-hermes", "smtp_host", default='', raise_exception=False)
+        if not smtp_host:
+            smtp_mock.assert_called_with()
+        else:
+            smtp_mock.assert_called_with(host="testing.host", port=1234)
     service_dict = {"influx": 0, "elastic": 0, "email": 0, "activemq": 0}
     messages = retrieve_messages(50, old_mode=False)
     for message in messages:
