@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import importlib
+import os
 from typing import TYPE_CHECKING
 
 from flask import Flask
@@ -22,6 +23,27 @@ from rucio.common.config import config_get_list
 from rucio.common.exception import ConfigurationError
 from rucio.common.logging import setup_logging
 from rucio.web.rest.flaskapi.v1.common import CORSMiddleware
+
+if os.getenv('PYCHARM_REMOTE'):
+    try:
+        import sys
+
+        egg = '/opt/pycharm-debug/pydevd-pycharm.egg'
+        if os.path.exists(egg):
+            sys.path.append(egg)
+        import pydevd_pycharm  # type: ignore
+
+        pydevd_pycharm.settrace(
+            os.getenv('PYCHARM_HOST', 'localhost'),
+            port=int(os.getenv('PYCHARM_PORT', '5680')),
+            stdoutToServer=True,
+            stderrToServer=True,
+            suspend=False,
+        )
+    except Exception as exc:  # pragma: no cover - debugger setup is best effort
+        import logging
+
+        logging.getLogger(__name__).warning('PyCharm debugger setup failed: %s', exc)
 
 if TYPE_CHECKING:
     from collections.abc import Iterable

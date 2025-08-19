@@ -65,6 +65,7 @@ class Ping(ErrorHandlingMethodView):
         headers = self.get_headers()
         response = jsonify(version=version.version_string())
         response.headers.extend(headers)
+        print(response.headers)
         return response
 
 

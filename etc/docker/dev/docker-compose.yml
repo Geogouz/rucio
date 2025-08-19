@@ -57,10 +57,20 @@ services:
       - ../../../lib:/opt/rucio/lib:Z
       - ../../../tests:/opt/rucio/tests:Z
       - ../../../:/rucio_source:ro
+      # Mount a folder containing the debugger egg. Create it locally with:
+      #   mkdir -p ./.pycharm-debug
+      #   cp "<PyCharm install>/debug-eggs/pydevd-pycharm.egg" ./.pycharm-debug/
+      - ./.pycharm-debug:/opt/pycharm-debug:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       - REQUESTS_CA_BUNDLE=/etc/pki/tls/certs/ca-bundle.crt
       - RUCIO_SOURCE_DIR=/rucio_source
       - RDBMS
+      # ---- PyCharm remote attach (reverse connect) ----
+      - PYCHARM_REMOTE=1
+      - PYCHARM_HOST=${PYCHARM_HOST:-host.docker.internal}
+      - PYCHARM_PORT=${PYCHARM_PORT:-5680}
     depends_on:
       oracle:
         condition: service_healthy

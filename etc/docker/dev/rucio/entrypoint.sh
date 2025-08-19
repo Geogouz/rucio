@@ -114,4 +114,5 @@ fi
 
 update-ca-trust
 
+# Always start the main process (Apache/mod_wsgi)
 exec "$@"

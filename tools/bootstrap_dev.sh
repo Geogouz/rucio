@@ -49,6 +49,9 @@
 #       - This will include the additional docker-compose.ports.yml file so that the containers expose their ports on localhost.
 #       - If omitted, the containers run without published ports.
 #
+#    5. (Optional) Starts the rucio service under debugpy via -d, --debug.
+#       - Exposes port 5678 for a debugger to attach.
+#
 #  Prerequisites:
 #   - You have cloned your Rucio fork locally.
 #   - Docker, docker-compose (or Docker Compose v2), curl, and jq are installed/running.
@@ -60,7 +63,7 @@
 #                            [--cache-use]
 #                            [--expose-ports]
 #                            [--help]
-#   (You can also use the short forms: -r <TAG>, -l, -m, -p <NAME>, -t <N>, -f <PYTEST>, -c, -x, -h)
+#   (You can also use the short forms: -r <TAG>, -l, -m, -p <NAME>, -t <N>, -f <PYTEST>, -c, -x, -d, -h)
 #
 # Examples:
 #   1) Check out a specific release (37.4.0) and start the dev environment including the "storage" profile:
@@ -107,6 +110,28 @@
 #        ./tools/bootstrap_dev.sh -p storage -p monitoring -c
 #     or:
 #        ./tools/bootstrap_dev.sh --profile storage --profile monitoring --cache-use
+#
+#  10) Start the dev environment in debug mode:
+#        ./tools/bootstrap_dev.sh -p -x -d
+#
+#  Steps for PyCharm remote debugging:
+#  -----
+#  1.  Copy the PyCharm debugger egg from your IDE installation into
+#      ``./.pycharm-debug/pydevd-pycharm.egg``.  The docker compose setup
+#      mounts this path inside the container at
+#      ``/opt/pycharm-debug/pydevd-pycharm.egg``.
+#  2.  In PyCharm create a *Python Remote Debug* configuration that listens on
+#      port ``5680`` (or change ``PYCHARM_PORT``) and start the debugger.  Use
+#      path mapping so that ``/rucio_source`` maps to your local repository.  The
+#      container connects to the host specified in ``PYCHARM_HOST`` (defaults to
+#      ``host.docker.internal``; adjust for your platform).
+#  3.  Run the dev environment, e.g. ``./tools/bootstrap_dev.sh -p -x``.  When a
+#      request is processed the service connects back to PyCharm and any
+#      breakpoints will be hit.
+#
+#  The shell script ``bootstrap_dev.sh`` performs the actual setup; this module is
+#  only a convenient place to record the debugging instructions.
+#
 # ---------------------------------------------------------------------------
 
 set -euo pipefail
@@ -138,6 +163,7 @@ Docker options:
                         If NAME is provided, spin up that profile plus unprofiled services.
                         You can specify multiple profiles by repeating this option.
   -x, --expose-ports    Include docker-compose.ports.yml so that containers have published ports.
+  -d, --debug           Run rucio service under debugpy on port 5678.
 
 Other:
   -t, --test <N>        Run test number N after bootstrap. Cannot be used with
@@ -570,6 +596,7 @@ USE_LATEST="false"
 PROFILES=()                 # Named profiles
 ANY_PROFILE_ARG=false       # Will be set true if -p/--profile is used at all
 EXPOSE_PORTS=false          # Track whether we want to expose ports
+ENABLE_DEBUG=false          # Start rucio service under debugpy
 PYTEST_FILTER=""            # Optional pytest filter for selected tests
 REUSE_AUTOTEST_IMAGES=false # Reuse cached test images if available
 if [[ "${RUCIO_AUTOTEST_REUSE_IMAGES:-}" == "1" ]]; then
@@ -628,6 +655,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     -x|--expose-ports)
       EXPOSE_PORTS=true
+      shift
+      ;;
+    -d|--debug)
+      ENABLE_DEBUG=true
       shift
       ;;
     -c|--cache-use)
@@ -715,6 +746,10 @@ if $EXPOSE_PORTS; then
   echo "Local port mappings enabled (docker-compose.ports.yml will be used)."
 else
   echo "No local port mappings requested."
+fi
+
+if $ENABLE_DEBUG; then
+  echo "Debug mode enabled: rucio will wait for a debugger on port 5678."
 fi
 
 if [[ -n "$SELECTED_TEST" ]]; then
@@ -860,6 +895,9 @@ if $EXPOSE_PORTS; then
   # localhost when the user requested --expose-ports.
   compose_files+=(--file docker-compose.ports.yml)
 fi
+if $ENABLE_DEBUG; then
+  compose_files+=(--file docker-compose.debug.yml)
+fi
 
 # Determine if we should prevent pulls during 'up' (Compose v2 only supports --pull never)
 declare -a up_no_pull_args=()
@@ -997,6 +1035,9 @@ if [[ "$SELECTED_TEST" == "1" ]]; then
   compose_files=(--file docker-compose.yml)
   if $EXPOSE_PORTS; then
     compose_files+=(--file docker-compose.ports.yml)
+  fi
+  if $ENABLE_DEBUG; then
+    compose_files+=(--file docker-compose.debug.yml)
   fi
 
   (
