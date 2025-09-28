@@ -38,14 +38,16 @@ from rucio.common.schema import get_schema_value
 from rucio.common.types import InternalAccount, LoggerFunction
 from rucio.common.utils import generate_uuid
 from rucio.db.sqla import models
+from rucio.db.sqla.alembic_validation import Issue, build_validation_context
+from rucio.db.sqla.alembic_validation import validate_history as _run_alembic_validation
 from rucio.db.sqla.constants import AccountStatus, AccountType, IdentityType
 from rucio.db.sqla.session import get_dump_engine, get_engine, get_session
 from rucio.db.sqla.types import InternalScopeString, String
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Sequence
 
-    from sqlalchemy.engine import Inspector
+    from sqlalchemy.engine import Engine, Inspector
     from sqlalchemy.orm import Query, Session
 
     # TypeVar representing the DeclarativeObj class defined inside _create_temp_table
@@ -73,8 +75,96 @@ def build_database() -> None:
     models.register_models(engine)
 
     # Put the database under version control
-    alembic_cfg = Config(config_get('alembic', 'cfg'))
-    command.stamp(alembic_cfg, "head")
+    cfg_path = config_get('alembic', 'cfg', raise_exception=False, default=None, check_config_table=False)
+    if cfg_path:
+        alembic_cfg = Config(cfg_path)
+        command.stamp(alembic_cfg, "head")
+
+
+def _ensure_alembic_config() -> Config:
+    """
+    Load the Alembic configuration file declared in ``rucio.cfg``.
+
+    The helper mirrors the behaviour of :func:`build_database` by resolving the
+    ``[alembic] cfg`` option from the Rucio configuration and instantiating an
+    Alembic :class:`~alembic.config.Config` object pointing at that file.
+    """
+
+    cfg_path = config_get('alembic', 'cfg')
+    return Config(cfg_path)
+
+
+def validate_alembic_history(
+        *,
+        logger: Optional["Callable[[str], None]"] = None,
+        load_config: Optional["Callable[[], Config]"] = None,
+        load_models_metadata: Optional["Callable[[], sqlalchemy.MetaData]"] = None,
+        load_engine: Optional["Callable[[], sqlalchemy.engine.Engine]"] = None,
+) -> list[Issue]:
+    """
+    Run the Alembic validation suite and return any issues that were found.
+
+    Parameters
+    ----------
+    logger:
+        Optional callback used to report progress messages.  When omitted a
+        no-op logger is used.
+    load_config, load_models_metadata, load_engine:
+        Optional factories overriding how the Alembic ``Config``, SQLAlchemy
+        ``MetaData`` and ``Engine`` objects are created.  They exist primarily
+        to ease testing.
+
+    Returns
+    -------
+    list[Issue]
+        Detailed descriptions of each failure encountered during validation.  An
+        empty list indicates that the history is consistent.  The validator
+        halts after reporting the first issue so results are limited to the
+        earliest inconsistency detected.
+    """
+
+    log = logger or (lambda msg: None)
+
+    load_config = load_config or _ensure_alembic_config
+    load_models_metadata = load_models_metadata or (lambda: models.BASE.metadata)
+    load_engine = load_engine or get_engine
+
+    context = build_validation_context(
+        load_config=load_config,
+        load_models_metadata=load_models_metadata,
+        load_engine=load_engine,
+    )
+
+    engine = context.engine
+    metadata = context.models_metadata
+
+    def _issue_callback(issue: Issue) -> None:
+        msg = issue.detail
+        if issue.kind == 'roundtrip':
+            msg = f"Round-trip drift detected at {issue.at_revision}: {issue.detail}"
+        elif issue.kind == 'models-drift':
+            msg = f"Schema drift detected after upgrading from {issue.at_revision}: {issue.detail}"
+        log(msg)
+
+    log('Verifying Alembic head matches SQLAlchemy models via Alembic validation framework')
+
+    issues = _run_alembic_validation(
+        cfg=context.cfg,
+        script=context.script,
+        engine=engine,
+        models_metadata=metadata,
+        logger=log,
+        include_schemas=context.include_schemas,
+        schemas_to_clear=context.schemas_to_clear,
+        version_table_schema=context.version_table_schema,
+        is_old_db_checker=lambda: is_old_db(
+            engine=engine,
+            schema=context.version_table_schema,
+        ),
+        issue_callback=_issue_callback,
+    )
+
+    return issues
 
 
 def dump_schema() -> None:
@@ -175,16 +265,17 @@ def create_root_account() -> None:
     up_id = config_get('bootstrap', 'userpass_identity', default='ddmlab')
     up_pwd = config_get('bootstrap', 'userpass_pwd', default='secret')
     up_email = config_get('bootstrap', 'userpass_email', default='ph-adp-ddm-lab@cern.ch')
-    x509_id = config_get('bootstrap', 'x509_identity', default='emailAddress=ph-adp-ddm-lab@cern.ch,CN=DDMLAB Client Certificate,OU=PH-ADP-CO,O=CERN,ST=Geneva,C=CH')
+    x509_id = config_get('bootstrap', 'x509_identity',
+                         default='emailAddress=ph-adp-ddm-lab@cern.ch,CN=DDMLAB Client Certificate,OU=PH-ADP-CO,O=CERN,ST=Geneva,C=CH')
     x509_email = config_get('bootstrap', 'x509_email', default='ph-adp-ddm-lab@cern.ch')
     gss_id = config_get('bootstrap', 'gss_identity', default='ddmlab@CERN.CH')
     gss_email = config_get('bootstrap', 'gss_email', default='ph-adp-ddm-lab@cern.ch')
     ssh_id = config_get('bootstrap', 'ssh_identity',
                         default='ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq5LySllrQFpPL614sulXQ7wnIr1aGhGtl8b+HCB/'
-                        '0FhMSMTHwSjX78UbfqEorZV16rXrWPgUpvcbp2hqctw6eCbxwqcgu3uGWaeS5A0iWRw7oXUh6ydn'
-                        'Vy89zGzX1FJFFDZ+AgiZ3ytp55tg1bjqqhK1OSC0pJxdNe878TRVVo5MLI0S/rZY2UovCSGFaQG2'
-                        'iLj14wz/YqI7NFMUuJFR4e6xmNsOP7fCZ4bGMsmnhR0GmY0dWYTupNiP5WdYXAfKExlnvFLTlDI5'
-                        'Mgh4Z11NraQ8pv4YE1woolYpqOc/IMMBBXFniTT4tC7cgikxWb9ZmFe+r4t6yCDpX4IL8L5GOQ== ddmlab'
+                                '0FhMSMTHwSjX78UbfqEorZV16rXrWPgUpvcbp2hqctw6eCbxwqcgu3uGWaeS5A0iWRw7oXUh6ydn'
+                                'Vy89zGzX1FJFFDZ+AgiZ3ytp55tg1bjqqhK1OSC0pJxdNe878TRVVo5MLI0S/rZY2UovCSGFaQG2'
+                                'iLj14wz/YqI7NFMUuJFR4e6xmNsOP7fCZ4bGMsmnhR0GmY0dWYTupNiP5WdYXAfKExlnvFLTlDI5'
+                                'Mgh4Z11NraQ8pv4YE1woolYpqOc/IMMBBXFniTT4tC7cgikxWb9ZmFe+r4t6yCDpX4IL8L5GOQ== ddmlab'
                         )
     ssh_email = config_get('bootstrap', 'ssh_email', default='ph-adp-ddm-lab@cern.ch')
 
@@ -195,7 +286,8 @@ def create_root_account() -> None:
     else:
         access = 'root'
 
-    account = models.Account(account=InternalAccount(access, DEFAULT_VO), account_type=AccountType.SERVICE, status=AccountStatus.ACTIVE)
+    account = models.Account(account=InternalAccount(access, DEFAULT_VO), account_type=AccountType.SERVICE,
+                             status=AccountStatus.ACTIVE)
 
     salt = urandom(255)
     salted_password = salt + up_pwd.encode()
@@ -205,29 +297,34 @@ def create_root_account() -> None:
     associations = []
 
     if up_id and up_pwd:
-        identity1 = models.Identity(identity=up_id, identity_type=IdentityType.USERPASS, password=hashed_password, salt=salt, email=up_email)
-        iaa1 = models.IdentityAccountAssociation(identity=identity1.identity, identity_type=identity1.identity_type, account=account.account, is_default=True)
+        identity1 = models.Identity(identity=up_id, identity_type=IdentityType.USERPASS, password=hashed_password,
+                                    salt=salt, email=up_email)
+        iaa1 = models.IdentityAccountAssociation(identity=identity1.identity, identity_type=identity1.identity_type,
+                                                 account=account.account, is_default=True)
         identities.append(identity1)
         associations.append(iaa1)
 
     # X509 authentication
     if x509_id and x509_email:
         identity2 = models.Identity(identity=x509_id, identity_type=IdentityType.X509, email=x509_email)
-        iaa2 = models.IdentityAccountAssociation(identity=identity2.identity, identity_type=identity2.identity_type, account=account.account, is_default=True)
+        iaa2 = models.IdentityAccountAssociation(identity=identity2.identity, identity_type=identity2.identity_type,
+                                                 account=account.account, is_default=True)
         identities.append(identity2)
         associations.append(iaa2)
 
     # GSS authentication
     if gss_id and gss_email:
         identity3 = models.Identity(identity=gss_id, identity_type=IdentityType.GSS, email=gss_email)
-        iaa3 = models.IdentityAccountAssociation(identity=identity3.identity, identity_type=identity3.identity_type, account=account.account, is_default=True)
+        iaa3 = models.IdentityAccountAssociation(identity=identity3.identity, identity_type=identity3.identity_type,
+                                                 account=account.account, is_default=True)
         identities.append(identity3)
         associations.append(iaa3)
 
     # SSH authentication
     if ssh_id and ssh_email:
         identity4 = models.Identity(identity=ssh_id, identity_type=IdentityType.SSH, email=ssh_email)
-        iaa4 = models.IdentityAccountAssociation(identity=identity4.identity, identity_type=identity4.identity_type, account=account.account, is_default=True)
+        iaa4 = models.IdentityAccountAssociation(identity=identity4.identity, identity_type=identity4.identity_type,
+                                                 account=account.account, is_default=True)
         identities.append(identity4)
         associations.append(iaa4)
 
@@ -284,25 +381,37 @@ def get_count(q: "Query") -> int:
     return count
 
 
-def is_old_db() -> bool:
+def is_old_db(*, engine: Optional["Engine"] = None, schema: Optional[str] = None) -> bool:
     """
     Returns true, if alembic is used and the database is not on the
     same revision as the code base.
     """
-    schema = config_get('database', 'schema', raise_exception=False)
+    if engine is None:
+        engine = get_engine()
+
+    if schema is None:
+        schema = config_get('database', 'schema', raise_exception=False)
 
     # checks if alembic is being used by looking up the AlembicVersion table
-    inspector = inspect(get_engine())
+    inspector = inspect(engine)
     if not inspector.has_table(models.AlembicVersion.__tablename__, schema):
         return False
 
-    session_scoped = get_session()
-    with session_scoped() as s:
-        with s.begin():
-            # query = s.query(models.AlembicVersion.version_num)
-            query = s.execute(select(models.AlembicVersion)).scalars().all()
-            # return query.count() != 0 and str(query.first()[0]) != alembicrevision.ALEMBIC_REVISION
-            return (len(query) != 0 and str(query[0].version_num) != alembicrevision.ALEMBIC_REVISION)
+    version_table = models.AlembicVersion.__table__
+    if schema is not None:
+        version_table = version_table.tometadata(MetaData(), schema=schema)
+    else:
+        version_table = version_table.tometadata(MetaData())
+
+    with engine.connect() as connection:
+        rows = [
+            str(v)
+            for v in connection.execute(select(version_table.c.version_num)).scalars().all()
+        ]
+        db_heads = set(rows)
+
+    # Up-to-date iff the version table is exactly {ALEMBIC_REVISION}
+    return db_heads != {alembicrevision.ALEMBIC_REVISION}
 
 
 def json_implemented(*, session: Optional["Session"] = None) -> bool:
@@ -345,7 +454,8 @@ def list_oracle_global_temp_tables(session: "Session") -> list[str]:
     """
     Retrieve the list of global temporary tables in oracle
     """
-    global_temp_tables = config_get_list('core', 'oracle_global_temp_tables', raise_exception=False, check_config_table=False, default='')
+    global_temp_tables = config_get_list('core', 'oracle_global_temp_tables', raise_exception=False,
+                                         check_config_table=False, default='')
     if global_temp_tables:
         return [t.upper() for t in global_temp_tables]
 
@@ -400,7 +510,7 @@ def _create_temp_table(
     if not primary_key:
         primary_key = columns[0]
     if not hasattr(primary_key, '__iter__'):
-        primary_key = (primary_key, )
+        primary_key = (primary_key,)
 
     oracle_table_is_global = False
     if session.bind.dialect.name == 'oracle':
@@ -443,7 +553,8 @@ def _create_temp_table(
         oracle_global_name if oracle_table_is_global else name,
         base.metadata,
         *columns,
-        schema=models.BASE.metadata.schema if oracle_table_is_global else None,  # Temporary tables exist in a special schema, so a schema name cannot be given when creating a temporary table
+        schema=models.BASE.metadata.schema if oracle_table_is_global else None,
+        # Temporary tables exist in a special schema, so a schema name cannot be given when creating a temporary table
         **additional_kwargs,
     )
 
@@ -504,7 +615,8 @@ class TempTableManager:
             logger: LoggerFunction = logging.log
     ) -> type["DeclarativeObj"]:
         idx = self.next_idx_to_use.setdefault(name, 0)
-        table = _create_temp_table(f'{name}_{idx}', *columns, primary_key=primary_key, session=self.session, logger=logger)
+        table = _create_temp_table(f'{name}_{idx}', *columns, primary_key=primary_key, session=self.session,
+                                   logger=logger)
         self.next_idx_to_use[name] = idx + 1
         return table
 
