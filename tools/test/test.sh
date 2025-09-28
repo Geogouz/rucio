@@ -20,8 +20,9 @@ echo "* Using $(command -v python) $(python --version 2>&1) and $(command -v pip
 
 SOURCE_PATH=${RUCIO_SOURCE_DIR:-/usr/local/src/rucio}
 CFG_PATH=${RUCIO_SOURCE_DIR:-/usr/local/src/rucio}/etc/docker/test/extra/
+ORIGINAL_RUCIO_HOME=${RUCIO_HOME:-/opt/rucio}
 if [ -z "$RUCIO_HOME" ]; then
-    RUCIO_HOME=/opt/rucio
+    RUCIO_HOME="$ORIGINAL_RUCIO_HOME"
 fi
 
 function srchome() {
@@ -50,7 +51,7 @@ function wait_for_database() {
 if [ "$SUITE" == "client" ]; then
     tools/run_tests.sh -i
 
-    cp "$SOURCE_PATH"/etc/docker/test/extra/rucio_client.cfg "$RUCIO_HOME"/etc/rucio.cfg    
+    cp "$SOURCE_PATH"/etc/docker/test/extra/rucio_client.cfg "$RUCIO_HOME"/etc/rucio.cfg
     srchome
     tools/pytest.sh -v --tb=short tests/test_clients.py tests/test_bin_rucio.py tests/test_module_import.py
 
@@ -99,6 +100,16 @@ elif [ "$SUITE" == "multi_vo" ]; then
     httpd -k restart
 
     tools/run_multi_vo_tests_docker.sh
+
+elif [ "$SUITE" == "alembic_history" ]; then
+    wait_for_database
+    (
+        cd "$SOURCE_PATH"
+        PYTHONPATH=lib \
+            RUCIO_HOME="$ORIGINAL_RUCIO_HOME" \
+            ALEMBIC_CONFIG="$ORIGINAL_RUCIO_HOME/etc/alembic.ini" \
+            python3 tools/check_alembic_history.py
+    )
 
 elif [ "$SUITE" == "remote_dbs" ] || [ "$SUITE" == "sqlite" ]; then
     wait_for_database

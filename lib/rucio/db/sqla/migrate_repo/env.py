@@ -38,16 +38,20 @@ target_metadata = None
 
 
 def run_migrations_offline():
-    """
-    Run migrations in 'offline' mode.
+    """Run migrations in *offline* mode using only configuration values.
 
-    This configures the context with just a URL/dialect
-    and not an Engine, though an Engine is acceptable
-    here as well.  By skipping the Engine creation
-    we don't even need a DBAPI to be available.
+    The context is configured from ``alembic.ini`` without creating an Engine.
+    This allows Alembic to emit SQL without a live DBAPI connection.
 
-    Calls to context.execute() here emit the given string to the
-    script output.
+    Recognized options (from ``alembic.ini``):
+      - ``sqlalchemy.url``: database URL (may be omitted when using ``dialect``).
+      - ``dialect``: force a dialect name when no URL is supplied.
+      - ``version_table_schema``: schema that owns Alembic's version table.
+      - ``starting_rev``: optional starting revision to limit the run.
+
+    The environment enables ``include_schemas=True`` so objects outside the
+    default schema are included, and uses ``literal_binds=True`` to produce
+    fully rendered SQL.
     """
 
     # try getting url & version_table_schema
@@ -74,11 +78,17 @@ def run_migrations_offline():
 
 
 def run_migrations_online():
-    """
-    Run migrations in 'online' mode.
+    """Run migrations in *online* mode against a live database connection.
 
-    In this scenario we need to create an Engine
-    and associate a connection with the context.
+    An Engine is constructed from the ``alembic.ini`` section. For databases
+    that support named schemas (e.g., PostgreSQL), we set a
+    ``schema_translate_map`` so that ``None`` maps to ``version_table_schema``
+    (if provided). The Alembic context is configured with:
+      - the active connection,
+      - the resolved ``version_table_schema``, and
+      - ``include_schemas=True`` so all schemas are migrated.
+
+    Migrations are then executed inside a transaction.
     """
 
     params = config.get_section(config.config_ini_section)

@@ -14,16 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-memcached -u root -d
-memcached_ready=false
-for attempt in {1..10}; do
-    if timeout 1 bash -c "cat < /dev/null > /dev/tcp/127.0.0.1/11211" 2>/dev/null; then
-        memcached_ready=true
-        break
-    fi
-    sleep 1
-done
-
 function usage {
   echo "Usage: $0 [OPTION]..."
   echo 'Run Rucio test suite'
@@ -37,17 +27,28 @@ function usage {
   echo '  -r    Activate default RSEs (XRD1, XRD2, XRD3, SSH1)'
   echo '  -s    Run special tests for Dirac. Includes using BelleII schema'
   echo '  -t    Verbose output from pytest'
-  echo '  -a    Skip alembic downgrade/upgrade test'
   echo '  -u    Update pip dependencies only'
   echo '  -x    exit instantly on first error or failed test'
   echo '  -c    Generate test coverage'
+  echo '  -H    Run Alembic history drift checker after the tests'
   exit
 }
 
-alembic="true"
 iterations=1
+selection=""
+keep_db=""
+init_only=""
+lint=""
+activate_rse=""
+special=""
+trace=""
+pip_only=""
+stop_on_failure=""
+coverage=""
+alembic_history=""
+alembic_history_only=""
 
-while getopts h2cpkilrstauxc opt
+while getopts h2cpkilrstuxcH opt
 do
   case "$opt" in
     h) usage;;
@@ -59,10 +60,10 @@ do
     r) activate_rse="true";;
     s) special="true";selection="true";TESTS="test_dirac.py";;
     t) trace="true";;
-    a) alembic="";;
     u) pip_only="true";;
     x) stop_on_failure="--exitfirst";;
     c) coverage="true";;
+    H) alembic_history="true";;
     *) usage; exit 1;
   esac
 done
@@ -70,11 +71,30 @@ done
 if [ -z "$RUCIO_HOME" ]; then
     RUCIO_HOME=/opt/rucio
 fi
-echo 'Clearing memcache'
-if [ "$memcached_ready" = true ]; then
-    echo flush_all > /dev/tcp/127.0.0.1/11211
+
+if test ${alembic_history} && test ${init_only}; then
+    alembic_history_only="true"
+fi
+
+if [ -z "$alembic_history_only" ]; then
+    memcached -u root -d
+    memcached_ready=false
+    for attempt in {1..10}; do
+        if timeout 1 bash -c "cat < /dev/null > /dev/tcp/127.0.0.1/11211" 2>/dev/null; then
+            memcached_ready=true
+            break
+        fi
+        sleep 1
+    done
+
+    echo 'Clearing memcache'
+    if [ "$memcached_ready" = true ]; then
+        echo flush_all > /dev/tcp/127.0.0.1/11211
+    else
+        echo 'Warning: memcached on port 11211 did not become ready; skipping flush'
+    fi
 else
-    echo 'Warning: memcached on port 11211 did not become ready; skipping flush'
+    echo 'Skipping memcached startup for Alembic history check'
 fi
 
 if [ -f './requirements/requirements.dev.txt' ]; then
@@ -143,53 +163,72 @@ else
     fi
 fi
 
-if test ${alembic}; then
-    echo 'Running full alembic migration'
-    ALEMBIC_CONFIG="$RUCIO_HOME/etc/alembic.ini" tools/alembic_migration.sh
+if [ -z "$alembic_history_only" ]; then
+    echo 'Graceful restart of Apache'
+    httpd -k graceful
+
+    echo 'Bootstrapping tests'
+    tools/bootstrap_tests.py
     if [ $? != 0 ]; then
-        echo 'Failed to run alembic migration!'
+        echo 'Failed to bootstrap!'
         exit 1
     fi
-fi
 
-echo 'Graceful restart of Apache'
-httpd -k graceful
+    echo 'Sync rse_repository'
+    if test ${special}; then
+        tools/sync_rses.py etc/rse_repository.json.special
+        if [ $? != 0 ]; then
+            echo 'Failed to sync!'
+            exit 1
+        fi
+    else
+        tools/sync_rses.py
+        if [ $? != 0 ]; then
+            echo 'Failed to sync!'
+            exit 1
+        fi
+    fi
 
-echo 'Bootstrapping tests'
-tools/bootstrap_tests.py
-if [ $? != 0 ]; then
-    echo 'Failed to bootstrap!'
-    exit 1
-fi
-
-echo 'Sync rse_repository'
-if test ${special}; then
-    tools/sync_rses.py etc/rse_repository.json.special
+    echo 'Sync metadata keys'
+    tools/sync_meta.py
     if [ $? != 0 ]; then
         echo 'Failed to sync!'
         exit 1
     fi
 else
-    tools/sync_rses.py
-    if [ $? != 0 ]; then
-        echo 'Failed to sync!'
-        exit 1
-    fi
+    echo 'Skipping Apache restart and sync steps for Alembic history check'
 fi
 
-echo 'Sync metadata keys'
-tools/sync_meta.py
-if [ $? != 0 ]; then
-    echo 'Failed to sync!'
-    exit 1
-fi
-
-if test ${activate_rse}; then
+if test ${activate_rse} && [ -z "$alembic_history_only" ]; then
     echo 'Activating default RSEs (XRD1, XRD2, XRD3, SSH1)'
     tools/docker_activate_rses.sh
 fi
 
+function run_alembic_history_check() {
+    if ! test ${alembic_history}; then
+        return
+    fi
+
+    echo 'Running Alembic history drift checker'
+    local checker_env="PYTHONPATH=lib${PYTHONPATH+:$PYTHONPATH} ALEMBIC_CONFIG=${RUCIO_HOME}/etc/alembic.ini"
+    local -a cmd
+    cmd=(python3 tools/check_alembic_history.py \
+        --verbose)
+    echo "${checker_env} ${cmd[*]}"
+    ALEMBIC_CONFIG="${RUCIO_HOME}/etc/alembic.ini" PYTHONPATH="lib${PYTHONPATH+:$PYTHONPATH}" "${cmd[@]}"
+    rc=$?
+    if [[ $rc -ne 0 ]]; then
+        if [[ $rc -eq 1 ]]; then
+            echo 'Alembic history drift detected!'
+        else
+            echo 'Alembic history check failed unexpectedly!'
+        fi
+        exit $rc
+    fi
+}
+
 if test ${init_only}; then
+    run_alembic_history_check
     exit
 fi
 
@@ -219,4 +258,6 @@ do
     echo 'Running test iteration' $i
     echo tools/pytest.sh $PYTEST_SH_ARGS $TESTS
     tools/pytest.sh $PYTEST_SH_ARGS $TESTS
+
+    run_alembic_history_check
 done

@@ -91,8 +91,18 @@ def run_tests(cases: list, images: dict, tests: Optional[list[str]] = None):
     if parallel or copy_rucio_logs:
         logs_dir.mkdir(exist_ok=True)
 
+    def _coerce_bool(val, default=True):
+        if val is None:
+            return default
+        if isinstance(val, str):
+            return val.lower() in ('1', 'true', 'yes', 'on')
+        return bool(val)
+
     def gen_case_kwargs(case: dict):
-        use_httpd = case.get('RUN_HTTPD', True)
+        raw_use_httpd = case.get('RUN_HTTPD')
+        if raw_use_httpd is None and case.get('SUITE') == 'alembic_history':
+            raw_use_httpd = False
+        use_httpd = _coerce_bool(raw_use_httpd, default=True)
         return {
             'caseenv': stringify_dict(case),
             'image': find_image(images=images, case=case),
@@ -391,7 +401,7 @@ def run_with_httpd(
 def main():
     obj = json.load(sys.stdin)
     cases = (obj["matrix"],) if isinstance(obj["matrix"], dict) else obj["matrix"]
-    
+
     # Use runtime images if provided
     if "runtime_images" in obj:
         images = {}
@@ -402,7 +412,7 @@ def main():
     else:
         # Fallback to old behavior (Keeping this here in case we need to change testing startegy in the future)
         images = obj["images"]
-    
+
     run_tests(cases, images)
 
 
