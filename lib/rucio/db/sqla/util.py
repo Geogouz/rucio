@@ -20,7 +20,10 @@ from typing import TYPE_CHECKING, Any, Optional, TypeVar, Union
 
 import sqlalchemy
 from alembic import command, op
+from alembic.autogenerate import compare_metadata
 from alembic.config import Config
+from alembic.migration import MigrationContext
+from alembic.script import ScriptDirectory
 from dogpile.cache.api import NoValue
 from sqlalchemy import Column, PrimaryKeyConstraint, func, inspect
 from sqlalchemy.dialects.postgresql.base import PGInspector
@@ -43,7 +46,7 @@ from rucio.db.sqla.session import get_dump_engine, get_engine, get_session
 from rucio.db.sqla.types import InternalScopeString, String
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Sequence
 
     from sqlalchemy.engine import Inspector
     from sqlalchemy.orm import Query, Session
@@ -75,6 +78,103 @@ def build_database() -> None:
     # Put the database under version control
     alembic_cfg = Config(config_get('alembic', 'cfg'))
     command.stamp(alembic_cfg, "head")
+
+
+def _ensure_alembic_config(alembic_cfg: Optional[Union[str, Config]] = None) -> Config:
+    """Return an Alembic ``Config`` instance from a path or reuse an existing one."""
+
+    if isinstance(alembic_cfg, Config):
+        return alembic_cfg
+
+    if alembic_cfg is None:
+        cfg_path = config_get('alembic', 'cfg')
+    else:
+        cfg_path = alembic_cfg
+
+    return Config(cfg_path)
+
+
+def schema_differences(
+        *,
+        engine: Optional[sqlalchemy.engine.Engine] = None,
+        metadata: Optional[sqlalchemy.MetaData] = None
+) -> list[tuple[str, tuple[Any, ...]]]:
+    """Compare the current database schema with the ORM metadata and return the differences."""
+
+    engine = engine or get_engine()
+    metadata = metadata or models.BASE.metadata
+
+    schema = config_get('database', 'schema', raise_exception=False, check_config_table=False)
+    opts: dict[str, Any] = {
+        'compare_type': True,
+        'compare_server_default': True,
+        'include_schemas': True,
+    }
+    if schema:
+        opts['version_table_schema'] = schema
+
+    with engine.connect() as connection:
+        context = MigrationContext.configure(connection=connection, opts=opts)
+        differences = list(compare_metadata(context, metadata))
+
+    return differences
+
+
+def validate_alembic_history(
+        *,
+        alembic_cfg: Optional[Union[str, Config]] = None,
+        logger: Optional["Callable[[str], None]"] = None,
+        stop_on_first_issue: bool = False,
+) -> list[tuple[str, list[tuple[str, tuple[Any, ...]]]]]:
+    """Ensure that every downgrade/upgrade path ends with the ORM schema.
+
+    The helper downgrades the database to every revision reachable from head, then upgrades back to
+    head and runs :func:`schema_differences`. Any detected drift is returned as a list of tuples where
+    the first entry is the revision we downgraded to and the second entry is the list of differences.
+    When ``stop_on_first_issue`` is ``True`` the traversal stops immediately after the first drift is
+    observed.
+    """
+
+    log = logger or (lambda msg: None)
+
+    cfg = _ensure_alembic_config(alembic_cfg)
+    script_directory = ScriptDirectory.from_config(cfg)
+
+    head_revision = script_directory.get_current_head()
+    if head_revision is None:
+        heads = script_directory.get_heads()
+        if len(heads) != 1:
+            raise RuntimeError('validate_alembic_history requires a single-head Alembic history')
+        head_revision = heads[0]
+
+    revisions = list(script_directory.walk_revisions(base='base', head=head_revision))
+    if not revisions:
+        return []
+
+    # Make sure we always start testing from the head revision.
+    command.upgrade(cfg, head_revision)
+
+    issues: list[tuple[str, list[tuple[str, tuple[Any, ...]]]]] = []
+
+    # Skip the head itself and iterate over all remaining revisions plus the Alembic base target.
+    downgrade_targets: list[str] = [rev.revision for rev in revisions[1:]]
+    downgrade_targets.append('base')
+
+    for target in downgrade_targets:
+        log(f'Downgrading database to {target}')
+        command.downgrade(cfg, target)
+
+        log('Upgrading database back to head')
+        command.upgrade(cfg, 'head')
+
+        drift = schema_differences()
+        if drift:
+            issues.append((target, drift))
+            log(f'Schema drift detected after upgrading from {target}: {drift}')
+            if stop_on_first_issue:
+                break
+
+    return issues
 
 
 def dump_schema() -> None:

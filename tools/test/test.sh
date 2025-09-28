@@ -89,6 +89,12 @@ elif [ "$SUITE" == "multi_vo" ]; then
 
     tools/run_multi_vo_tests_docker.sh
 
+elif [ "$SUITE" == "alembic_history" ]; then
+    wait_for_database
+    srchome
+    tools/reset_database.py
+    PYTHONPATH=lib python3 tools/check_alembic_history.py
+
 elif [ "$SUITE" == "remote_dbs" ] || [ "$SUITE" == "sqlite" ]; then
     wait_for_database
     wait_for_httpd

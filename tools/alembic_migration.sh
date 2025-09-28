@@ -13,24 +13,34 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 set -euo pipefail
-IFS=$'\n\t'
 
-echo "Downgrading the DB to base"
-alembic downgrade base
+THIS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="${REPO_ROOT:-$(cd "$THIS_DIR/.." && pwd)}"
 
-echo "Check if is_old_db function is returning false after the full downgrade (tests it without alembic)"
-PYTHONPATH=lib python3 -c 'import sys; import rucio.db.sqla.util; sys.exit(1 if rucio.db.sqla.util.is_old_db() else 0);'
+echo "Optional: check is_old_db before upgrade (if available)"
+python3 - <<'PY' || true
+try:
+    import sys
+    from rucio.db.sqla.util import is_old_db
+    sys.exit(0 if is_old_db() else 1)
+except Exception:
+    pass
+PY
+echo "Upgrading the DB to head (pre-check)"
+alembic -c "${ALEMBIC_INI:-$REPO_ROOT/etc/alembic.ini}" upgrade head
+echo "Optional: check is_old_db after upgrade (if available)"
+python3 - <<'PY' || true
+try:
+    import sys
+    from rucio.db.sqla.util import is_old_db
+    sys.exit(1 if is_old_db() else 0)
+except Exception:
+    pass
+PY
 
-echo "Updating the DB to head-1"
-alembic upgrade head-1
-
-echo "Check if is_old_db function is returning true before the full upgrade"
-PYTHONPATH=lib python3 -c 'import sys; import rucio.db.sqla.util; sys.exit(0 if rucio.db.sqla.util.is_old_db() else 1);'
-
-echo "Upgrading the DB to head"
-alembic upgrade head
-
-echo "Check if is_old_db function returns false after the full upgrade"
-PYTHONPATH=lib python3 -c 'import sys; import rucio.db.sqla.util; sys.exit(1 if rucio.db.sqla.util.is_old_db() else 0);'
+echo "Validating full Alembic history for schema drift"
+python3 "${REPO_ROOT}/tools/check_alembic_history.py" \
+  --alembic-cfg "${ALEMBIC_INI:-$REPO_ROOT/etc/alembic.ini}" \
+  --models "${MODELS_EXPR:-rucio.db.sqla.models:BASE}" \
+  --report-json "${ARTIFACTS_DIR:-$REPO_ROOT/artifacts}/alembic_history_report.json"

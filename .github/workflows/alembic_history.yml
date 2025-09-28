@@ -1,0 +1,71 @@
+name: Alembic history validation
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 4 * * 0'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  runtime_images:
+    name: Build Python 3.9 Runtime Image
+    uses: ./.github/workflows/runtime_images.yml
+    permissions:
+      packages: write
+
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Update pip
+        run: python3 -m pip install -U pip setuptools
+      - name: Install python requirements for matrix_parser.py
+        run: python3 -m pip install -U PyYAML
+      - name: Identify Matrix
+        id: matrix
+        run: echo "matrix=$(./tools/test/matrix_parser.py < ./etc/docker/test/matrix_alembic_history.yml)" >> $GITHUB_OUTPUT
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+
+  validate-history:
+    needs: [runtime_images, setup]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        cfg: ${{ fromJson(needs.setup.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+      - name: Set repository variable
+        id: repo
+        run: echo "repo=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+      - name: Build Python 3.9 image locally
+        if: needs.runtime_images.outputs.build_locally == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: etc/docker/test/runtime.Dockerfile
+          target: final
+          build-args: |
+            PYTHON=3.9
+          push: false
+          tags: ${{ needs.runtime_images.outputs.py39_image }}
+          outputs: type=docker
+          cache-from: type=registry,ref=ghcr.io/${{ steps.repo.outputs.repo }}/rucio-dev-runtime:py39-buildcache
+        continue-on-error: false
+      - name: Run Alembic history validation
+        env:
+          PY39_RUNTIME_IMAGE: ${{ needs.runtime_images.outputs.py39_image }}
+          BUILD_LOCALLY: ${{ needs.runtime_images.outputs.build_locally }}
+        run: |
+          echo '{"matrix": ${{ toJson(matrix.cfg) }}, "runtime_images": {"3.9": "${{ needs.runtime_images.outputs.py39_image }}"}, "build_locally": "${{ needs.runtime_images.outputs.build_locally }}" }' | ./tools/test/run_tests.py

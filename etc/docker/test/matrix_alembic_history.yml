@@ -1,0 +1,19 @@
+dists:
+  - id: alma9
+    allow:
+      python:
+        - "3.9"
+python:
+  - id: "3.9"
+    allow:
+      suites:
+        - alembic_history
+suites:
+  - id: alembic_history
+    RUN_HTTPD: false
+    RDBMS:
+      - postgres14
+      - mysql8
+      - oracle
+image_identifier:
+  - autotest
