@@ -13,6 +13,79 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Production-grade test runner used by Rucio's CI/autotest tooling.
+
+``donkeyrider.py`` collects matrix entries from
+``etc/docker/test/matrix.yml`` (via :mod:`tools.test.matrix_parser`), resolves
+runtime images, and finally pipes a JSON payload into this module.  From that
+payload we derive a sequence of *cases* (distribution × python version × test
+suite × database) and execute them either as ad-hoc containers or through the
+development docker-compose stack.
+
+The intent is to centralise all orchestration concerns in a single place so
+that higher level tooling can simply call :func:`run_tests`.
+
+Execution modes
+===============
+Two execution strategies are supported and are selected on a per-case basis:
+
+``RUN_HTTPD`` true (default)
+    Bring up the development compose stack from
+    ``etc/docker/dev/docker-compose.yml``.  The ``rucio`` service is
+    temporarily overridden to use the desired runtime image while mounting the
+    working tree, and the tests are triggered via ``docker compose exec``.
+
+``RUN_HTTPD`` false
+    Start a single throw-away container from the resolved image and run
+    ``./tools/test/test.sh`` directly.  Syntax-only suites use this path as it
+    avoids the httpd/database dependencies.
+
+Environment variables honoured by this module
+=============================================
+``USE_PODMAN``
+    When set to ``"1"`` the runner prefixes the relevant commands with
+    ``podman`` instead of ``docker``.  The parallel path additionally attaches
+    containers to per-case pods to keep networking consistent.
+
+``PARALLEL_AUTOTESTS`` and ``PARALLEL_AUTOTESTS_PROCNUM``
+    Toggle whether cases are executed concurrently (via
+    :class:`multiprocessing.Pool`) and configure the worker pool size.
+
+``PARALLEL_AUTOTESTS_FAILFAST``
+    Instructs the parallel executor to abort remaining cases as soon as one
+    failure is observed.
+
+``COPY_AUTOTEST_LOGS``
+    When using the compose/httpd path, copy the service logs into a
+    per-case directory for later inspection.
+
+``GITHUB_ACTIONS``
+    Injected into every container through :func:`env_args` so downstream
+    scripts can detect whether they run in CI.
+
+To make the control flow easier to follow, the module is structured as a few
+small helpers:
+
+``main``
+    Reads the JSON payload from ``stdin`` and prepares the ``cases`` and
+    ``images`` structures used by :func:`run_tests`.
+
+``run_tests``
+    Handles parallelism, logging, and success aggregation across cases.
+
+``run_case``
+    Implements the per-case orchestration, deciding between direct execution
+    and compose-based execution, managing pods/namespaces and triggering log
+    capture.
+
+``run_test_directly`` and ``run_with_httpd``
+    The low-level primitives that actually launch containers or compose
+    stacks.
+
+The heavy inline documentation below expands on this overview so that new
+contributors can modify the runner with confidence.
+"""
+
 import itertools
 import json
 import multiprocessing
@@ -35,6 +108,15 @@ if TYPE_CHECKING:
 
 
 def run(*args, check=True, return_stdout=False, env=None) -> Union[NoReturn, 'io.TextIOBase']:
+    """Invoke ``subprocess.run`` with aggressive logging and optional capture.
+
+    ``run`` is deliberately verbose: every command is echoed before execution
+    so the CI logs contain the full docker/podman history leading up to a
+    failure.  The helper also mirrors :func:`subprocess.run`'s ``check``
+    semantics and exposes a lightweight ``return_stdout`` flag that switches to
+    capturing stdout when the caller needs the produced value (e.g. ``podman
+    pod create`` returning the pod identifier).
+    """
     kwargs = {'check': check, 'stdout': sys.stderr, 'stderr': subprocess.STDOUT}
     if env is not None:
         kwargs['env'] = env
@@ -49,6 +131,15 @@ def run(*args, check=True, return_stdout=False, env=None) -> Union[NoReturn, 'io
 
 
 def env_args(caseenv):
+    """Expand a case environment mapping into CLI ``--env`` fragments.
+
+    ``caseenv`` is derived from the matrix entry and contains the suite name,
+    optional database, and other flags consumed by ``test.sh``.  We flatten the
+    mapping into a list ``['--env', 'KEY=value', ...]`` suitable for
+    ``docker/podman run`` while force-injecting ``GITHUB_ACTIONS`` so that
+    downstream shell scripts retain awareness of the CI context even when the
+    surrounding orchestrator is not GitHub Actions.
+    """
     environment_args = list(itertools.chain(*map(lambda x: ('--env', f'{x[0]}={x[1]}'), caseenv.items())))
     environment_args.append('--env')
     environment_args.append('GITHUB_ACTIONS')
@@ -56,6 +147,12 @@ def env_args(caseenv):
 
 
 def matches(small: dict, group: dict):
+    """Return ``True`` when ``group`` contains all key/value pairs from ``small``.
+
+    Image metadata and matrix entries are represented as loose dictionaries.
+    The helper isolates the "does this image satisfy the required
+    characteristics?" check used by :func:`find_image`.
+    """
     for key in small.keys():
         if key not in group or small[key] != group[key]:
             return False
@@ -63,10 +160,23 @@ def matches(small: dict, group: dict):
 
 
 def stringify_dict(inp: dict):
+    """Coerce mapping keys/values to strings for JSON/YAML consumption.
+
+    The matrix originates from YAML where types may be integers or booleans;
+    container environment variables expect strings, so we normalise eagerly to
+    avoid subtle differences between Python/YAML types later in the pipeline.
+    """
     return {str(k): str(v) for k, v in inp.items()}
 
 
 def find_image(images: dict, case: dict):
+    """Return the runtime image tag matching the matrix attributes.
+
+    ``images`` is the structure produced by :mod:`tools.test.build_images`
+    (and forwarded through ``donkeyrider``).  Each entry describes the image in
+    terms of distribution, Python version, and optional identifiers.  The
+    matrix case must be fully contained in one of those metadata dictionaries.
+    """
     for image, idgroup in images.items():
         if matches(idgroup, case):
             return image
@@ -74,15 +184,55 @@ def find_image(images: dict, case: dict):
 
 
 def case_id(case: dict) -> str:
+    """Generate a human-readable identifier from the matrix attributes.
+
+    The resulting string is used for log file names and stderr prefixes, e.g.
+    ``centos7-py3.10-daemons-postgres14``.
+    """
     parts = [case["DIST"], 'py' + case["PYTHON"], case["SUITE"], case.get("RDBMS", "")]
     return '-'.join(filter(bool, parts))
 
 
 def case_log(caseid, msg, file=sys.stderr):
+    """Print ``msg`` with the case identifier prefix for consistent logging.
+
+    ``stderr`` noise is unavoidable when exercising docker/compose.  Prefixing
+    every log line with the case identifier makes later debugging of parallel
+    runs significantly easier.
+    """
     print(caseid, msg, file=file, flush=True)
 
 
 def run_tests(cases: list, images: dict, tests: Optional[list[str]] = None):
+    """Execute all matrix cases serially or in parallel.
+
+    Parameters
+    ----------
+    cases:
+        Case dictionaries produced by :mod:`tools.test.matrix_parser`.  These
+        contain environment variables and flags such as ``RUN_HTTPD`` which
+        choose the orchestration mode.
+    images:
+        Mapping used by :func:`find_image` to resolve cases to container
+        images.  When ``runtime_images`` are provided by
+        :mod:`tools.test.donkeyrider`, they override the default build matrix.
+    tests:
+        Optional test selectors forwarded to ``tools/test/test.sh`` and, in
+        turn, to ``tools/run_tests.sh``.  When set, the runner drops to a
+        filtered pytest invocation rather than executing the full suite.
+
+    High-level behaviour
+    --------------------
+    * honours ``PARALLEL_AUTOTESTS`` (and related variables) to decide whether
+      to spawn a :class:`multiprocessing.Pool`.
+    * normalises each case environment to strings so it can be passed to the
+      shell wrappers without surprises.
+    * records stdout/stderr for each case in dedicated log files when running
+      in parallel, making it possible to inspect failures after the workers
+      exit.
+    * aggregates success/failure and raises :class:`SystemExit` if any case
+      fails.
+    """
     use_podman = 'USE_PODMAN' in os.environ and os.environ['USE_PODMAN'] == '1'
     parallel = 'PARALLEL_AUTOTESTS' in os.environ and os.environ['PARALLEL_AUTOTESTS'] == '1'
     failfast = 'PARALLEL_AUTOTESTS_FAILFAST' in os.environ and os.environ['PARALLEL_AUTOTESTS_FAILFAST'] == '1'
@@ -142,6 +292,14 @@ def run_tests(cases: list, images: dict, tests: Optional[list[str]] = None):
 
 
 def run_case_logger(run_case_kwargs: dict, stdlog=sys.stderr):
+    """Wrap :func:`run_case` to add per-case log files and error reporting.
+
+    The multiprocessing pool cannot share file descriptors with the parent, so
+    we open the log file inside the worker process and temporarily redirect
+    ``sys.stderr``.  Any exception is re-raised after writing the traceback to
+    the case log, allowing :func:`run_tests` to decide whether to abort the
+    run (``FAILFAST``) or continue with the remaining cases.
+    """
     caseid = case_id(run_case_kwargs['caseenv'])
     case_log(caseid, 'started task. Logging to ' + repr(stdlog))
     defaultstderr = sys.stderr
@@ -175,6 +333,20 @@ def run_case_logger(run_case_kwargs: dict, stdlog=sys.stderr):
 
 
 def run_case(caseenv, image, use_podman, use_namespace, use_httpd, copy_rucio_logs, logs_dir: pathlib.Path, tests: list[str]):
+    """Run a single matrix case using the requested container orchestration.
+
+    ``run_case`` normalises all per-case decisions before delegating to the
+    execution primitives.  Responsibilities include:
+
+    * performing a best-effort ``docker image ls`` to surface missing images
+      early with a descriptive error message.
+    * creating/tearing down Podman pods or namespaces when parallel execution
+      would otherwise result in conflicting container names.
+    * dispatching to :func:`run_test_directly` or :func:`run_with_httpd`
+      depending on ``RUN_HTTPD``.
+    * copying compose logs when requested and converting the boolean success
+      back into the ``sys.exit`` contract expected by the outer control flow.
+    """
     if use_namespace:
         namespace = str(uuid.uuid4())
         namespace_args = ['--namespace', namespace]
@@ -235,6 +407,22 @@ def run_test_directly(
     namespace_args: list[str],
     tests: list[str],
 ):
+    """Execute the suite by invoking ``tools/test/test.sh`` directly.
+
+    The direct path keeps orchestration costs to a minimum.  We start a single
+    container, mount the relevant parts of the repository (``/rucio_source``
+    plus ``/opt/rucio/{tools,bin,lib,tests}``) and then execute the shell
+    helper that performs dependency installation, bootstrapping, and pytest
+    execution.  Additional matrix-provided environment variables are passed in
+    via ``--env`` flags and optional ``tests`` selectors are surfaced through
+    the ``TESTS`` variable.
+
+    Returns
+    -------
+    bool
+        ``True`` on success, ``False`` on failure (the caller will handle
+        logging and exiting).
+    """
     pod_net_arg = ['--pod', pod] if use_podman else []
     scripts_to_run = ' && '.join(
         [
@@ -298,6 +486,29 @@ def run_with_httpd(
     logs_dir: pathlib.Path,
     tests: list[str],
 ) -> bool:
+    """Execute a test case by overlaying the development docker-compose stack.
+
+    The httpd-enabled suites require the full stack of services (web server,
+    daemons, databases).  We therefore:
+
+    * render a temporary compose override file that replaces the ``rucio``
+      service image and mounts the repository checkout.
+    * start the stack via ``docker compose up`` (optionally scoped by the
+      requested ``RDBMS`` profile).
+    * ``docker compose exec`` into the running ``rucio`` container to trigger
+      ``./tools/test/test.sh``.
+    * optionally collect container logs into ``logs_dir`` for post-mortem
+      analysis before tearing everything down with ``docker compose down``.
+
+    The ``namespace_args``/``namespace_env`` parameters keep the interface
+    consistent with Podman invocations where ``docker`` commands are wrapped in
+    ``podman --namespace <name>`` to avoid resource conflicts.
+
+    Returns
+    -------
+    bool
+        ``True`` when the suite completes successfully, ``False`` otherwise.
+    """
 
     with (NamedTemporaryFile() as compose_override_file):
         compose_override_content = yaml.dump({
@@ -389,9 +600,17 @@ def run_with_httpd(
 
 
 def main():
+    """Entry point consumed by ``donkeyrider.py`` via ``python -m``.
+
+    ``donkeyrider`` serialises the expanded matrix, resolved images and
+    optional runtime overrides into JSON and pipes it into ``run_tests``.  The
+    function keeps backward compatibility with historical payloads so the
+    docker-compose jobs used in CI and developer machines can share the same
+    code path.
+    """
     obj = json.load(sys.stdin)
     cases = (obj["matrix"],) if isinstance(obj["matrix"], dict) else obj["matrix"]
-    
+
     # Use runtime images if provided
     if "runtime_images" in obj:
         images = {}
@@ -402,7 +621,7 @@ def main():
     else:
         # Fallback to old behavior (Keeping this here in case we need to change testing startegy in the future)
         images = obj["images"]
-    
+
     run_tests(cases, images)
 
 
