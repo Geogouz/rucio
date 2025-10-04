@@ -545,16 +545,18 @@ def run_with_httpd(
 
         rdbms = caseenv.get('RDBMS', '')
         project = os.urandom(8).hex()
+        compose_env = os.environ.copy()
+        compose_env.update(namespace_env)
+        rucio_container = f'{project}-rucio-1'
+        compose_env['RUCIO_HTTPD_CONTAINER_NAME'] = rucio_container
         up_down_args = (
             '--file', 'etc/docker/dev/docker-compose.yml',
             '--file', compose_override_file.name,
             '--profile', rdbms,
         )
-
-        rucio_container = 'dev-rucio-1'
         try:
             # Start docker compose
-            run('docker', 'compose', '-p', project, *up_down_args, 'up', '-d')
+            run('docker', 'compose', '-p', project, *up_down_args, 'up', '-d', env=compose_env)
 
             # Install Rucio directly from the mounted source
             run('docker', *namespace_args, 'exec', rucio_container, 'pip', 'install', '--no-cache-dir', '-e', '/rucio_source')
@@ -595,7 +597,7 @@ def run_with_httpd(
                         file=sys.stderr,
                         flush=True,
                     )
-            run('docker', 'compose', '-p', project, *up_down_args, 'down', '-t', '30', check=False)
+            run('docker', 'compose', '-p', project, *up_down_args, 'down', '-t', '30', check=False, env=compose_env)
         return False
 
 

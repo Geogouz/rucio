@@ -35,7 +35,7 @@ services:
       - RDBMS
 
   rucio:
-    container_name: dev-rucio-1
+    container_name: ${RUCIO_HTTPD_CONTAINER_NAME:-dev-rucio-1}
     image: "docker.io/${DOCKER_REPO:-rucio}/rucio-dev:${RUCIO_DEV_PREFIX:-}${RUCIO_TAG:-latest}"
     platform: linux/amd64
     entrypoint: ["/rucio_source/etc/docker/dev/rucio/entrypoint.sh"]
