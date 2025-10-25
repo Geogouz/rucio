@@ -17,11 +17,22 @@
 import datetime
 
 import sqlalchemy as sa
-from alembic import context
-from alembic.op import add_column, create_check_constraint, create_index, create_primary_key, create_table, drop_column, drop_constraint, drop_index, drop_table
+from alembic import context, op
+from alembic.op import (
+    add_column,
+    create_check_constraint,
+    create_index,
+    create_primary_key,
+    create_table,
+    drop_column,
+    drop_constraint,
+    drop_index,
+    drop_table,
+)
 
 from rucio.db.sqla.constants import DIDType
 from rucio.db.sqla.types import GUID
+from rucio.db.sqla.migrate_repo.enum_ddl_helpers import drop_enum_sql
 
 # Alembic revision identifiers
 revision = '3ad36e2268b0'
@@ -63,10 +74,20 @@ def downgrade():
 
     schema = context.get_context().version_table_schema if context.get_context().version_table_schema else ''
 
-    if context.get_context().dialect.name in ['oracle', 'postgresql']:
+    if context.get_context().dialect.name == 'oracle':
         drop_column('collection_replicas', 'available_replicas_cnt', schema=schema)
         drop_column('collection_replicas', 'available_bytes', schema=schema)
         drop_table('updated_col_rep')
+
+    elif context.get_context().dialect.name == 'postgresql':
+        # Drop columns & table first so there are no remaining dependencies on the enum type.
+        drop_column('collection_replicas', 'available_replicas_cnt', schema=schema)
+        drop_column('collection_replicas', 'available_bytes', schema=schema)
+        drop_table('updated_col_rep')
+
+        # Then drop the PostgreSQL enum type created by this migration so that a subsequent
+        # upgrade can recreate it cleanly without DuplicateObject errors.
+        op.execute(drop_enum_sql('UPDATED_COL_REP_TYPE_CHK', schema=schema))
 
     elif context.get_context().dialect.name == 'mysql':
         drop_column('collection_replicas', 'available_replicas_cnt', schema=schema)
