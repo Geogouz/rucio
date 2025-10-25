@@ -17,7 +17,7 @@
 from alembic import context, op
 from alembic.op import create_check_constraint, create_primary_key, drop_constraint, rename_table
 
-from rucio.db.sqla.util import try_drop_constraint
+from rucio.db.sqla.migrate_repo import try_drop_constraint
 
 # Alembic revision identifiers
 revision = '58c8b78301ab'

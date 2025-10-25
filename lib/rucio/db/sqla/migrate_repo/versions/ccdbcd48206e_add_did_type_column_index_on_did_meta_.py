@@ -19,7 +19,7 @@ from alembic.context import get_context
 from alembic.op import add_column, create_index, drop_column, drop_index, execute
 
 from rucio.db.sqla.constants import DIDType
-from rucio.db.sqla.util import try_drop_constraint
+from rucio.db.sqla.migrate_repo import try_drop_constraint
 
 # Alembic revision identifiers
 revision = 'ccdbcd48206e'

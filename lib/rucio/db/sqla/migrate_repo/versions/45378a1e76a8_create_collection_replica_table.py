@@ -22,7 +22,7 @@ from alembic.op import create_check_constraint, create_foreign_key, create_index
 
 from rucio.db.sqla.constants import DIDType, ReplicaState
 from rucio.db.sqla.types import GUID
-from rucio.db.sqla.util import try_drop_constraint
+from rucio.db.sqla.migrate_repo import try_drop_constraint
 
 # Alembic revision identifiers
 revision = '45378a1e76a8'

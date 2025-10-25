@@ -18,7 +18,7 @@ import sqlalchemy as sa
 from alembic import context, op
 from alembic.op import add_column, create_check_constraint, drop_column, drop_constraint
 
-from rucio.db.sqla.util import try_drop_constraint
+from rucio.db.sqla.migrate_repo import try_drop_constraint
 
 # Alembic revision identifiers
 revision = 'bb695f45c04'

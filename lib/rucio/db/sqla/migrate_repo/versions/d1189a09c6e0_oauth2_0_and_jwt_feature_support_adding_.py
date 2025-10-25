@@ -21,7 +21,7 @@ from alembic import context
 from alembic.op import add_column, alter_column, create_check_constraint, create_index, create_primary_key, create_table, drop_column, drop_table, execute
 
 from rucio.db.sqla.types import InternalAccountString
-from rucio.db.sqla.util import try_drop_constraint
+from rucio.db.sqla.migrate_repo import try_drop_constraint
 
 # Alembic revision identifiers
 revision = 'd1189a09c6e0'

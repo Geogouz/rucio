@@ -19,7 +19,7 @@ from alembic import context, op
 from alembic.op import add_column, drop_column
 
 from rucio.db.sqla.constants import RuleNotification
-from rucio.db.sqla.util import try_drop_constraint
+from rucio.db.sqla.migrate_repo import try_drop_constraint
 
 # Alembic revision identifiers
 revision = '4207be2fd914'

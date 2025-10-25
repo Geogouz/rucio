@@ -21,7 +21,7 @@ from alembic import context, op
 from alembic.op import add_column, create_check_constraint, create_foreign_key, create_index, create_primary_key, create_table, drop_column, drop_constraint, drop_index, drop_table
 
 from rucio.db.sqla.constants import BadPFNStatus
-from rucio.db.sqla.util import try_drop_constraint
+from rucio.db.sqla.migrate_repo import try_drop_constraint
 
 # Alembic revision identifiers
 revision = 'b96a1c7e1cc4'
