@@ -28,14 +28,25 @@ def upgrade():
     '''
     Upgrade the database to this revision
     '''
-
     schema = context.get_context().version_table_schema + '.' if context.get_context().version_table_schema else ''
 
     if context.get_context().dialect.name == 'oracle':
+        # Drop PK on source (callbacks) if present, then rename to messages.
         drop_current_primary_key('callbacks')
         for pk_name in ('CALLBACKS_PK', 'callbacks_pk', 'callbacks_pkey', 'PRIMARY'):
             try_drop_constraint(pk_name, 'callbacks')
+
         rename_table('callbacks', 'messages')
+
+        # Idempotency: remove any leftover constraints with either legacy or target names.
+        for chk in (
+            'CALLBACKS_EVENT_TYPE_NN', 'CALLBACKS_PAYLOAD_NN', 'CALLBACKS_CREATED_NN', 'CALLBACKS_UPDATED_NN',
+            'callbacks_event_type_nn', 'callbacks_payload_nn', 'callbacks_created_nn', 'callbacks_updated_nn',
+            'MESSAGES_EVENT_TYPE_NN', 'MESSAGES_PAYLOAD_NN', 'MESSAGES_CREATED_NN', 'MESSAGES_UPDATED_NN',
+            'messages_event_type_nn', 'messages_payload_nn', 'messages_created_nn', 'messages_updated_nn',
+        ):
+            try_drop_constraint(chk, 'messages')
+
         create_primary_key('messages_pk', 'messages', ['id'])
         create_check_constraint('messages_event_type_nn', 'messages', 'event_type is not null')
         create_check_constraint('messages_payload_nn', 'messages', 'payload is not null')
@@ -43,10 +54,22 @@ def upgrade():
         create_check_constraint('messages_updated_nn', 'messages', 'updated_at is not null')
 
     elif context.get_context().dialect.name == 'postgresql':
+        # Drop PK on source (callbacks) if present, then rename to messages.
         drop_current_primary_key('callbacks')
         for pk_name in ('CALLBACKS_PK', 'callbacks_pk', 'callbacks_pkey', 'PRIMARY'):
             try_drop_constraint(pk_name, 'callbacks')
+
         rename_table('callbacks', 'messages', schema=schema[:-1])
+
+        # Idempotency: remove any leftover constraints with either legacy or target names.
+        for chk in (
+            'CALLBACKS_EVENT_TYPE_NN', 'CALLBACKS_PAYLOAD_NN', 'CALLBACKS_CREATED_NN', 'CALLBACKS_UPDATED_NN',
+            'callbacks_event_type_nn', 'callbacks_payload_nn', 'callbacks_created_nn', 'callbacks_updated_nn',
+            'MESSAGES_EVENT_TYPE_NN', 'MESSAGES_PAYLOAD_NN', 'MESSAGES_CREATED_NN', 'MESSAGES_UPDATED_NN',
+            'messages_event_type_nn', 'messages_payload_nn', 'messages_created_nn', 'messages_updated_nn',
+        ):
+            try_drop_constraint(chk, 'messages')
+
         create_primary_key('messages_pk', 'messages', ['id'])
         create_check_constraint('messages_event_type_nn', 'messages', 'event_type is not null')
         create_check_constraint('messages_payload_nn', 'messages', 'payload is not null')
@@ -67,18 +90,31 @@ def downgrade():
     '''
     Downgrade the database to the previous revision
     '''
-
     schema = context.get_context().version_table_schema + '.' if context.get_context().version_table_schema else ''
 
     if context.get_context().dialect.name == 'oracle':
-        try_drop_constraint('MESSAGES_EVENT_TYPE_NN', 'messages')
-        try_drop_constraint('MESSAGES_PAYLOAD_NN', 'messages')
-        try_drop_constraint('MESSAGES_CREATED_NN', 'messages')
-        try_drop_constraint('MESSAGES_UPDATED_NN', 'messages')
+        # Drop target-name variants on messages before renaming.
+        for chk in (
+            'MESSAGES_EVENT_TYPE_NN', 'MESSAGES_PAYLOAD_NN', 'MESSAGES_CREATED_NN', 'MESSAGES_UPDATED_NN',
+            'messages_event_type_nn', 'messages_payload_nn', 'messages_created_nn', 'messages_updated_nn',
+        ):
+            try_drop_constraint(chk, 'messages')
+
         drop_current_primary_key('messages')
         for pk_name in ('MESSAGES_PK', 'messages_pk', 'messages_pkey', 'PRIMARY'):
             try_drop_constraint(pk_name, 'messages')
+
         rename_table('messages', 'callbacks')
+
+        # After rename, make sure no stray constraints remain under any name.
+        for chk in (
+            'CALLBACKS_EVENT_TYPE_NN', 'CALLBACKS_PAYLOAD_NN', 'CALLBACKS_CREATED_NN', 'CALLBACKS_UPDATED_NN',
+            'callbacks_event_type_nn', 'callbacks_payload_nn', 'callbacks_created_nn', 'callbacks_updated_nn',
+            'MESSAGES_EVENT_TYPE_NN', 'MESSAGES_PAYLOAD_NN', 'MESSAGES_CREATED_NN', 'MESSAGES_UPDATED_NN',
+            'messages_event_type_nn', 'messages_payload_nn', 'messages_created_nn', 'messages_updated_nn',
+        ):
+            try_drop_constraint(chk, 'callbacks')
+
         create_primary_key('CALLBACKS_PK', 'callbacks', ['id'])
         create_check_constraint('CALLBACKS_EVENT_TYPE_NN', 'callbacks', 'event_type is not null')
         create_check_constraint('CALLBACKS_PAYLOAD_NN', 'callbacks', 'payload is not null')
@@ -86,14 +122,28 @@ def downgrade():
         create_check_constraint('CALLBACKS_UPDATED_NN', 'callbacks', 'updated_at is not null')
 
     elif context.get_context().dialect.name == 'postgresql':
-        try_drop_constraint('MESSAGES_EVENT_TYPE_NN', 'messages')
-        try_drop_constraint('MESSAGES_PAYLOAD_NN', 'messages')
-        try_drop_constraint('MESSAGES_CREATED_NN', 'messages')
-        try_drop_constraint('MESSAGES_UPDATED_NN', 'messages')
+        # Drop target-name variants on messages before renaming.
+        for chk in (
+            'MESSAGES_EVENT_TYPE_NN', 'MESSAGES_PAYLOAD_NN', 'MESSAGES_CREATED_NN', 'MESSAGES_UPDATED_NN',
+            'messages_event_type_nn', 'messages_payload_nn', 'messages_created_nn', 'messages_updated_nn',
+        ):
+            try_drop_constraint(chk, 'messages')
+
         drop_current_primary_key('messages')
         for pk_name in ('MESSAGES_PK', 'messages_pk', 'messages_pkey', 'PRIMARY'):
             try_drop_constraint(pk_name, 'messages')
+
         rename_table('messages', 'callbacks', schema=schema[:-1])
+
+        # After rename, make sure no stray constraints remain under any name.
+        for chk in (
+            'CALLBACKS_EVENT_TYPE_NN', 'CALLBACKS_PAYLOAD_NN', 'CALLBACKS_CREATED_NN', 'CALLBACKS_UPDATED_NN',
+            'callbacks_event_type_nn', 'callbacks_payload_nn', 'callbacks_created_nn', 'callbacks_updated_nn',
+            'MESSAGES_EVENT_TYPE_NN', 'MESSAGES_PAYLOAD_NN', 'MESSAGES_CREATED_NN', 'MESSAGES_UPDATED_NN',
+            'messages_event_type_nn', 'messages_payload_nn', 'messages_created_nn', 'messages_updated_nn',
+        ):
+            try_drop_constraint(chk, 'callbacks')
+
         create_primary_key('CALLBACKS_PK', 'callbacks', ['id'])
         create_check_constraint('CALLBACKS_EVENT_TYPE_NN', 'callbacks', 'event_type is not null')
         create_check_constraint('CALLBACKS_PAYLOAD_NN', 'callbacks', 'payload is not null')
