@@ -15,13 +15,23 @@
 ''' add convention table and closed_at to DIDs '''
 
 import datetime
+from rucio.db.sqla.migrate_repo.ddl_helpers import get_effective_schema, is_current_dialect
 
 import sqlalchemy as sa
-from alembic import context
-from alembic.op import add_column, create_check_constraint, create_foreign_key, create_primary_key, create_table, drop_column, drop_table
+from alembic import op
+from alembic.op import (
+    add_column,
+    create_check_constraint,
+    create_foreign_key,
+    create_primary_key,
+    create_table,
+    drop_column,
+    drop_table,
+)
 
 from rucio.common.schema import get_schema_value
 from rucio.db.sqla.constants import KeyType
+from rucio.db.sqla.migrate_repo.enum_ddl_helpers import drop_enum_sql
 
 # Alembic revision identifiers
 revision = '3082b8cef557'
@@ -33,10 +43,12 @@ def upgrade():
     Upgrade the database to this revision
     '''
 
-    if context.get_context().dialect.name in ['oracle', 'mysql', 'postgresql']:
-        schema = context.get_context().version_table_schema if context.get_context().version_table_schema else ''
+    if is_current_dialect('oracle', 'mysql', 'postgresql'):
+        schema = get_effective_schema() or ''
+
         add_column('dids', sa.Column('closed_at', sa.DateTime), schema=schema)
         add_column('contents_history', sa.Column('deleted_at', sa.DateTime), schema=schema)
+
         create_table('naming_conventions',
                      sa.Column('scope', sa.String(get_schema_value('SCOPE_LENGTH'))),
                      sa.Column('regexp', sa.String(255)),
@@ -59,9 +71,17 @@ def downgrade():
     '''
     Downgrade the database to the previous revision
     '''
+    schema = get_effective_schema() or ''
 
-    if context.get_context().dialect.name in ['oracle', 'mysql', 'postgresql']:
-        schema = context.get_context().version_table_schema if context.get_context().version_table_schema else ''
+    if is_current_dialect('oracle', 'mysql'):
         drop_column('dids', 'closed_at', schema=schema)
         drop_column('contents_history', 'deleted_at', schema=schema)
         drop_table('naming_conventions', schema=schema)
+
+    elif is_current_dialect('postgresql'):
+        # Drop the table first to remove dependencies, then drop the enum type,
+        # then remove the added columns.
+        drop_table('naming_conventions', schema=schema)
+        op.execute(drop_enum_sql('CVT_TYPE_CHK', schema=schema))
+        drop_column('dids', 'closed_at', schema=schema)
+        drop_column('contents_history', 'deleted_at', schema=schema)
