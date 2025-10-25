@@ -15,8 +15,9 @@
 ''' Add columns for third_party_copy_read and third_party_copy_write '''
 
 import sqlalchemy as sa
-from alembic import context
 from alembic.op import add_column, drop_column
+
+from rucio.db.sqla.migrate_repo.ddl_helpers import get_effective_schema, is_current_dialect
 
 # Alembic revision identifiers
 revision = '2b69addda658'
@@ -28,8 +29,8 @@ def upgrade():
     Upgrade the database to this revision
     '''
 
-    if context.get_context().dialect.name in ['oracle', 'mysql', 'postgresql']:
-        schema = context.get_context().version_table_schema if context.get_context().version_table_schema else ''
+    if is_current_dialect('oracle', 'mysql', 'postgresql'):
+        schema = get_effective_schema()
         add_column('rse_protocols', sa.Column('third_party_copy_write', sa.Integer), schema=schema)
         add_column('rse_protocols', sa.Column('third_party_copy_read', sa.Integer), schema=schema)
 
@@ -39,7 +40,7 @@ def downgrade():
     Downgrade the database to the previous revision
     '''
 
-    if context.get_context().dialect.name in ['oracle', 'mysql', 'postgresql']:
-        schema = context.get_context().version_table_schema if context.get_context().version_table_schema else ''
+    if is_current_dialect('oracle', 'mysql', 'postgresql'):
+        schema = get_effective_schema()
         drop_column('rse_protocols', 'third_party_copy_write', schema=schema)
         drop_column('rse_protocols', 'third_party_copy_read', schema=schema)

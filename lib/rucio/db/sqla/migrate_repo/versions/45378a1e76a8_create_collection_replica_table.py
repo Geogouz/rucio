@@ -17,7 +17,7 @@
 import datetime
 
 import sqlalchemy as sa
-from alembic import context, op
+from alembic import op
 from alembic.op import (
     create_check_constraint,
     create_foreign_key,
@@ -28,9 +28,10 @@ from alembic.op import (
 )
 
 from rucio.db.sqla.constants import DIDType, ReplicaState
-from rucio.db.sqla.types import GUID
 from rucio.db.sqla.migrate_repo import try_drop_constraint
+from rucio.db.sqla.migrate_repo.ddl_helpers import is_current_dialect
 from rucio.db.sqla.migrate_repo.enum_ddl_helpers import drop_enum_sql
+from rucio.db.sqla.types import GUID
 
 # Alembic revision identifiers
 revision = '45378a1e76a8'
@@ -42,7 +43,7 @@ def upgrade():
     Upgrade the database to this revision
     '''
 
-    if context.get_context().dialect.name in ['oracle', 'mysql', 'postgresql']:
+    if is_current_dialect('oracle', 'mysql', 'postgresql'):
         create_table('collection_replicas',
                      sa.Column('scope', sa.String(25)),
                      sa.Column('name', sa.String(255)),
@@ -75,11 +76,11 @@ def downgrade():
     Downgrade the database to the previous revision
     '''
 
-    if context.get_context().dialect.name == 'oracle':
+    if is_current_dialect('oracle'):
         try_drop_constraint('COLLECTION_REPLICAS_STATE_CHK', 'collection_replicas')
         drop_table('collection_replicas')
 
-    elif context.get_context().dialect.name == 'postgresql':
+    elif is_current_dialect('postgresql'):
         # Drop table first so there are no remaining dependencies on enum types.
         drop_table('collection_replicas')
 
@@ -90,5 +91,5 @@ def downgrade():
         ):
             op.execute(drop_enum_sql(enum_name))
 
-    elif context.get_context().dialect.name == 'mysql':
+    elif is_current_dialect('mysql'):
         drop_table('collection_replicas')

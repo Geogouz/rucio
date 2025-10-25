@@ -17,9 +17,9 @@
 import datetime
 
 import sqlalchemy as sa
-from alembic import context
 from alembic.op import add_column, create_foreign_key, create_index, create_primary_key, create_table, drop_column, drop_table
 
+from rucio.db.sqla.migrate_repo.ddl_helpers import get_effective_schema, is_current_dialect
 from rucio.db.sqla.models import String
 from rucio.db.sqla.types import GUID
 
@@ -33,7 +33,7 @@ def upgrade():
     Upgrade the database to this revision
     '''
 
-    if context.get_context().dialect.name in ['oracle', 'mysql', 'postgresql']:
+    if is_current_dialect('oracle', 'mysql', 'postgresql'):
         create_table('archive_contents',
                      sa.Column('child_scope', String(25)),
                      sa.Column('child_name', String(255)),
@@ -77,7 +77,7 @@ def upgrade():
         create_index('ARCH_CONT_HIST_IDX', 'archive_contents_history',
                      ['scope', 'name'])
 
-        schema = context.get_context().version_table_schema if context.get_context().version_table_schema else ''
+        schema = get_effective_schema()
         add_column('dids', sa.Column('is_archive',
                                      sa.Boolean(name='DIDS_ARCHIVE_CHK', create_constraint=True)),
                    schema=schema)
@@ -93,11 +93,11 @@ def downgrade():
     Downgrade the database to the previous revision
     '''
 
-    if context.get_context().dialect.name in ['oracle', 'mysql', 'postgresql']:
+    if is_current_dialect('oracle', 'mysql', 'postgresql'):
         drop_table('archive_contents')
         drop_table('archive_contents_history')
 
-        schema = context.get_context().version_table_schema if context.get_context().version_table_schema else ''
+        schema = get_effective_schema()
         drop_column('dids', 'is_archive', schema=schema)
         drop_column('dids', 'constituent', schema=schema)
         drop_column('deleted_dids', 'is_archive', schema=schema)

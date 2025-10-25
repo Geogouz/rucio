@@ -17,9 +17,10 @@
 import datetime
 
 import sqlalchemy as sa
-from alembic import context
 from alembic.op import add_column, bulk_insert, create_primary_key, create_table, create_unique_constraint, drop_column, drop_constraint, drop_table
 from sqlalchemy import String
+
+from rucio.db.sqla.migrate_repo.ddl_helpers import get_effective_schema, is_current_dialect
 
 # Alembic revision identifiers
 revision = 'a118956323f8'
@@ -31,8 +32,8 @@ def upgrade():
     Upgrade the database to this revision
     '''
 
-    if context.get_context().dialect.name in ['oracle', 'postgresql', 'mysql']:
-        schema = context.get_context().version_table_schema if context.get_context().version_table_schema else ''
+    if is_current_dialect('oracle', 'postgresql', 'mysql'):
+        schema = get_effective_schema()
         # add a vo table
         vos = create_table('vos',
                            sa.Column('vo', String(3)),
@@ -61,8 +62,8 @@ def downgrade():
     Downgrade the database to the previous revision
     '''
 
-    if context.get_context().dialect.name in ['oracle', 'postgresql', 'mysql']:
-        schema = context.get_context().version_table_schema if context.get_context().version_table_schema else ''
+    if is_current_dialect('oracle', 'postgresql', 'mysql'):
+        schema = get_effective_schema()
 
         # change unique constraint: (rse, vo) -> (rse)
         drop_constraint('RSES_RSE_UQ', 'rses', type_='unique', schema=schema)

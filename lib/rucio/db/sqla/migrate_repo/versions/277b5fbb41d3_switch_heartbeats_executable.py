@@ -15,11 +15,11 @@
 ''' switch heartbeats executable '''
 
 import sqlalchemy as sa
-from alembic import context
 from alembic.op import add_column, create_primary_key, drop_column, drop_constraint
 
-from rucio.db.sqla.models import String
 from rucio.db.sqla.migrate_repo import drop_current_primary_key, try_drop_constraint
+from rucio.db.sqla.migrate_repo.ddl_helpers import get_current_dialect, get_effective_schema
+from rucio.db.sqla.models import String
 
 # Alembic revision identifiers
 revision = '277b5fbb41d3'
@@ -31,7 +31,7 @@ def upgrade():
     Upgrade the database to this revision
     '''
 
-    dialect = context.get_context().dialect.name
+    dialect = get_current_dialect()
 
     if dialect in ['oracle', 'mysql', 'postgresql']:
         if dialect in ['oracle', 'postgresql']:
@@ -40,7 +40,7 @@ def upgrade():
                 try_drop_constraint(pk_name, 'heartbeats')
         else:
             drop_constraint('heartbeats_pk', 'heartbeats', type_='primary')
-        schema = context.get_context().version_table_schema if context.get_context().version_table_schema else ''
+        schema = get_effective_schema()
         drop_column('heartbeats', 'executable', schema=schema)
         add_column('heartbeats', sa.Column('executable', String(64)), schema=schema)
         add_column('heartbeats', sa.Column('readable', String(4000)), schema=schema)
@@ -52,7 +52,7 @@ def downgrade():
     Downgrade the database to the previous revision
     '''
 
-    dialect = context.get_context().dialect.name
+    dialect = get_current_dialect()
 
     if dialect in ['oracle', 'mysql', 'postgresql']:
         if dialect in ['oracle', 'postgresql']:
@@ -61,7 +61,7 @@ def downgrade():
                 try_drop_constraint(pk_name, 'heartbeats')
         else:
             drop_constraint('heartbeats_pk', 'heartbeats', type_='primary')
-        schema = context.get_context().version_table_schema if context.get_context().version_table_schema else ''
+        schema = get_effective_schema()
         drop_column('heartbeats', 'executable', schema=schema)
         drop_column('heartbeats', 'readable', schema=schema)
         add_column('heartbeats', sa.Column('executable', String(767)), schema=schema)

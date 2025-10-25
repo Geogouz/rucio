@@ -14,10 +14,15 @@
 
 ''' new replica state for temporary unavailable replicas '''
 
-from alembic import context, op
+from alembic import op
 from alembic.op import create_check_constraint
 
 from rucio.db.sqla.migrate_repo import try_drop_constraint
+from rucio.db.sqla.migrate_repo.ddl_helpers import (
+    get_effective_schema,
+    is_current_dialect,
+    qualify_table,
+)
 
 # Alembic revision identifiers
 revision = '7ec22226cdbf'
@@ -29,21 +34,33 @@ def upgrade():
     Upgrade the database to this revision
     '''
 
-    schema = context.get_context().version_table_schema + '.' if context.get_context().version_table_schema else ''
+    schema = get_effective_schema()
+    replicas_table = qualify_table('replicas', schema)
 
-    if context.get_context().dialect.name == 'oracle':
+    if is_current_dialect('oracle'):
         try_drop_constraint('REPLICAS_STATE_CHK', 'replicas')
         create_check_constraint(constraint_name='REPLICAS_STATE_CHK', table_name='replicas',
                                 condition="state in ('A', 'U', 'C', 'B', 'D', 'S', 'T')")
 
-    elif context.get_context().dialect.name == 'postgresql':
-        op.execute('ALTER TABLE ' + schema + 'replicas DROP CONSTRAINT IF EXISTS "REPLICAS_STATE_CHK", ALTER COLUMN state TYPE CHAR')
+    elif is_current_dialect('postgresql'):
+        op.execute(
+            f'ALTER TABLE {replicas_table} '
+            'DROP CONSTRAINT IF EXISTS "REPLICAS_STATE_CHK", ALTER COLUMN state TYPE CHAR'
+        )
         op.execute('DROP TYPE "REPLICAS_STATE_CHK"')
-        op.execute("CREATE TYPE \"REPLICAS_STATE_CHK\" AS ENUM('A', 'U', 'C', 'B', 'D', 'S', 'T')")
-        op.execute("ALTER TABLE %sreplicas ALTER COLUMN state TYPE \"REPLICAS_STATE_CHK\" USING state::\"REPLICAS_STATE_CHK\"" % schema)
+        op.execute(
+            """CREATE TYPE "REPLICAS_STATE_CHK" AS ENUM('A', 'U', 'C', 'B', 'D', 'S', 'T')"""
+        )
+        op.execute(
+            f"""
+            ALTER TABLE {replicas_table}
+            ALTER COLUMN state TYPE "REPLICAS_STATE_CHK"
+            USING state::"REPLICAS_STATE_CHK"
+            """
+        )
 
-    elif context.get_context().dialect.name == 'mysql':
-        op.execute('ALTER TABLE ' + schema + 'replicas DROP CHECK REPLICAS_STATE_CHK')  # pylint: disable=no-member
+    elif is_current_dialect('mysql'):
+        op.execute(f'ALTER TABLE {replicas_table} DROP CHECK REPLICAS_STATE_CHK')
         create_check_constraint(constraint_name='REPLICAS_STATE_CHK', table_name='replicas',
                                 condition="state in ('A', 'U', 'C', 'B', 'D', 'S', 'T')")
 
@@ -53,20 +70,32 @@ def downgrade():
     Downgrade the database to the previous revision
     '''
 
-    schema = context.get_context().version_table_schema + '.' if context.get_context().version_table_schema else ''
+    schema = get_effective_schema()
+    replicas_table = qualify_table('replicas', schema)
 
-    if context.get_context().dialect.name == 'oracle':
+    if is_current_dialect('oracle'):
         try_drop_constraint('REPLICAS_STATE_CHK', 'replicas')
         create_check_constraint(constraint_name='REPLICAS_STATE_CHK', table_name='replicas',
                                 condition="state in ('A', 'U', 'C', 'B', 'D', 'S')")
 
-    elif context.get_context().dialect.name == 'postgresql':
-        op.execute('ALTER TABLE ' + schema + 'replicas DROP CONSTRAINT IF EXISTS "REPLICAS_STATE_CHK", ALTER COLUMN state TYPE CHAR')
+    elif is_current_dialect('postgresql'):
+        op.execute(
+            f'ALTER TABLE {replicas_table} '
+            'DROP CONSTRAINT IF EXISTS "REPLICAS_STATE_CHK", ALTER COLUMN state TYPE CHAR'
+        )
         op.execute('DROP TYPE "REPLICAS_STATE_CHK"')
-        op.execute("CREATE TYPE \"REPLICAS_STATE_CHK\" AS ENUM('A', 'U', 'C', 'B', 'D', 'S')")
-        op.execute("ALTER TABLE %sreplicas ALTER COLUMN state TYPE \"REPLICAS_STATE_CHK\" USING state::\"REPLICAS_STATE_CHK\"" % schema)
+        op.execute(
+            """CREATE TYPE "REPLICAS_STATE_CHK" AS ENUM('A', 'U', 'C', 'B', 'D', 'S')"""
+        )
+        op.execute(
+            f"""
+            ALTER TABLE {replicas_table}
+            ALTER COLUMN state TYPE "REPLICAS_STATE_CHK"
+            USING state::"REPLICAS_STATE_CHK"
+            """
+        )
 
-    elif context.get_context().dialect.name == 'mysql':
-        op.execute('ALTER TABLE ' + schema + 'replicas DROP CHECK REPLICAS_STATE_CHK')  # pylint: disable=no-member
+    elif is_current_dialect('mysql'):
+        op.execute(f'ALTER TABLE {replicas_table} DROP CHECK REPLICAS_STATE_CHK')
         create_check_constraint(constraint_name='REPLICAS_STATE_CHK', table_name='replicas',
                                 condition="state in ('A', 'U', 'C', 'B', 'D', 'S')")

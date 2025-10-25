@@ -14,10 +14,15 @@
 
 ''' Add PREPARING state to Request model. '''
 
-from alembic import context, op
+from alembic import op
 
-from rucio.db.sqla.migrate_repo import create_enum_sql, drop_enum_sql, enum_values_clause, render_enum_name
-from rucio.db.sqla.migrate_repo import try_drop_constraint
+from rucio.db.sqla.migrate_repo import create_enum_sql, drop_enum_sql, enum_values_clause, render_enum_name, try_drop_constraint
+from rucio.db.sqla.migrate_repo.ddl_helpers import (
+    get_current_dialect,
+    get_effective_schema,
+    get_migration_context,
+    qualify_table,
+)
 
 # Alembic revision identifiers
 revision = 'd23453595260'
@@ -29,8 +34,10 @@ def upgrade():
 
     new_enum_values = ['Q', 'G', 'S', 'D', 'F', 'L', 'N', 'O', 'A', 'U', 'W', 'M', 'P']
 
-    schema = context.get_context().version_table_schema + '.' if context.get_context().version_table_schema else ''
-    dialect = context.get_context().dialect.name
+    schema = get_effective_schema()
+    requests_table = qualify_table('requests', schema)
+    requests_history_table = qualify_table('requests_history', schema)
+    dialect = get_current_dialect()
 
     if dialect == 'oracle':
         try_drop_constraint('REQUESTS_STATE_CHK', 'requests')
@@ -43,17 +50,25 @@ def upgrade():
         requests_history_enum = render_enum_name('REQUESTS_HISTORY_STATE_CHK')
         requests_enum = render_enum_name('REQUESTS_STATE_CHK')
 
-        op.execute('ALTER TABLE %srequests_history DROP CONSTRAINT IF EXISTS "REQUESTS_HISTORY_STATE_CHK", ALTER COLUMN state TYPE CHAR' % schema)
+        op.execute(
+            f'ALTER TABLE {requests_history_table} '
+            'DROP CONSTRAINT IF EXISTS "REQUESTS_HISTORY_STATE_CHK", ALTER COLUMN state TYPE CHAR'
+        )
         op.execute(drop_enum_sql('REQUESTS_HISTORY_STATE_CHK'))
         op.execute(create_enum_sql('REQUESTS_HISTORY_STATE_CHK', new_enum_values))
-        op.execute(f'ALTER TABLE {schema}requests_history ALTER COLUMN state TYPE {requests_history_enum} USING state::{requests_history_enum}')
-        op.execute('ALTER TABLE %srequests DROP CONSTRAINT IF EXISTS "REQUESTS_STATE_CHK", ALTER COLUMN state TYPE CHAR' % schema)
+        op.execute(f'ALTER TABLE {requests_history_table} ALTER COLUMN state TYPE {requests_history_enum} USING state::{requests_history_enum}')
+        op.execute(
+            f'ALTER TABLE {requests_table} '
+            'DROP CONSTRAINT IF EXISTS "REQUESTS_STATE_CHK", ALTER COLUMN state TYPE CHAR'
+        )
         op.execute(drop_enum_sql('REQUESTS_STATE_CHK'))
         op.execute(create_enum_sql('REQUESTS_STATE_CHK', new_enum_values))
-        op.execute(f'ALTER TABLE {schema}requests ALTER COLUMN state TYPE {requests_enum} USING state::{requests_enum}')
+        op.execute(f'ALTER TABLE {requests_table} ALTER COLUMN state TYPE {requests_enum} USING state::{requests_enum}')
 
     elif dialect == 'mysql':
-        if context.get_context().dialect.server_version_info[0] == 8:
+        ctx = get_migration_context()
+        server_version = getattr(getattr(ctx, 'dialect', None), 'server_version_info', None)
+        if server_version and server_version[0] == 8:
             op.drop_constraint('REQUESTS_STATE_CHK', 'requests', type_='check')
 
         op.create_check_constraint(
@@ -68,8 +83,10 @@ def downgrade():
 
     old_enum_values = ['Q', 'G', 'S', 'D', 'F', 'L', 'N', 'O', 'A', 'U', 'W', 'M']
 
-    schema = context.get_context().version_table_schema + '.' if context.get_context().version_table_schema else ''
-    dialect = context.get_context().dialect.name
+    schema = get_effective_schema()
+    requests_table = qualify_table('requests', schema)
+    requests_history_table = qualify_table('requests_history', schema)
+    dialect = get_current_dialect()
 
     if dialect == 'oracle':
         try_drop_constraint('REQUESTS_STATE_CHK', 'requests')
@@ -82,14 +99,20 @@ def downgrade():
         requests_history_enum = render_enum_name('REQUESTS_HISTORY_STATE_CHK')
         requests_enum = render_enum_name('REQUESTS_STATE_CHK')
 
-        op.execute('ALTER TABLE %srequests_history DROP CONSTRAINT IF EXISTS "REQUESTS_HISTORY_STATE_CHK", ALTER COLUMN state TYPE CHAR' % schema)
+        op.execute(
+            f'ALTER TABLE {requests_history_table} '
+            'DROP CONSTRAINT IF EXISTS "REQUESTS_HISTORY_STATE_CHK", ALTER COLUMN state TYPE CHAR'
+        )
         op.execute(drop_enum_sql('REQUESTS_HISTORY_STATE_CHK'))
         op.execute(create_enum_sql('REQUESTS_HISTORY_STATE_CHK', old_enum_values))
-        op.execute(f'ALTER TABLE {schema}requests_history ALTER COLUMN state TYPE {requests_history_enum} USING state::{requests_history_enum}')
-        op.execute('ALTER TABLE %srequests DROP CONSTRAINT IF EXISTS "REQUESTS_STATE_CHK", ALTER COLUMN state TYPE CHAR' % schema)
+        op.execute(f'ALTER TABLE {requests_history_table} ALTER COLUMN state TYPE {requests_history_enum} USING state::{requests_history_enum}')
+        op.execute(
+            f'ALTER TABLE {requests_table} '
+            'DROP CONSTRAINT IF EXISTS "REQUESTS_STATE_CHK", ALTER COLUMN state TYPE CHAR'
+        )
         op.execute(drop_enum_sql('REQUESTS_STATE_CHK'))
         op.execute(create_enum_sql('REQUESTS_STATE_CHK', old_enum_values))
-        op.execute(f'ALTER TABLE {schema}requests ALTER COLUMN state TYPE {requests_enum} USING state::{requests_enum}')
+        op.execute(f'ALTER TABLE {requests_table} ALTER COLUMN state TYPE {requests_enum} USING state::{requests_enum}')
 
     elif dialect == 'mysql':
         op.create_check_constraint(
@@ -98,5 +121,7 @@ def downgrade():
             condition=f'state in ({enum_values_clause(old_enum_values)})',
         )
 
-        if context.get_context().dialect.server_version_info[0] == 8:
+        ctx = get_migration_context()
+        server_version = getattr(getattr(ctx, 'dialect', None), 'server_version_info', None)
+        if server_version and server_version[0] == 8:
             op.drop_constraint('REQUESTS_STATE_CHK', 'requests', type_='check')

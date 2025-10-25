@@ -15,9 +15,9 @@
 ''' added child_rule_id column '''
 
 import sqlalchemy as sa
-from alembic import context
 from alembic.op import add_column, create_foreign_key, create_index, drop_column, drop_constraint, drop_index
 
+from rucio.db.sqla.migrate_repo.ddl_helpers import get_effective_schema, is_current_dialect
 from rucio.db.sqla.types import GUID
 
 # Alembic revision identifiers
@@ -30,8 +30,8 @@ def upgrade():
     Upgrade the database to this revision
     '''
 
-    if context.get_context().dialect.name in ['oracle', 'mysql', 'postgresql']:
-        schema = context.get_context().version_table_schema if context.get_context().version_table_schema else ''
+    if is_current_dialect('oracle', 'mysql', 'postgresql'):
+        schema = get_effective_schema()
         add_column('rules', sa.Column('child_rule_id', GUID()), schema=schema)
         add_column('rules_hist_recent', sa.Column('child_rule_id', GUID()), schema=schema)
         add_column('rules_history', sa.Column('child_rule_id', GUID()), schema=schema)
@@ -45,11 +45,11 @@ def downgrade():
     Downgrade the database to the previous revision
     '''
 
-    if context.get_context().dialect.name in ['oracle', 'mysql', 'postgresql']:
+    if is_current_dialect('oracle', 'mysql', 'postgresql'):
         drop_constraint('RULES_CHILD_RULE_ID_FK', 'rules', type_='foreignkey')
         drop_index('RULES_CHILD_RULE_ID_IDX', 'rules')
 
-        schema = context.get_context().version_table_schema if context.get_context().version_table_schema else ''
+        schema = get_effective_schema()
         drop_column('rules', 'child_rule_id', schema=schema)
         drop_column('rules_hist_recent', 'child_rule_id', schema=schema)
         drop_column('rules_history', 'child_rule_id', schema=schema)

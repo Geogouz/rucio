@@ -17,10 +17,12 @@
 import datetime
 
 import sqlalchemy as sa
-from alembic import context
+from alembic import op
 from alembic.op import create_check_constraint, create_primary_key, create_table, drop_table
 
 from rucio.db.sqla.constants import DIDType, LifetimeExceptionsState
+from rucio.db.sqla.migrate_repo.ddl_helpers import get_effective_schema, is_current_dialect
+from rucio.db.sqla.migrate_repo.enum_ddl_helpers import drop_enum_sql
 from rucio.db.sqla.types import GUID
 
 # Alembic revision identifiers
@@ -33,7 +35,7 @@ def upgrade():
     Upgrade the database to this revision
     '''
 
-    if context.get_context().dialect.name in ['oracle', 'mysql', 'postgresql']:
+    if is_current_dialect('oracle', 'mysql', 'postgresql'):
         create_table('lifetime_except',
                      sa.Column('id', GUID()),
                      sa.Column('scope', sa.String(25)),
@@ -63,6 +65,14 @@ def downgrade():
     '''
     Downgrade the database to the previous revision
     '''
+    # Handle PostgreSQL separately to drop enum types after dropping the table.
+    if is_current_dialect('postgresql'):
+        schema = get_effective_schema()
+        drop_table('lifetime_except')
+        # Drop enums so a subsequent upgrade can recreate them cleanly.
+        op.execute(drop_enum_sql('LIFETIME_EXCEPT_TYPE_CHK', schema=schema))
+        op.execute(drop_enum_sql('LIFETIME_EXCEPT_STATE_CHK', schema=schema))
 
-    if context.get_context().dialect.name in ['oracle', 'mysql', 'postgresql']:
+    # Other dialects: just drop the table.
+    elif is_current_dialect('oracle', 'mysql'):
         drop_table('lifetime_except')

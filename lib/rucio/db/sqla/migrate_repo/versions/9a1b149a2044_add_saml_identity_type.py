@@ -14,10 +14,14 @@
 
 ''' add saml identity type '''
 
-from alembic import context
 from alembic.op import create_check_constraint, execute
 
 from rucio.db.sqla.migrate_repo import try_drop_constraint
+from rucio.db.sqla.migrate_repo.ddl_helpers import (
+    get_effective_schema,
+    is_current_dialect,
+    qualify_table,
+)
 
 # Alembic revision identifiers
 revision = '9a1b149a2044'
@@ -29,8 +33,11 @@ def upgrade():
     Upgrade the database to this revision
     '''
 
-    schema = context.get_context().version_table_schema + '.' if context.get_context().version_table_schema else ''
-    if context.get_context().dialect.name in ['oracle', 'postgresql']:
+    schema = get_effective_schema()
+    identities_table = qualify_table('identities', schema)
+    account_map_table = qualify_table('account_map', schema)
+
+    if is_current_dialect('oracle', 'postgresql'):
         try_drop_constraint('IDENTITIES_TYPE_CHK', 'identities')
         create_check_constraint(constraint_name='IDENTITIES_TYPE_CHK',
                                 table_name='identities',
@@ -40,12 +47,12 @@ def upgrade():
                                 table_name='account_map',
                                 condition="identity_type in ('X509', 'GSS', 'USERPASS', 'SSH', 'SAML')")
 
-    elif context.get_context().dialect.name == 'mysql':
-        execute('ALTER TABLE ' + schema + 'identities DROP CHECK IDENTITIES_TYPE_CHK')  # pylint: disable=no-member
+    elif is_current_dialect('mysql'):
+        execute(f'ALTER TABLE {identities_table} DROP CHECK IDENTITIES_TYPE_CHK')
         create_check_constraint(constraint_name='IDENTITIES_TYPE_CHK',
                                 table_name='identities',
                                 condition="identity_type in ('X509', 'GSS', 'USERPASS', 'SSH', 'SAML')")
-        execute('ALTER TABLE ' + schema + 'account_map DROP CHECK ACCOUNT_MAP_ID_TYPE_CHK')  # pylint: disable=no-member
+        execute(f'ALTER TABLE {account_map_table} DROP CHECK ACCOUNT_MAP_ID_TYPE_CHK')
         create_check_constraint(constraint_name='ACCOUNT_MAP_ID_TYPE_CHK',
                                 table_name='account_map',
                                 condition="identity_type in ('X509', 'GSS', 'USERPASS', 'SSH', 'SAML')")
@@ -56,8 +63,11 @@ def downgrade():
     Downgrade the database to the previous revision
     '''
 
-    schema = context.get_context().version_table_schema + '.' if context.get_context().version_table_schema else ''
-    if context.get_context().dialect.name in ['oracle']:
+    schema = get_effective_schema()
+    identities_table = qualify_table('identities', schema)
+    account_map_table = qualify_table('account_map', schema)
+
+    if is_current_dialect('oracle'):
         try_drop_constraint('IDENTITIES_TYPE_CHK', 'identities')
         create_check_constraint(constraint_name='IDENTITIES_TYPE_CHK',
                                 table_name='identities',
@@ -68,18 +78,18 @@ def downgrade():
                                 table_name='account_map',
                                 condition="identity_type in ('X509', 'GSS', 'USERPASS', 'SSH')")
 
-    elif context.get_context().dialect.name == 'mysql':
-        execute('ALTER TABLE ' + schema + 'identities DROP CHECK IDENTITIES_TYPE_CHK')  # pylint: disable=no-member
+    elif is_current_dialect('mysql'):
+        execute(f'ALTER TABLE {identities_table} DROP CHECK IDENTITIES_TYPE_CHK')
         create_check_constraint(constraint_name='IDENTITIES_TYPE_CHK',
                                 table_name='identities',
                                 condition="identity_type in ('X509', 'GSS', 'USERPASS', 'SSH')")
 
-        execute('ALTER TABLE ' + schema + 'account_map DROP CHECK ACCOUNT_MAP_ID_TYPE_CHK')  # pylint: disable=no-member
+        execute(f'ALTER TABLE {account_map_table} DROP CHECK ACCOUNT_MAP_ID_TYPE_CHK')
         create_check_constraint(constraint_name='ACCOUNT_MAP_ID_TYPE_CHK',
                                 table_name='account_map',
                                 condition="identity_type in ('X509', 'GSS', 'USERPASS', 'SSH')")
 
-    elif context.get_context().dialect.name == 'postgresql':
+    elif is_current_dialect('postgresql'):
 
         try_drop_constraint('IDENTITIES_TYPE_CHK', 'identities')
         create_check_constraint(constraint_name='IDENTITIES_TYPE_CHK',
@@ -90,5 +100,3 @@ def downgrade():
         create_check_constraint(constraint_name='ACCOUNT_MAP_ID_TYPE_CHK',
                                 table_name='account_map',
                                 condition="identity_type in ('X509', 'GSS', 'USERPASS', 'SSH')")
-        # drop_constraint('ACCOUNT_MAP_ID_TYPE_FK', 'account_map', type_='foreignkey')
-        # create_foreign_key('ACCOUNT_MAP_ID_TYPE_FK', 'account_map', 'identities', ['identity', 'identity_type'], ['identity', 'identity_type'])

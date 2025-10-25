@@ -15,10 +15,10 @@
 ''' Fix primary key for subscription_history '''
 
 
-from alembic import context
 from alembic.op import create_primary_key, drop_constraint
 
 from rucio.db.sqla.migrate_repo import drop_current_primary_key, try_drop_constraint
+from rucio.db.sqla.migrate_repo.ddl_helpers import get_current_dialect
 
 # Alembic revision identifiers
 revision = 'b5493606bbf5'
@@ -29,7 +29,7 @@ def upgrade():
     '''
     Upgrade the database to this revision
     '''
-    dialect = context.get_context().dialect.name
+    dialect = get_current_dialect()
 
     if dialect in ['oracle', 'mysql', 'postgresql']:
         if dialect in ['oracle', 'postgresql']:
@@ -45,7 +45,7 @@ def downgrade():
     '''
     Downgrade the database to the previous revision
     '''
-    dialect = context.get_context().dialect.name
+    dialect = get_current_dialect()
 
     if dialect in ['oracle', 'mysql', 'postgresql']:
         if dialect in ['oracle', 'postgresql']:

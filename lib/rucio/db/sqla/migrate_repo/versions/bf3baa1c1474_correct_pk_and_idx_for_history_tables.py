@@ -15,11 +15,10 @@
 ''' correct PK and IDX for history tables '''
 
 import sqlalchemy as sa
-from alembic import context
 from alembic.op import add_column, create_primary_key, drop_column, drop_constraint, drop_index
 
 from rucio.db.sqla.migrate_repo import drop_current_primary_key, try_drop_constraint
-
+from rucio.db.sqla.migrate_repo.ddl_helpers import get_current_dialect, get_effective_schema
 from rucio.db.sqla.types import GUID
 
 # Alembic revision identifiers
@@ -32,7 +31,7 @@ def upgrade():
     Upgrade the database to this revision
     '''
 
-    dialect = context.get_context().dialect.name
+    dialect = get_current_dialect()
 
     if dialect in ['oracle', 'mysql', 'postgresql']:
         # CONTENTS_HISTORY
@@ -52,7 +51,7 @@ def upgrade():
             drop_constraint(constraint_name='ARCH_CONT_HIST_PK', table_name='archive_contents_history', type_='primary')
 
         # RULES_HIST_RECENT
-        schema = context.get_context().version_table_schema if context.get_context().version_table_schema else ''
+        schema = get_effective_schema()
         if dialect in ['oracle', 'postgresql']:
             drop_current_primary_key('rules_hist_recent')
             for pk_name in ('RULES_HIST_RECENT_PK', 'rules_hist_recent_pk', 'rules_hist_recent_pkey', 'PRIMARY'):
@@ -70,7 +69,7 @@ def downgrade():
     Downgrade the database to the previous revision
     '''
 
-    dialect = context.get_context().dialect.name
+    dialect = get_current_dialect()
 
     if dialect in ['oracle', 'mysql', 'postgresql']:
         # CONTENTS_HISTORY
@@ -89,7 +88,7 @@ def downgrade():
         drop_index('ARCH_CONT_HIST_IDX', 'archive_contents_history')
 
         # RULES_HIST_RECENT
-        schema = context.get_context().version_table_schema if context.get_context().version_table_schema else ''
+        schema = get_effective_schema()
         add_column('rules_hist_recent', sa.Column('history_id', GUID()), schema=schema)
         if dialect in ['oracle', 'postgresql']:
             drop_current_primary_key('rules_hist_recent')

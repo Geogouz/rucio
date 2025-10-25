@@ -17,10 +17,10 @@
 import datetime
 
 import sqlalchemy as sa
-from alembic import context
 from alembic.op import create_check_constraint, create_primary_key, create_table, drop_table
 
 from rucio.db.sqla.migrate_repo import try_drop_constraint
+from rucio.db.sqla.migrate_repo.ddl_helpers import is_current_dialect
 
 # Alembic revision identifiers
 revision = '2b8e7bcb4783'
@@ -32,7 +32,7 @@ def upgrade():
     Upgrade the database to this revision
     '''
 
-    if context.get_context().dialect.name in ['oracle', 'mysql', 'postgresql']:
+    if is_current_dialect('oracle', 'mysql', 'postgresql'):
         create_table('configs',
                      sa.Column('section', sa.String(128)),
                      sa.Column('opt', sa.String(128)),
@@ -58,11 +58,11 @@ def downgrade():
     Downgrade the database to the previous revision
     '''
 
-    if context.get_context().dialect.name in ['oracle', 'mysql', 'postgresql']:
+    if is_current_dialect('oracle', 'mysql', 'postgresql'):
         drop_table('configs')
         drop_table('configs_history')
 
-    elif context.get_context().dialect.name == 'postgresql':
+    elif is_current_dialect('postgresql'):
         try_drop_constraint('configs_pk', 'configs')
         try_drop_constraint('configs_created_nn', 'configs')
         try_drop_constraint('configs_updated_nn', 'configs')

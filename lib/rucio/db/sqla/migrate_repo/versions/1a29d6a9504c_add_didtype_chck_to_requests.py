@@ -15,10 +15,15 @@
 ''' add didtype_chck to requests '''
 
 import sqlalchemy as sa
-from alembic import context, op
+from alembic import op
 from alembic.op import add_column, drop_column
 
 from rucio.db.sqla.constants import DIDType
+from rucio.db.sqla.migrate_repo.ddl_helpers import (
+    get_effective_schema,
+    is_current_dialect,
+    qualify_table,
+)
 
 # Alembic revision identifiers
 revision = '1a29d6a9504c'
@@ -30,22 +35,25 @@ def upgrade():
     Upgrade the database to this revision
     '''
 
-    schema = context.get_context().version_table_schema + '.' if context.get_context().version_table_schema else ''  # pylint: disable=no-member
+    schema = get_effective_schema()
 
-    if context.get_context().dialect.name in ['oracle', 'mysql']:  # pylint: disable=no-member
+    if is_current_dialect('oracle', 'mysql'):
         add_column('requests', sa.Column('did_type',
                                          sa.Enum(DIDType,
                                                  name='REQUESTS_DIDTYPE_CHK',
                                                  create_constraint=True,
                                                  values_callable=lambda obj: [e.value for e in obj]),
-                                         default=DIDType.FILE), schema=schema[:-1])
+                                         default=DIDType.FILE), schema=schema)
         # we don't want checks on the history table, fake the DID type
-        add_column('requests_history', sa.Column('did_type', sa.String(1)), schema=schema[:-1])
+        add_column('requests_history', sa.Column('did_type', sa.String(1)), schema=schema)
 
-    elif context.get_context().dialect.name == 'postgresql':  # pylint: disable=no-member
-        op.execute("ALTER TABLE %srequests ADD COLUMN did_type \"REQUESTS_DIDTYPE_CHK\"" % schema)  # pylint: disable=no-member
+    elif is_current_dialect('postgresql'):
+        requests_table = qualify_table('requests', schema)
+        op.execute(
+            f'ALTER TABLE {requests_table} ADD COLUMN did_type "REQUESTS_DIDTYPE_CHK"'
+        )
         # we don't want checks on the history table, fake the DID type
-        add_column('requests_history', sa.Column('did_type', sa.String(1)), schema=schema[:-1])
+        add_column('requests_history', sa.Column('did_type', sa.String(1)), schema=schema)
 
 
 def downgrade():
@@ -53,8 +61,8 @@ def downgrade():
     Downgrade the database to the previous revision
     '''
 
-    schema = context.get_context().version_table_schema if context.get_context().version_table_schema else ''  # pylint: disable=no-member
+    schema = get_effective_schema()
 
-    if context.get_context().dialect.name in ['oracle', 'mysql', 'postgresql']:  # pylint: disable=no-member
+    if is_current_dialect('oracle', 'mysql', 'postgresql'):
         drop_column('requests', 'did_type', schema=schema)
         drop_column('requests_history', 'did_type', schema=schema)

@@ -15,11 +15,11 @@
 ''' Add did_type column + index on did_meta table '''
 
 import sqlalchemy as sa
-from alembic.context import get_context
 from alembic.op import add_column, create_index, drop_column, drop_index, execute
 
 from rucio.db.sqla.constants import DIDType
 from rucio.db.sqla.migrate_repo import try_drop_constraint
+from rucio.db.sqla.migrate_repo.ddl_helpers import get_current_dialect, get_effective_schema, qualify_table
 
 # Alembic revision identifiers
 revision = 'ccdbcd48206e'
@@ -31,17 +31,24 @@ def upgrade():
     Upgrade the database to this revision
     '''
 
-    schema = get_context().version_table_schema + '.' if get_context().version_table_schema else ''
-    if get_context().dialect.name in ['oracle', 'mysql']:
+    schema = get_effective_schema()
+    dialect = get_current_dialect()
+    did_meta_table = qualify_table('did_meta', schema)
+
+    if dialect in ['oracle', 'mysql']:
         add_column('did_meta',
                    sa.Column('did_type', sa.Enum(DIDType,
                                                  name='DID_META_DID_TYPE_CHK',
                                                  create_constraint=True,
                                                  values_callable=lambda obj: [e.value for e in obj])),
-                   schema=schema[:-1])
-    elif get_context().dialect.name == 'postgresql':
-        execute("CREATE TYPE \"DID_META_DID_TYPE_CHK\" AS ENUM('F', 'D', 'C', 'A', 'X', 'Y', 'Z')")
-        execute("ALTER TABLE %sdid_meta ADD COLUMN did_type \"DID_META_DID_TYPE_CHK\"" % schema)
+                   schema=schema)
+    elif dialect == 'postgresql':
+        execute(
+            """CREATE TYPE "DID_META_DID_TYPE_CHK" AS ENUM('F', 'D', 'C', 'A', 'X', 'Y', 'Z')"""
+        )
+        execute(
+            f'ALTER TABLE {did_meta_table} ADD COLUMN did_type "DID_META_DID_TYPE_CHK"'
+        )
     create_index('DID_META_DID_TYPE_IDX', 'did_meta', ['did_type'])
 
 
@@ -51,15 +58,21 @@ def downgrade():
     '''
 
     drop_index('DID_META_DID_TYPE_IDX', 'did_meta')
-    schema = get_context().version_table_schema + '.' if get_context().version_table_schema else ''
-    if get_context().dialect.name == 'oracle':
+    schema = get_effective_schema()
+    dialect = get_current_dialect()
+    did_meta_table = qualify_table('did_meta', schema)
+
+    if dialect == 'oracle':
         try_drop_constraint('DID_META_DID_TYPE_CHK', 'did_meta')
-        drop_column('did_meta', 'did_type', schema=schema[:-1])
+        drop_column('did_meta', 'did_type', schema=schema)
 
-    elif get_context().dialect.name == 'postgresql':
-        execute('ALTER TABLE %sdid_meta DROP CONSTRAINT IF EXISTS "DID_META_DID_TYPE_CHK", ALTER COLUMN did_type TYPE CHAR' % schema)
-        execute('ALTER TABLE %sdid_meta DROP COLUMN did_type' % schema)
-        execute('DROP TYPE \"DID_META_DID_TYPE_CHK\"')
+    elif dialect == 'postgresql':
+        execute(
+            f'ALTER TABLE {did_meta_table} '
+            'DROP CONSTRAINT IF EXISTS "DID_META_DID_TYPE_CHK", ALTER COLUMN did_type TYPE CHAR'
+        )
+        execute(f'ALTER TABLE {did_meta_table} DROP COLUMN did_type')
+        execute('DROP TYPE "DID_META_DID_TYPE_CHK"')
 
-    elif get_context().dialect.name == 'mysql':
-        drop_column('did_meta', 'did_type', schema=schema[:-1])
+    elif dialect == 'mysql':
+        drop_column('did_meta', 'did_type', schema=schema)

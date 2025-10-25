@@ -15,11 +15,16 @@
 ''' add notification column to rules '''
 
 import sqlalchemy as sa
-from alembic import context, op
+from alembic import op
 from alembic.op import add_column, drop_column
 
 from rucio.db.sqla.constants import RuleNotification
 from rucio.db.sqla.migrate_repo import try_drop_constraint
+from rucio.db.sqla.migrate_repo.ddl_helpers import (
+    get_effective_schema,
+    is_current_dialect,
+    qualify_table,
+)
 
 # Alembic revision identifiers
 revision = '4207be2fd914'
@@ -31,17 +36,22 @@ def upgrade():
     Upgrade the database to this revision
     '''
 
-    schema = context.get_context().version_table_schema + '.' if context.get_context().version_table_schema else ''
+    schema = get_effective_schema()
+    rules_table = qualify_table('rules', schema)
 
-    if context.get_context().dialect.name in ['oracle', 'mysql']:
+    if is_current_dialect('oracle', 'mysql'):
         add_column('rules', sa.Column('notification', sa.Enum(RuleNotification,
                                                               name='RULES_NOTIFICATION_CHK',
                                                               create_constraint=True,
                                                               values_callable=lambda obj: [e.value for e in obj]),
-                                      default=RuleNotification.NO), schema=schema[:-1])
-    elif context.get_context().dialect.name == 'postgresql':
-        op.execute("CREATE TYPE \"RULES_NOTIFICATION_CHK\" AS ENUM('Y', 'N', 'C', 'P')")
-        op.execute("ALTER TABLE %srules ADD COLUMN notification \"RULES_NOTIFICATION_CHK\"" % schema)
+                                      default=RuleNotification.NO), schema=schema)
+    elif is_current_dialect('postgresql'):
+        op.execute(
+            """CREATE TYPE "RULES_NOTIFICATION_CHK" AS ENUM('Y', 'N', 'C', 'P')"""
+        )
+        op.execute(
+            f'ALTER TABLE {rules_table} ADD COLUMN notification "RULES_NOTIFICATION_CHK"'
+        )
 
 
 def downgrade():
@@ -49,16 +59,20 @@ def downgrade():
     Downgrade the database to the previous revision
     '''
 
-    schema = context.get_context().version_table_schema + '.' if context.get_context().version_table_schema else ''
+    schema = get_effective_schema()
+    rules_table = qualify_table('rules', schema)
 
-    if context.get_context().dialect.name == 'oracle':
+    if is_current_dialect('oracle'):
         try_drop_constraint('RULES_NOTIFICATION_CHK', 'rules')
-        drop_column('rules', 'notification', schema=schema[:-1])
+        drop_column('rules', 'notification', schema=schema)
 
-    elif context.get_context().dialect.name == 'postgresql':
-        op.execute('ALTER TABLE %srules DROP CONSTRAINT IF EXISTS "RULES_NOTIFICATION_CHK", ALTER COLUMN notification TYPE CHAR' % schema)
-        op.execute('ALTER TABLE %srules DROP COLUMN notification' % schema)
-        op.execute('DROP TYPE \"RULES_NOTIFICATION_CHK\"')
+    elif is_current_dialect('postgresql'):
+        op.execute(
+            f'ALTER TABLE {rules_table} '
+            'DROP CONSTRAINT IF EXISTS "RULES_NOTIFICATION_CHK", ALTER COLUMN notification TYPE CHAR'
+        )
+        op.execute(f'ALTER TABLE {rules_table} DROP COLUMN notification')
+        op.execute('DROP TYPE "RULES_NOTIFICATION_CHK"')
 
-    elif context.get_context().dialect.name == 'mysql':
-        drop_column('rules', 'notification', schema=schema[:-1])
+    elif is_current_dialect('mysql'):
+        drop_column('rules', 'notification', schema=schema)

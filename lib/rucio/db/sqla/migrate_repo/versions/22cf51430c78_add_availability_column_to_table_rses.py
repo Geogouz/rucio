@@ -15,8 +15,9 @@
 ''' add availability column to table RSEs '''
 
 import sqlalchemy as sa
-from alembic import context
 from alembic.op import add_column, drop_column
+
+from rucio.db.sqla.migrate_repo.ddl_helpers import get_effective_schema, is_current_dialect
 
 # Alembic revision identifiers
 revision = '22cf51430c78'
@@ -28,12 +29,12 @@ def upgrade():
     Upgrade the database to this revision
     '''
 
-    if context.get_context().dialect.name in ['oracle', 'mysql', 'postgresql']:
-        schema = context.get_context().version_table_schema if context.get_context().version_table_schema else ''
+    if is_current_dialect('oracle', 'mysql', 'postgresql'):
+        schema = get_effective_schema()
         add_column('rses', sa.Column('availability', sa.Integer, server_default='7'), schema=schema)
 
 
 def downgrade():
-    if context.get_context().dialect.name in ['oracle', 'mysql', 'postgresql']:
-        schema = context.get_context().version_table_schema if context.get_context().version_table_schema else ''
+    if is_current_dialect('oracle', 'mysql', 'postgresql'):
+        schema = get_effective_schema()
         drop_column('rses', 'availability', schema=schema)

@@ -17,7 +17,7 @@
 import datetime
 
 import sqlalchemy as sa
-from alembic import context, op
+from alembic import op
 from alembic.op import (
     add_column,
     create_check_constraint,
@@ -31,8 +31,9 @@ from alembic.op import (
 )
 
 from rucio.db.sqla.constants import DIDType
-from rucio.db.sqla.types import GUID
+from rucio.db.sqla.migrate_repo.ddl_helpers import get_effective_schema, is_current_dialect
 from rucio.db.sqla.migrate_repo.enum_ddl_helpers import drop_enum_sql
+from rucio.db.sqla.types import GUID
 
 # Alembic revision identifiers
 revision = '3ad36e2268b0'
@@ -44,8 +45,8 @@ def upgrade():
     Upgrade the database to this revision
     '''
 
-    if context.get_context().dialect.name in ['oracle', 'mysql', 'postgresql']:
-        schema = context.get_context().version_table_schema if context.get_context().version_table_schema else ''
+    if is_current_dialect('oracle', 'mysql', 'postgresql'):
+        schema = get_effective_schema()
         add_column('collection_replicas', sa.Column('available_replicas_cnt', sa.BigInteger()), schema=schema)
         add_column('collection_replicas', sa.Column('available_bytes', sa.BigInteger()), schema=schema)
 
@@ -72,14 +73,14 @@ def downgrade():
     Downgrade the database to the previous revision
     '''
 
-    schema = context.get_context().version_table_schema if context.get_context().version_table_schema else ''
+    schema = get_effective_schema()
 
-    if context.get_context().dialect.name == 'oracle':
+    if is_current_dialect('oracle'):
         drop_column('collection_replicas', 'available_replicas_cnt', schema=schema)
         drop_column('collection_replicas', 'available_bytes', schema=schema)
         drop_table('updated_col_rep')
 
-    elif context.get_context().dialect.name == 'postgresql':
+    elif is_current_dialect('postgresql'):
         # Drop columns & table first so there are no remaining dependencies on the enum type.
         drop_column('collection_replicas', 'available_replicas_cnt', schema=schema)
         drop_column('collection_replicas', 'available_bytes', schema=schema)
@@ -89,7 +90,7 @@ def downgrade():
         # upgrade can recreate it cleanly without DuplicateObject errors.
         op.execute(drop_enum_sql('UPDATED_COL_REP_TYPE_CHK', schema=schema))
 
-    elif context.get_context().dialect.name == 'mysql':
+    elif is_current_dialect('mysql'):
         drop_column('collection_replicas', 'available_replicas_cnt', schema=schema)
         drop_column('collection_replicas', 'available_bytes', schema=schema)
         drop_constraint('UPDATED_COL_REP_PK', 'updated_col_rep', type_='primary')

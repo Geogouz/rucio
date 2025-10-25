@@ -17,11 +17,15 @@
 import datetime
 
 import sqlalchemy as sa
-from alembic import context
 from alembic.op import add_column, alter_column, create_check_constraint, create_index, create_primary_key, create_table, drop_column, drop_table, execute
 
-from rucio.db.sqla.types import InternalAccountString
 from rucio.db.sqla.migrate_repo import try_drop_constraint
+from rucio.db.sqla.migrate_repo.ddl_helpers import (
+    get_effective_schema,
+    is_current_dialect,
+    qualify_table,
+)
+from rucio.db.sqla.types import InternalAccountString
 
 # Alembic revision identifiers
 revision = 'd1189a09c6e0'
@@ -32,8 +36,11 @@ def upgrade():
     '''
     Upgrade the database to this revision
     '''
-    schema = context.get_context().version_table_schema + '.' if context.get_context().version_table_schema else ''  # pylint: disable=no-member
-    if context.get_context().dialect.name in ['oracle', 'postgresql']:  # pylint: disable=no-member
+    schema = get_effective_schema()
+    identities_table = qualify_table('identities', schema)
+    account_map_table = qualify_table('account_map', schema)
+
+    if is_current_dialect('oracle', 'postgresql'):
         try_drop_constraint('IDENTITIES_TYPE_CHK', 'identities')
         create_check_constraint(constraint_name='IDENTITIES_TYPE_CHK',
                                 table_name='identities',
@@ -42,24 +49,24 @@ def upgrade():
         create_check_constraint(constraint_name='ACCOUNT_MAP_ID_TYPE_CHK',
                                 table_name='account_map',
                                 condition="identity_type in ('X509', 'GSS', 'USERPASS', 'SSH', 'SAML', 'OIDC')")
-    elif context.get_context().dialect.name == 'mysql':  # pylint: disable=no-member
-        execute('ALTER TABLE ' + schema + 'identities DROP CHECK IDENTITIES_TYPE_CHK')  # pylint: disable=no-member
+    elif is_current_dialect('mysql'):
+        execute(f'ALTER TABLE {identities_table} DROP CHECK IDENTITIES_TYPE_CHK')
         create_check_constraint(constraint_name='IDENTITIES_TYPE_CHK',
                                 table_name='identities',
                                 condition="identity_type in ('X509', 'GSS', 'USERPASS', 'SSH', 'SAML', 'OIDC')")
-        execute('ALTER TABLE ' + schema + 'account_map DROP CHECK ACCOUNT_MAP_ID_TYPE_CHK')  # pylint: disable=no-member
+        execute(f'ALTER TABLE {account_map_table} DROP CHECK ACCOUNT_MAP_ID_TYPE_CHK')
         create_check_constraint(constraint_name='ACCOUNT_MAP_ID_TYPE_CHK',
                                 table_name='account_map',
                                 condition="identity_type in ('X509', 'GSS', 'USERPASS', 'SSH', 'SAML', 'OIDC')")
 
-    if context.get_context().dialect.name in ['oracle', 'mysql', 'postgresql']:  # pylint: disable=no-member
-        add_column('tokens', sa.Column('oidc_scope', sa.String(2048), nullable=True, default=None), schema=schema[:-1])
-        add_column('tokens', sa.Column('audience', sa.String(315), nullable=True, default=None), schema=schema[:-1])
-        add_column('tokens', sa.Column('refresh_token', sa.String(315), nullable=True, default=None), schema=schema[:-1])
-        add_column('tokens', sa.Column('refresh', sa.Boolean(name='TOKENS_REFRESH_CHK', create_constraint=True), default=False), schema=schema[:-1])
-        add_column('tokens', sa.Column('refresh_start', sa.DateTime(), nullable=True, default=None), schema=schema[:-1])
-        add_column('tokens', sa.Column('refresh_expired_at', sa.DateTime(), nullable=True, default=None), schema=schema[:-1])
-        add_column('tokens', sa.Column('refresh_lifetime', sa.Integer(), nullable=True, default=None), schema=schema[:-1])
+    if is_current_dialect('oracle', 'mysql', 'postgresql'):
+        add_column('tokens', sa.Column('oidc_scope', sa.String(2048), nullable=True, default=None), schema=schema)
+        add_column('tokens', sa.Column('audience', sa.String(315), nullable=True, default=None), schema=schema)
+        add_column('tokens', sa.Column('refresh_token', sa.String(315), nullable=True, default=None), schema=schema)
+        add_column('tokens', sa.Column('refresh', sa.Boolean(name='TOKENS_REFRESH_CHK', create_constraint=True), default=False), schema=schema)
+        add_column('tokens', sa.Column('refresh_start', sa.DateTime(), nullable=True, default=None), schema=schema)
+        add_column('tokens', sa.Column('refresh_expired_at', sa.DateTime(), nullable=True, default=None), schema=schema)
+        add_column('tokens', sa.Column('refresh_lifetime', sa.Integer(), nullable=True, default=None), schema=schema)
 
         create_table('oauth_requests',
                      sa.Column('account', InternalAccountString(25)),
@@ -77,18 +84,21 @@ def upgrade():
         create_index('OAUTH_REQUESTS_ACC_EXP_AT_IDX', 'oauth_requests', ['account', 'expired_at'])
         create_index('OAUTH_REQUESTS_ACCESS_MSG_IDX', 'oauth_requests', ['access_msg'])
 
-    if context.get_context().dialect.name in ['oracle', 'postgresql']:  # pylint: disable=no-member
-        alter_column('tokens', 'token', existing_type=sa.String(length=352), type_=sa.String(length=3072), schema=schema[:-1])
-    if context.get_context().dialect.name in ['mysql']:  # pylint: disable=no-member
-        alter_column('tokens', 'token', existing_type=sa.String(length=352), type_=sa.String(length=3072), existing_nullable=False, nullable=False, schema=schema[:-1])
+    if is_current_dialect('oracle', 'postgresql'):
+        alter_column('tokens', 'token', existing_type=sa.String(length=352), type_=sa.String(length=3072), schema=schema)
+    if is_current_dialect('mysql'):
+        alter_column('tokens', 'token', existing_type=sa.String(length=352), type_=sa.String(length=3072), existing_nullable=False, nullable=False, schema=schema)
 
 
 def downgrade():
     '''
     Downgrade the database to the previous revision
     '''
-    schema = context.get_context().version_table_schema + '.' if context.get_context().version_table_schema else ''  # pylint: disable=no-member
-    if context.get_context().dialect.name in ['oracle']:  # pylint: disable=no-member
+    schema = get_effective_schema()
+    identities_table = qualify_table('identities', schema)
+    account_map_table = qualify_table('account_map', schema)
+
+    if is_current_dialect('oracle'):
         try_drop_constraint('IDENTITIES_TYPE_CHK', 'identities')
         create_check_constraint(constraint_name='IDENTITIES_TYPE_CHK',
                                 table_name='identities',
@@ -98,17 +108,17 @@ def downgrade():
         create_check_constraint(constraint_name='ACCOUNT_MAP_ID_TYPE_CHK',
                                 table_name='account_map',
                                 condition="identity_type in ('X509', 'GSS', 'USERPASS', 'SSH', 'SAML')")
-        drop_column('tokens', 'oidc_scope', schema=schema[:-1])
-        drop_column('tokens', 'audience', schema=schema[:-1])
-        drop_column('tokens', 'refresh_token', schema=schema[:-1])
-        drop_column('tokens', 'refresh', schema=schema[:-1])
-        drop_column('tokens', 'refresh_start', schema=schema[:-1])
-        drop_column('tokens', 'refresh_expired_at', schema=schema[:-1])
-        drop_column('tokens', 'refresh_lifetime', schema=schema[:-1])
+        drop_column('tokens', 'oidc_scope', schema=schema)
+        drop_column('tokens', 'audience', schema=schema)
+        drop_column('tokens', 'refresh_token', schema=schema)
+        drop_column('tokens', 'refresh', schema=schema)
+        drop_column('tokens', 'refresh_start', schema=schema)
+        drop_column('tokens', 'refresh_expired_at', schema=schema)
+        drop_column('tokens', 'refresh_lifetime', schema=schema)
         drop_table('oauth_requests')
-        alter_column('tokens', 'token', existing_type=sa.String(length=3072), type_=sa.String(length=352), schema=schema[:-1])
+        alter_column('tokens', 'token', existing_type=sa.String(length=3072), type_=sa.String(length=352), schema=schema)
 
-    elif context.get_context().dialect.name == 'mysql':  # pylint: disable=no-member
+    elif is_current_dialect('mysql'):
         try_drop_constraint('IDENTITIES_TYPE_CHK', 'identities')
         create_check_constraint(constraint_name='IDENTITIES_TYPE_CHK',
                                 table_name='identities',
@@ -118,17 +128,17 @@ def downgrade():
         create_check_constraint(constraint_name='ACCOUNT_MAP_ID_TYPE_CHK',
                                 table_name='account_map',
                                 condition="identity_type in ('X509', 'GSS', 'USERPASS', 'SSH', 'SAML')")
-        drop_column('tokens', 'oidc_scope', schema=schema[:-1])
-        drop_column('tokens', 'audience', schema=schema[:-1])
-        drop_column('tokens', 'refresh_token', schema=schema[:-1])
-        drop_column('tokens', 'refresh', schema=schema[:-1])
-        drop_column('tokens', 'refresh_start', schema=schema[:-1])
-        drop_column('tokens', 'refresh_expired_at', schema=schema[:-1])
-        drop_column('tokens', 'refresh_lifetime', schema=schema[:-1])
-        alter_column('tokens', 'token', existing_type=sa.String(length=3072), type_=sa.String(length=352), existing_nullable=False, nullable=False, schema=schema[:-1])
+        drop_column('tokens', 'oidc_scope', schema=schema)
+        drop_column('tokens', 'audience', schema=schema)
+        drop_column('tokens', 'refresh_token', schema=schema)
+        drop_column('tokens', 'refresh', schema=schema)
+        drop_column('tokens', 'refresh_start', schema=schema)
+        drop_column('tokens', 'refresh_expired_at', schema=schema)
+        drop_column('tokens', 'refresh_lifetime', schema=schema)
+        alter_column('tokens', 'token', existing_type=sa.String(length=3072), type_=sa.String(length=352), existing_nullable=False, nullable=False, schema=schema)
         drop_table('oauth_requests')
 
-    elif context.get_context().dialect.name == 'postgresql':  # pylint: disable=no-member
+    elif is_current_dialect('postgresql'):
 
         try_drop_constraint('IDENTITIES_TYPE_CHK', 'identities')
         create_check_constraint(constraint_name='IDENTITIES_TYPE_CHK',
@@ -139,12 +149,12 @@ def downgrade():
         create_check_constraint(constraint_name='ACCOUNT_MAP_ID_TYPE_CHK',
                                 table_name='account_map',
                                 condition="identity_type in ('X509', 'GSS', 'USERPASS', 'SSH', 'SAML')")
-        drop_column('tokens', 'oidc_scope', schema=schema[:-1])
-        drop_column('tokens', 'audience', schema=schema[:-1])
-        drop_column('tokens', 'refresh_token', schema=schema[:-1])
-        drop_column('tokens', 'refresh', schema=schema[:-1])
-        drop_column('tokens', 'refresh_start', schema=schema[:-1])
-        drop_column('tokens', 'refresh_expired_at', schema=schema[:-1])
-        drop_column('tokens', 'refresh_lifetime', schema=schema[:-1])
-        alter_column('tokens', 'token', existing_type=sa.String(length=3072), type_=sa.String(length=352), schema=schema[:-1])
+        drop_column('tokens', 'oidc_scope', schema=schema)
+        drop_column('tokens', 'audience', schema=schema)
+        drop_column('tokens', 'refresh_token', schema=schema)
+        drop_column('tokens', 'refresh', schema=schema)
+        drop_column('tokens', 'refresh_start', schema=schema)
+        drop_column('tokens', 'refresh_expired_at', schema=schema)
+        drop_column('tokens', 'refresh_lifetime', schema=schema)
+        alter_column('tokens', 'token', existing_type=sa.String(length=3072), type_=sa.String(length=352), schema=schema)
         drop_table('oauth_requests')

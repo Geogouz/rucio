@@ -15,7 +15,6 @@
 ''' add convention table and closed_at to DIDs '''
 
 import datetime
-from rucio.db.sqla.migrate_repo.ddl_helpers import get_effective_schema, is_current_dialect
 
 import sqlalchemy as sa
 from alembic import op
@@ -31,6 +30,7 @@ from alembic.op import (
 
 from rucio.common.schema import get_schema_value
 from rucio.db.sqla.constants import KeyType
+from rucio.db.sqla.migrate_repo.ddl_helpers import get_effective_schema, is_current_dialect
 from rucio.db.sqla.migrate_repo.enum_ddl_helpers import drop_enum_sql
 
 # Alembic revision identifiers
@@ -44,7 +44,7 @@ def upgrade():
     '''
 
     if is_current_dialect('oracle', 'mysql', 'postgresql'):
-        schema = get_effective_schema() or ''
+        schema = get_effective_schema()
 
         add_column('dids', sa.Column('closed_at', sa.DateTime), schema=schema)
         add_column('contents_history', sa.Column('deleted_at', sa.DateTime), schema=schema)
@@ -71,7 +71,7 @@ def downgrade():
     '''
     Downgrade the database to the previous revision
     '''
-    schema = get_effective_schema() or ''
+    schema = get_effective_schema()
 
     if is_current_dialect('oracle', 'mysql'):
         drop_column('dids', 'closed_at', schema=schema)

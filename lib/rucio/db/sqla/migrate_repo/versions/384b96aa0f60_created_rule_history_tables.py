@@ -17,12 +17,13 @@
 import datetime
 
 import sqlalchemy as sa
-from alembic import context, op
+from alembic import op
 from alembic.op import create_index, create_primary_key, create_table, drop_index, drop_table
 
 from rucio.db.sqla.constants import DIDType, RuleGrouping, RuleNotification, RuleState
-from rucio.db.sqla.types import GUID
+from rucio.db.sqla.migrate_repo.ddl_helpers import get_effective_schema, is_current_dialect
 from rucio.db.sqla.migrate_repo.enum_ddl_helpers import drop_enum_sql
+from rucio.db.sqla.types import GUID
 
 # Alembic revision identifiers
 revision = '384b96aa0f60'
@@ -33,7 +34,7 @@ def upgrade():
     '''
     Upgrade the database to this revision
     '''
-    if context.get_context().dialect.name in ['oracle', 'mysql', 'postgresql']:
+    if is_current_dialect('oracle', 'mysql', 'postgresql'):
         create_table('rules_hist_recent',
                      sa.Column('history_id', GUID()),
                      sa.Column('id', GUID()),
@@ -143,18 +144,18 @@ def downgrade():
     Downgrade the database to the previous revision
     '''
 
-    if context.get_context().dialect.name in ['oracle', 'mysql']:
+    if is_current_dialect('oracle', 'mysql'):
         drop_index('RULES_HIST_RECENT_ID_IDX', 'rules_hist_recent')
         drop_table('rules_hist_recent')
         drop_table('rules_history')
 
-    elif context.get_context().dialect.name == 'postgresql':
+    elif is_current_dialect('postgresql'):
         # Drop tables first so there are no remaining dependencies on the enum types.
         drop_table('rules_hist_recent')
         drop_table('rules_history')
 
         # Then drop the PostgreSQL enum types so the next upgrade can recreate them cleanly.
-        schema = getattr(context.get_context(), "version_table_schema", None)
+        schema = get_effective_schema()
         for enum_name in (
                 'RULES_HIST_RECENT_DIDTYPE_CHK',
                 'RULES_HIST_RECENT_STATE_CHK',
