@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Increase OAuthRequest.redirect_msg length"""    # noqa: D400, D415
+''' Increase OAuthRequest.redirect_msg length '''
 
 import sqlalchemy as sa
 from alembic.op import alter_column

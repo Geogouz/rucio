@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" move rse settings to rse attributes """
+''' move rse settings to rse attributes '''
 
 import sqlalchemy as sa
 from alembic.op import get_bind

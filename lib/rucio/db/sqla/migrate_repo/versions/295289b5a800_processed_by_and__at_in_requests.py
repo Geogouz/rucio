@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" processed_by and _at in requests """
+''' processed_by and _at in requests '''
 
 import sqlalchemy as sa
 from alembic.op import add_column, drop_column

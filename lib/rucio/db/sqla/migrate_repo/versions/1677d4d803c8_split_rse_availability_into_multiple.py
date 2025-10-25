@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" split rse availability into multiple """
+''' split rse availability into multiple '''
 
 import sqlalchemy as sa
 from alembic.op import add_column, drop_column, get_bind

@@ -13,6 +13,7 @@
 # limitations under the License.
 
 ''' Add index on service column in the message table '''
+
 import sqlalchemy as sa
 from alembic.op import alter_column, create_index, drop_index
 

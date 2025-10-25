@@ -14,7 +14,6 @@
 
 ''' Fix primary key for subscription_history '''
 
-
 from alembic.op import create_primary_key, drop_constraint
 
 from rucio.db.sqla.migrate_repo import drop_current_primary_key, try_drop_constraint

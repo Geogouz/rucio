@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" state idx non functional """
+''' state idx non functional '''
 
 from alembic.op import create_index, drop_index, execute
 
