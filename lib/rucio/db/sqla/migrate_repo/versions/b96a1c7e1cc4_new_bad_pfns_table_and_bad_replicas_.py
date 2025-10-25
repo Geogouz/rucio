@@ -21,7 +21,7 @@ from alembic import context, op
 from alembic.op import add_column, create_check_constraint, create_foreign_key, create_index, create_primary_key, create_table, drop_column, drop_constraint, drop_index, drop_table
 
 from rucio.db.sqla.constants import BadPFNStatus
-from rucio.db.sqla.migrate_repo import try_drop_constraint
+from rucio.db.sqla.migrate_repo import drop_current_primary_key, try_drop_constraint
 
 # Alembic revision identifiers
 revision = 'b96a1c7e1cc4'
@@ -61,7 +61,9 @@ def upgrade():
         add_column('bad_replicas', sa.Column('expires_at', sa.DateTime()), schema=schema[:-1])
 
         # Change PK
-        try_drop_constraint('BAD_REPLICAS_STATE_PK', 'bad_replicas')
+        drop_current_primary_key('bad_replicas')
+        for pk_name in ('BAD_REPLICAS_STATE_PK', 'BAD_REPLICAS_PK', 'bad_replicas_pkey'):
+            try_drop_constraint(pk_name, 'bad_replicas')
         create_primary_key('BAD_REPLICAS_STATE_PK', 'bad_replicas', ['scope', 'name', 'rse_id', 'state', 'created_at'])
 
         # Add new Index to Table
@@ -116,7 +118,9 @@ def downgrade():
                                 condition="state in ('B', 'D', 'L', 'R', 'S')")
 
         drop_column('bad_replicas', 'expires_at')
-        try_drop_constraint('BAD_REPLICAS_STATE_PK', 'bad_replicas')
+        drop_current_primary_key('bad_replicas')
+        for pk_name in ('BAD_REPLICAS_STATE_PK', 'BAD_REPLICAS_PK', 'bad_replicas_pkey'):
+            try_drop_constraint(pk_name, 'bad_replicas')
         create_primary_key('BAD_REPLICAS_STATE_PK', 'bad_replicas', ['scope', 'name', 'rse_id', 'created_at'])
 
     elif context.get_context().dialect.name == 'postgresql':
@@ -128,7 +132,9 @@ def downgrade():
                                 condition="state in ('B', 'D', 'L', 'R', 'S')")
 
         drop_column('bad_replicas', 'expires_at', schema=schema[:-1])
-        try_drop_constraint('BAD_REPLICAS_STATE_PK', 'bad_replicas')
+        drop_current_primary_key('bad_replicas')
+        for pk_name in ('BAD_REPLICAS_STATE_PK', 'BAD_REPLICAS_PK', 'bad_replicas_pkey'):
+            try_drop_constraint(pk_name, 'bad_replicas')
         create_primary_key('BAD_REPLICAS_STATE_PK', 'bad_replicas', ['scope', 'name', 'rse_id', 'created_at'])
 
     elif context.get_context().dialect.name == 'mysql':

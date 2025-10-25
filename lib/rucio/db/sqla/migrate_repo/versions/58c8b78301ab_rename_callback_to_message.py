@@ -17,7 +17,7 @@
 from alembic import context, op
 from alembic.op import create_check_constraint, create_primary_key, drop_constraint, rename_table
 
-from rucio.db.sqla.migrate_repo import try_drop_constraint
+from rucio.db.sqla.migrate_repo import drop_current_primary_key, try_drop_constraint
 
 # Alembic revision identifiers
 revision = '58c8b78301ab'
@@ -32,7 +32,9 @@ def upgrade():
     schema = context.get_context().version_table_schema + '.' if context.get_context().version_table_schema else ''
 
     if context.get_context().dialect.name == 'oracle':
-        try_drop_constraint('callbacks_pk', 'callbacks')
+        drop_current_primary_key('callbacks')
+        for pk_name in ('CALLBACKS_PK', 'callbacks_pk', 'callbacks_pkey', 'PRIMARY'):
+            try_drop_constraint(pk_name, 'callbacks')
         rename_table('callbacks', 'messages')
         create_primary_key('messages_pk', 'messages', ['id'])
         create_check_constraint('messages_event_type_nn', 'messages', 'event_type is not null')
@@ -41,7 +43,9 @@ def upgrade():
         create_check_constraint('messages_updated_nn', 'messages', 'updated_at is not null')
 
     elif context.get_context().dialect.name == 'postgresql':
-        try_drop_constraint('callbacks_pk', 'callbacks')
+        drop_current_primary_key('callbacks')
+        for pk_name in ('CALLBACKS_PK', 'callbacks_pk', 'callbacks_pkey', 'PRIMARY'):
+            try_drop_constraint(pk_name, 'callbacks')
         rename_table('callbacks', 'messages', schema=schema[:-1])
         create_primary_key('messages_pk', 'messages', ['id'])
         create_check_constraint('messages_event_type_nn', 'messages', 'event_type is not null')
@@ -71,7 +75,9 @@ def downgrade():
         try_drop_constraint('MESSAGES_PAYLOAD_NN', 'messages')
         try_drop_constraint('MESSAGES_CREATED_NN', 'messages')
         try_drop_constraint('MESSAGES_UPDATED_NN', 'messages')
-        try_drop_constraint('MESSAGES_PK', 'messages')
+        drop_current_primary_key('messages')
+        for pk_name in ('MESSAGES_PK', 'messages_pk', 'messages_pkey', 'PRIMARY'):
+            try_drop_constraint(pk_name, 'messages')
         rename_table('messages', 'callbacks')
         create_primary_key('CALLBACKS_PK', 'callbacks', ['id'])
         create_check_constraint('CALLBACKS_EVENT_TYPE_NN', 'callbacks', 'event_type is not null')
@@ -84,7 +90,9 @@ def downgrade():
         try_drop_constraint('MESSAGES_PAYLOAD_NN', 'messages')
         try_drop_constraint('MESSAGES_CREATED_NN', 'messages')
         try_drop_constraint('MESSAGES_UPDATED_NN', 'messages')
-        try_drop_constraint('MESSAGES_PK', 'messages')
+        drop_current_primary_key('messages')
+        for pk_name in ('MESSAGES_PK', 'messages_pk', 'messages_pkey', 'PRIMARY'):
+            try_drop_constraint(pk_name, 'messages')
         rename_table('messages', 'callbacks', schema=schema[:-1])
         create_primary_key('CALLBACKS_PK', 'callbacks', ['id'])
         create_check_constraint('CALLBACKS_EVENT_TYPE_NN', 'callbacks', 'event_type is not null')

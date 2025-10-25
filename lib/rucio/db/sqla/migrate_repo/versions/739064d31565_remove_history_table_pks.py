@@ -17,6 +17,8 @@
 from alembic import context
 from alembic.op import create_primary_key, drop_constraint
 
+from rucio.db.sqla.migrate_repo import drop_current_primary_key, try_drop_constraint
+
 # Alembic revision identifiers
 revision = '739064d31565'
 down_revision = 'ccdbcd48206e'
@@ -27,9 +29,16 @@ def upgrade():
     Upgrade the database to this revision
     '''
 
-    if context.get_context().dialect.name in ['oracle', 'mysql', 'postgresql']:
+    dialect = context.get_context().dialect.name
+
+    if dialect in ['oracle', 'mysql', 'postgresql']:
         # CONFIGS_HISTORY
-        drop_constraint('CONFIGS_HISTORY_PK', 'configs_history', type_='primary')
+        if dialect in ['oracle', 'postgresql']:
+            drop_current_primary_key('configs_history')
+            for pk_name in ('CONFIGS_HISTORY_PK', 'configs_history_pk', 'configs_history_pkey', 'PRIMARY'):
+                try_drop_constraint(pk_name, 'configs_history')
+        else:
+            drop_constraint('CONFIGS_HISTORY_PK', 'configs_history', type_='primary')
 
 
 def downgrade():
@@ -37,5 +46,11 @@ def downgrade():
     Downgrade the database to the previous revision
     '''
 
-    if context.get_context().dialect.name in ['oracle', 'mysql', 'postgresql']:
+    dialect = context.get_context().dialect.name
+
+    if dialect in ['oracle', 'mysql', 'postgresql']:
+        if dialect in ['oracle', 'postgresql']:
+            drop_current_primary_key('configs_history')
+            for pk_name in ('CONFIGS_HISTORY_PK', 'configs_history_pk', 'configs_history_pkey', 'PRIMARY'):
+                try_drop_constraint(pk_name, 'configs_history')
         create_primary_key('CONFIGS_HISTORY_PK', 'configs_history', ['section', 'opt', 'updated_at'])

@@ -17,7 +17,7 @@
 from alembic import context
 from alembic.op import create_foreign_key, create_primary_key, drop_constraint, drop_index
 
-from rucio.db.sqla.migrate_repo import try_drop_constraint
+from rucio.db.sqla.migrate_repo import drop_current_primary_key, try_drop_constraint
 
 # revision identifiers used by alembic
 revision = '3345511706b8'
@@ -31,7 +31,9 @@ def upgrade():
 
     if context.get_context().dialect.name in ['oracle', 'postgresql']:
         try_drop_constraint('SOURCES_REPLICA_FK', 'sources')
-        try_drop_constraint('REPLICAS_PK', 'replicas')
+        drop_current_primary_key('replicas')
+        for pk_name in ('REPLICAS_PK', 'replicas_pk', 'replicas_pkey', 'PRIMARY'):
+            try_drop_constraint(pk_name, 'replicas')
         create_primary_key('REPLICAS_PK', 'replicas', ['scope', 'name', 'rse_id'])
         create_foreign_key('SOURCES_REPLICA_FK', 'sources', 'replicas', ['scope', 'name', 'rse_id'], ['scope', 'name', 'rse_id'])
 
@@ -56,7 +58,9 @@ def downgrade():
 
     if context.get_context().dialect.name in ['oracle', 'postgresql']:
         try_drop_constraint('SOURCES_REPLICA_FK', 'sources')
-        try_drop_constraint('REPLICAS_PK', 'replicas')
+        drop_current_primary_key('replicas')
+        for pk_name in ('REPLICAS_PK', 'replicas_pk', 'replicas_pkey', 'PRIMARY'):
+            try_drop_constraint(pk_name, 'replicas')
         create_primary_key('REPLICAS_PK', 'replicas', ['rse_id', 'scope', 'name'])
         create_foreign_key('SOURCES_REPLICA_FK', 'sources', 'replicas', ['rse_id', 'scope', 'name'], ['rse_id', 'scope', 'name'])
 
