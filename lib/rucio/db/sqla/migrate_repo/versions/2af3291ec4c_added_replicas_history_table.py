@@ -16,7 +16,9 @@
 
 import sqlalchemy as sa
 from alembic import context
-from alembic.op import create_check_constraint, create_foreign_key, create_primary_key, create_table, drop_constraint, drop_table
+from alembic.op import create_check_constraint, create_foreign_key, create_primary_key, create_table, drop_table
+
+from rucio.db.sqla.migrate_repo import try_drop_constraint
 
 from rucio.db.sqla.types import GUID
 
@@ -51,7 +53,7 @@ def downgrade():
         drop_table('replicas_history')
 
     elif context.get_context().dialect.name == 'postgresql':
-        drop_constraint('REPLICAS_HIST_PK', 'replicas_history', type_='primary')
-        drop_constraint('REPLICAS_HIST_RSE_ID_FK', 'replicas_history')
-        drop_constraint('REPLICAS_HIST_SIZE_NN', 'replicas_history')
+        try_drop_constraint('REPLICAS_HIST_PK', 'replicas_history')
+        try_drop_constraint('REPLICAS_HIST_RSE_ID_FK', 'replicas_history')
+        try_drop_constraint('REPLICAS_HIST_SIZE_NN', 'replicas_history')
         drop_table('replicas_history')

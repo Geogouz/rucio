@@ -16,7 +16,7 @@
 
 import sqlalchemy as sa
 from alembic import context, op
-from alembic.op import add_column, create_check_constraint, drop_column, drop_constraint
+from alembic.op import add_column, create_check_constraint, drop_column
 
 from rucio.db.sqla.migrate_repo import try_drop_constraint
 
@@ -62,7 +62,7 @@ def downgrade():
         drop_column('sources', 'is_using')
 
     elif context.get_context().dialect.name == 'postgresql':
-        drop_constraint('REQUESTS_STATE_CHK', 'requests', type_='check')
+        try_drop_constraint('REQUESTS_STATE_CHK', 'requests')
         create_check_constraint(constraint_name='REQUESTS_STATE_CHK', table_name='requests',
                                 condition="state in ('Q', 'G', 'S', 'D', 'F', 'L')")
         drop_column('requests', 'submitter_id', schema=schema[:-1])

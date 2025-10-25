@@ -15,7 +15,7 @@
 ''' add saml identity type '''
 
 from alembic import context
-from alembic.op import create_check_constraint, drop_constraint, execute
+from alembic.op import create_check_constraint, execute
 
 from rucio.db.sqla.migrate_repo import try_drop_constraint
 
@@ -81,12 +81,12 @@ def downgrade():
 
     elif context.get_context().dialect.name == 'postgresql':
 
-        drop_constraint('IDENTITIES_TYPE_CHK', 'identities', type_='check')
+        try_drop_constraint('IDENTITIES_TYPE_CHK', 'identities')
         create_check_constraint(constraint_name='IDENTITIES_TYPE_CHK',
                                 table_name='identities',
                                 condition="identity_type in ('X509', 'GSS', 'USERPASS', 'SSH')")
 
-        drop_constraint('ACCOUNT_MAP_ID_TYPE_CHK', 'account_map', type_='check')
+        try_drop_constraint('ACCOUNT_MAP_ID_TYPE_CHK', 'account_map')
         create_check_constraint(constraint_name='ACCOUNT_MAP_ID_TYPE_CHK',
                                 table_name='account_map',
                                 condition="identity_type in ('X509', 'GSS', 'USERPASS', 'SSH')")

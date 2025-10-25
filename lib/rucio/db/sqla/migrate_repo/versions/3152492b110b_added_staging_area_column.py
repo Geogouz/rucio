@@ -16,7 +16,7 @@
 
 import sqlalchemy as sa
 from alembic import context, op
-from alembic.op import add_column, create_check_constraint, drop_column, drop_constraint
+from alembic.op import add_column, create_check_constraint, drop_column
 
 from rucio.db.sqla.migrate_repo import try_drop_constraint
 
@@ -40,7 +40,7 @@ def upgrade():
 
     elif context.get_context().dialect.name == 'postgresql':
         add_column('rses', sa.Column('staging_area', sa.Boolean(name='RSE_STAGING_AREA_CHK', create_constraint=True), default=False), schema=schema[:-1])
-        drop_constraint('REQUESTS_TYPE_CHK', 'requests', type_='check')
+        try_drop_constraint('REQUESTS_TYPE_CHK', 'requests')
         create_check_constraint(constraint_name='REQUESTS_TYPE_CHK', table_name='requests',
                                 condition="request_type in ('U', 'D', 'T', 'I', '0')")
 

@@ -61,7 +61,7 @@ def upgrade():
         add_column('bad_replicas', sa.Column('expires_at', sa.DateTime()), schema=schema[:-1])
 
         # Change PK
-        drop_constraint('BAD_REPLICAS_STATE_PK', 'bad_replicas', type_='primary')
+        try_drop_constraint('BAD_REPLICAS_STATE_PK', 'bad_replicas')
         create_primary_key('BAD_REPLICAS_STATE_PK', 'bad_replicas', ['scope', 'name', 'rse_id', 'state', 'created_at'])
 
         # Add new Index to Table
@@ -116,7 +116,7 @@ def downgrade():
                                 condition="state in ('B', 'D', 'L', 'R', 'S')")
 
         drop_column('bad_replicas', 'expires_at')
-        drop_constraint('BAD_REPLICAS_STATE_PK', 'bad_replicas', type_='primary')
+        try_drop_constraint('BAD_REPLICAS_STATE_PK', 'bad_replicas')
         create_primary_key('BAD_REPLICAS_STATE_PK', 'bad_replicas', ['scope', 'name', 'rse_id', 'created_at'])
 
     elif context.get_context().dialect.name == 'postgresql':
@@ -128,7 +128,7 @@ def downgrade():
                                 condition="state in ('B', 'D', 'L', 'R', 'S')")
 
         drop_column('bad_replicas', 'expires_at', schema=schema[:-1])
-        drop_constraint('BAD_REPLICAS_STATE_PK', 'bad_replicas', type_='primary')
+        try_drop_constraint('BAD_REPLICAS_STATE_PK', 'bad_replicas')
         create_primary_key('BAD_REPLICAS_STATE_PK', 'bad_replicas', ['scope', 'name', 'rse_id', 'created_at'])
 
     elif context.get_context().dialect.name == 'mysql':

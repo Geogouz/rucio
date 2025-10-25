@@ -100,7 +100,7 @@ def downgrade():
         execute("DELETE FROM " + schema + "account_map WHERE identity_type='SSH'")  # pylint: disable=no-member
         execute("DELETE FROM " + schema + "identities WHERE identity_type='SSH'")  # pylint: disable=no-member
 
-        drop_constraint('ACCOUNT_MAP_ID_TYPE_FK', 'account_map', type_='foreignkey')
+        try_drop_constraint('ACCOUNT_MAP_ID_TYPE_FK', 'account_map')
         op.execute('ALTER TABLE ' + schema + 'identities DROP CONSTRAINT IF EXISTS "IDENTITIES_TYPE_CHK", ALTER COLUMN identity_type TYPE VARCHAR')  # pylint: disable=no-member
         create_check_constraint(constraint_name='IDENTITIES_TYPE_CHK',
                                 table_name='identities',

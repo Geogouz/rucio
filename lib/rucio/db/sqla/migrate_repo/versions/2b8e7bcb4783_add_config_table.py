@@ -18,7 +18,9 @@ import datetime
 
 import sqlalchemy as sa
 from alembic import context
-from alembic.op import create_check_constraint, create_primary_key, create_table, drop_constraint, drop_table
+from alembic.op import create_check_constraint, create_primary_key, create_table, drop_table
+
+from rucio.db.sqla.migrate_repo import try_drop_constraint
 
 # Alembic revision identifiers
 revision = '2b8e7bcb4783'
@@ -61,9 +63,9 @@ def downgrade():
         drop_table('configs_history')
 
     elif context.get_context().dialect.name == 'postgresql':
-        drop_constraint('configs_pk', 'configs', type_='primary')
-        drop_constraint('configs_created_nn', 'configs', type_='check')
-        drop_constraint('configs_updated_nn', 'configs', type_='check')
+        try_drop_constraint('configs_pk', 'configs')
+        try_drop_constraint('configs_created_nn', 'configs')
+        try_drop_constraint('configs_updated_nn', 'configs')
         drop_table('configs')
-        drop_constraint('configs_history_pk', 'configs_history', type_='check')
+        try_drop_constraint('configs_history_pk', 'configs_history')
         drop_table('configs_history')
