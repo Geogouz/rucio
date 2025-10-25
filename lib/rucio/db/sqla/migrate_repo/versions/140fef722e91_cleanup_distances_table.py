@@ -15,8 +15,9 @@
 ''' cleanup distances table '''
 
 import sqlalchemy as sa
-from alembic import context
 from alembic.op import add_column, alter_column, drop_column
+
+from rucio.db.sqla.migrate_repo.ddl_helpers import get_effective_schema, is_current_dialect
 
 # Alembic revision identifiers
 revision = '140fef722e91'
@@ -28,9 +29,9 @@ def upgrade():
     Upgrade the database to this revision
     '''
 
-    schema = context.get_context().version_table_schema if context.get_context().version_table_schema else ''
+    schema = get_effective_schema()
 
-    if context.get_context().dialect.name in ['oracle', 'mysql', 'postgresql']:
+    if is_current_dialect('oracle', 'mysql', 'postgresql'):
         drop_column('distances', 'agis_distance', schema=schema)
         drop_column('distances', 'geoip_distance', schema=schema)
         drop_column('distances', 'active', schema=schema)
@@ -54,9 +55,9 @@ def downgrade():
     Downgrade the database to the previous revision
     '''
 
-    schema = context.get_context().version_table_schema if context.get_context().version_table_schema else ''
+    schema = get_effective_schema()
 
-    if context.get_context().dialect.name in ['oracle', 'mysql', 'postgresql']:
+    if is_current_dialect('oracle', 'mysql', 'postgresql'):
 
         alter_column('distances', 'distance', existing_type=sa.Integer, new_column_name='ranking', schema=schema)
 

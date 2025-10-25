@@ -17,11 +17,22 @@
 import datetime
 
 import sqlalchemy as sa
-from alembic import context
-from alembic.op import add_column, create_check_constraint, create_foreign_key, create_primary_key, create_table, drop_column, drop_table
+from alembic import op
+from alembic.op import (
+    add_column,
+    create_check_constraint,
+    create_foreign_key,
+    create_primary_key,
+    create_table,
+    drop_column,
+    drop_table,
+)
+from sqlalchemy.dialects import postgresql as pg
 
 from rucio.common.schema import get_schema_value
 from rucio.db.sqla.constants import KeyType
+from rucio.db.sqla.migrate_repo import create_enum_if_absent_block, drop_enum_sql
+from rucio.db.sqla.migrate_repo.ddl_helpers import get_effective_schema, is_current_dialect
 
 # Alembic revision identifiers
 revision = '3082b8cef557'
@@ -33,17 +44,39 @@ def upgrade():
     Upgrade the database to this revision
     '''
 
-    if context.get_context().dialect.name in ['oracle', 'mysql', 'postgresql']:
-        schema = context.get_context().version_table_schema if context.get_context().version_table_schema else ''
+    if is_current_dialect('oracle', 'mysql', 'postgresql'):
+        schema = get_effective_schema()
+
         add_column('dids', sa.Column('closed_at', sa.DateTime), schema=schema)
         add_column('contents_history', sa.Column('deleted_at', sa.DateTime), schema=schema)
+
+        enum_values = [key_type.value for key_type in KeyType]
+        if is_current_dialect('postgresql'):
+            op.execute(
+                create_enum_if_absent_block(
+                    'CVT_TYPE_CHK',
+                    enum_values,
+                    schema=schema,
+                )
+            )
+            convention_type = pg.ENUM(
+                *enum_values,
+                name='CVT_TYPE_CHK',
+                schema=schema,
+                create_type=False,
+            )
+        else:
+            convention_type = sa.Enum(
+                KeyType,
+                name='CVT_TYPE_CHK',
+                create_constraint=True,
+                values_callable=lambda obj: [e.value for e in obj],
+            )
+
         create_table('naming_conventions',
                      sa.Column('scope', sa.String(get_schema_value('SCOPE_LENGTH'))),
                      sa.Column('regexp', sa.String(255)),
-                     sa.Column('convention_type', sa.Enum(KeyType,
-                                                          name='CVT_TYPE_CHK',
-                                                          create_constraint=True,
-                                                          values_callable=lambda obj: [e.value for e in obj])),
+                     sa.Column('convention_type', convention_type),
                      sa.Column('updated_at', sa.DateTime, default=datetime.datetime.utcnow),
                      sa.Column('created_at', sa.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow))
         create_primary_key('NAMING_CONVENTIONS_PK', 'naming_conventions', ['scope'])
@@ -59,9 +92,17 @@ def downgrade():
     '''
     Downgrade the database to the previous revision
     '''
+    schema = get_effective_schema()
 
-    if context.get_context().dialect.name in ['oracle', 'mysql', 'postgresql']:
-        schema = context.get_context().version_table_schema if context.get_context().version_table_schema else ''
+    if is_current_dialect('oracle', 'mysql'):
         drop_column('dids', 'closed_at', schema=schema)
         drop_column('contents_history', 'deleted_at', schema=schema)
         drop_table('naming_conventions', schema=schema)
+
+    elif is_current_dialect('postgresql'):
+        # Drop the table first to remove dependencies, then drop the enum type,
+        # then remove the added columns.
+        drop_table('naming_conventions', schema=schema)
+        op.execute(drop_enum_sql('CVT_TYPE_CHK', schema=schema))
+        drop_column('dids', 'closed_at', schema=schema)
+        drop_column('contents_history', 'deleted_at', schema=schema)

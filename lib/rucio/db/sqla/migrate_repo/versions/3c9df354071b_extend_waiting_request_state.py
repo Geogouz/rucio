@@ -14,10 +14,15 @@
 
 ''' extend waiting request state '''
 
-from alembic import context, op
+from alembic import op
 from alembic.op import create_check_constraint
 
-from rucio.db.sqla.util import try_drop_constraint
+from rucio.db.sqla.migrate_repo import try_drop_constraint
+from rucio.db.sqla.migrate_repo.ddl_helpers import (
+    get_effective_schema,
+    is_current_dialect,
+    qualify_table,
+)
 
 # Alembic revision identifiers
 revision = '3c9df354071b'
@@ -29,15 +34,16 @@ def upgrade():
     Upgrade the database to this revision
     '''
 
-    schema = context.get_context().version_table_schema + '.' if context.get_context().version_table_schema else ''
+    schema = get_effective_schema()
+    requests_table = qualify_table('requests', schema)
 
-    if context.get_context().dialect.name in ['oracle', 'postgresql']:
+    if is_current_dialect('oracle', 'postgresql'):
         try_drop_constraint('REQUESTS_STATE_CHK', 'requests')
         create_check_constraint(constraint_name='REQUESTS_STATE_CHK', table_name='requests',
                                 condition="state in ('Q', 'G', 'S', 'D', 'F', 'L', 'N', 'O', 'A', 'U','W')")
 
-    elif context.get_context().dialect.name == 'mysql':
-        op.execute('ALTER TABLE ' + schema + 'requests DROP CHECK REQUESTS_STATE_CHK')  # pylint: disable=no-member
+    elif is_current_dialect('mysql'):
+        op.execute(f'ALTER TABLE {requests_table} DROP CHECK REQUESTS_STATE_CHK')
         create_check_constraint(constraint_name='REQUESTS_STATE_CHK', table_name='requests',
                                 condition="state in ('Q', 'G', 'S', 'D', 'F', 'L', 'N', 'O', 'A', 'U','W')")
 
@@ -47,14 +53,15 @@ def downgrade():
     Downgrade the database to the previous revision
     '''
 
-    schema = context.get_context().version_table_schema + '.' if context.get_context().version_table_schema else ''
+    schema = get_effective_schema()
+    requests_table = qualify_table('requests', schema)
 
-    if context.get_context().dialect.name in ['oracle', 'postgresql']:
+    if is_current_dialect('oracle', 'postgresql'):
         try_drop_constraint('REQUESTS_STATE_CHK', 'requests')
         create_check_constraint(constraint_name='REQUESTS_STATE_CHK', table_name='requests',
                                 condition="state in ('Q', 'G', 'S', 'D', 'F', 'L', 'N', 'O', 'A', 'U')")
 
-    elif context.get_context().dialect.name == 'mysql':
-        op.execute('ALTER TABLE ' + schema + 'requests DROP CHECK REQUESTS_STATE_CHK')  # pylint: disable=no-member
+    elif is_current_dialect('mysql'):
+        op.execute(f'ALTER TABLE {requests_table} DROP CHECK REQUESTS_STATE_CHK')
         create_check_constraint(constraint_name='REQUESTS_STATE_CHK', table_name='requests',
                                 condition="state in ('Q', 'G', 'S', 'D', 'F', 'L', 'N', 'O', 'A', 'U')")

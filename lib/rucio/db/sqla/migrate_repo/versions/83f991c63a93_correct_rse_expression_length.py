@@ -15,8 +15,9 @@
 ''' correct rse_expression length '''
 
 import sqlalchemy as sa
-from alembic import context
 from alembic.op import alter_column
+
+from rucio.db.sqla.migrate_repo.ddl_helpers import get_effective_schema, is_current_dialect
 
 # Alembic revision identifiers
 revision = '83f991c63a93'
@@ -27,8 +28,8 @@ def upgrade():
     '''
     Upgrade the database to this revision
     '''
-    if context.get_context().dialect.name in ['oracle', 'mysql', 'postgresql']:
-        schema = context.get_context().version_table_schema if context.get_context().version_table_schema else ''
+    if is_current_dialect('oracle', 'mysql', 'postgresql'):
+        schema = get_effective_schema()
         alter_column('rules_hist_recent', 'rse_expression', existing_type=sa.String(255), type_=sa.String(3000), schema=schema)
         alter_column('rules_history', 'rse_expression', existing_type=sa.String(255), type_=sa.String(3000), schema=schema)
 
@@ -37,7 +38,7 @@ def downgrade():
     '''
     Downgrade the database to the previous revision
     '''
-    if context.get_context().dialect.name in ['oracle', 'mysql', 'postgresql']:
-        schema = context.get_context().version_table_schema if context.get_context().version_table_schema else ''
+    if is_current_dialect('oracle', 'mysql', 'postgresql'):
+        schema = get_effective_schema()
         alter_column('rules_hist_recent', 'rse_expression', existing_type=sa.String(3000), type_=sa.String(255), schema=schema)
         alter_column('rules_history', 'rse_expression', existing_type=sa.String(3000), type_=sa.String(255), schema=schema)

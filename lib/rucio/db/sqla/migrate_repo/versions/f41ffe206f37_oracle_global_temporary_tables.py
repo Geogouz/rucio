@@ -15,10 +15,11 @@
 ''' oracle_global_temporary_tables '''
 
 import sqlalchemy as sa
-from alembic import context
+from alembic import op
 from alembic.op import create_table, drop_table
 
 from rucio.common.schema import get_schema_value
+from rucio.db.sqla.migrate_repo.ddl_helpers import is_current_dialect
 from rucio.db.sqla.types import GUID, InternalScopeString, String
 
 # Alembic revision identifiers
@@ -31,7 +32,7 @@ def upgrade():
     Upgrade the database to this revision
     '''
 
-    if context.get_context().dialect.name == 'oracle':
+    if is_current_dialect('oracle'):
         additional_kwargs = {
             'oracle_on_commit': 'DELETE ROWS',
             'prefixes': ['GLOBAL TEMPORARY'],
@@ -66,8 +67,8 @@ def downgrade():
     Downgrade the database to the previous revision
     '''
 
-    if context.get_context().dialect.name == 'oracle':
-        global_temp_tables = sa.inspect(context.get_bind()).get_temp_table_names()
+    if is_current_dialect('oracle'):
+        global_temp_tables = sa.inspect(op.get_bind()).get_temp_table_names()
         for idx in range(5):
             for table_name in [f'TEMPORARY_ID_{idx}', f'TEMPORARY_ASSOCIATION_{idx}', f'TEMPORARY_SCOPE_NAME_{idx}']:
                 if table_name in global_temp_tables:

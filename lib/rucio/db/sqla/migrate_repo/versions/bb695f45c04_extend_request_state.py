@@ -15,10 +15,15 @@
 ''' extend request state '''
 
 import sqlalchemy as sa
-from alembic import context, op
-from alembic.op import add_column, create_check_constraint, drop_column, drop_constraint
+from alembic import op
+from alembic.op import add_column, create_check_constraint, drop_column
 
-from rucio.db.sqla.util import try_drop_constraint
+from rucio.db.sqla.migrate_repo import try_drop_constraint
+from rucio.db.sqla.migrate_repo.ddl_helpers import (
+    get_effective_schema,
+    is_current_dialect,
+    qualify_table,
+)
 
 # Alembic revision identifiers
 revision = 'bb695f45c04'
@@ -30,21 +35,22 @@ def upgrade():
     Upgrade the database to this revision
     '''
 
-    schema = context.get_context().version_table_schema + '.' if context.get_context().version_table_schema else ''
+    schema = get_effective_schema()
+    requests_table = qualify_table('requests', schema)
 
-    if context.get_context().dialect.name in ['oracle', 'postgresql']:
+    if is_current_dialect('oracle', 'postgresql'):
         try_drop_constraint('REQUESTS_STATE_CHK', 'requests')
         create_check_constraint(constraint_name='REQUESTS_STATE_CHK', table_name='requests',
                                 condition="state in ('Q', 'G', 'S', 'D', 'F', 'L', 'N', 'O', 'A', 'U')")
-        add_column('requests', sa.Column('submitter_id', sa.Integer()), schema=schema[:-1])
-        add_column('sources', sa.Column('is_using', sa.Boolean()), schema=schema[:-1])
+        add_column('requests', sa.Column('submitter_id', sa.Integer()), schema=schema)
+        add_column('sources', sa.Column('is_using', sa.Boolean()), schema=schema)
 
-    elif context.get_context().dialect.name == 'mysql':
-        op.execute('ALTER TABLE ' + schema + 'requests DROP CHECK REQUESTS_STATE_CHK')  # pylint: disable=no-member
+    elif is_current_dialect('mysql'):
+        op.execute(f'ALTER TABLE {requests_table} DROP CHECK REQUESTS_STATE_CHK')
         create_check_constraint(constraint_name='REQUESTS_STATE_CHK', table_name='requests',
                                 condition="state in ('Q', 'G', 'S', 'D', 'F', 'L', 'N', 'O', 'A', 'U')")
-        add_column('requests', sa.Column('submitter_id', sa.Integer()), schema=schema[:-1])
-        add_column('sources', sa.Column('is_using', sa.Boolean()), schema=schema[:-1])
+        add_column('requests', sa.Column('submitter_id', sa.Integer()), schema=schema)
+        add_column('sources', sa.Column('is_using', sa.Boolean()), schema=schema)
 
 
 def downgrade():
@@ -52,25 +58,26 @@ def downgrade():
     Downgrade the database to the previous revision
     '''
 
-    schema = context.get_context().version_table_schema + '.' if context.get_context().version_table_schema else ''
+    schema = get_effective_schema()
+    requests_table = qualify_table('requests', schema)
 
-    if context.get_context().dialect.name == 'oracle':
+    if is_current_dialect('oracle'):
         try_drop_constraint('REQUESTS_STATE_CHK', 'requests')
         create_check_constraint(constraint_name='REQUESTS_STATE_CHK', table_name='requests',
                                 condition="state in ('Q', 'G', 'S', 'D', 'F', 'L')")
         drop_column('requests', 'submitter_id')
         drop_column('sources', 'is_using')
 
-    elif context.get_context().dialect.name == 'postgresql':
-        drop_constraint('REQUESTS_STATE_CHK', 'requests', type_='check')
+    elif is_current_dialect('postgresql'):
+        try_drop_constraint('REQUESTS_STATE_CHK', 'requests')
         create_check_constraint(constraint_name='REQUESTS_STATE_CHK', table_name='requests',
                                 condition="state in ('Q', 'G', 'S', 'D', 'F', 'L')")
-        drop_column('requests', 'submitter_id', schema=schema[:-1])
-        drop_column('sources', 'is_using', schema=schema[:-1])
+        drop_column('requests', 'submitter_id', schema=schema)
+        drop_column('sources', 'is_using', schema=schema)
 
-    elif context.get_context().dialect.name == 'mysql':
-        op.execute('ALTER TABLE ' + schema + 'requests DROP CHECK REQUESTS_STATE_CHK')  # pylint: disable=no-member
+    elif is_current_dialect('mysql'):
+        op.execute(f'ALTER TABLE {requests_table} DROP CHECK REQUESTS_STATE_CHK')
         create_check_constraint(constraint_name='REQUESTS_STATE_CHK', table_name='requests',
                                 condition="state in ('Q', 'G', 'S', 'D', 'F', 'L')")
-        drop_column('requests', 'submitter_id', schema=schema[:-1])
-        drop_column('sources', 'is_using', schema=schema[:-1])
+        drop_column('requests', 'submitter_id', schema=schema)
+        drop_column('sources', 'is_using', schema=schema)

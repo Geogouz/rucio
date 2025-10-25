@@ -15,9 +15,10 @@
 ''' switch heartbeats executable '''
 
 import sqlalchemy as sa
-from alembic import context
 from alembic.op import add_column, create_primary_key, drop_column, drop_constraint
 
+from rucio.db.sqla.migrate_repo import drop_current_primary_key, try_drop_constraint
+from rucio.db.sqla.migrate_repo.ddl_helpers import get_current_dialect, get_effective_schema
 from rucio.db.sqla.models import String
 
 # Alembic revision identifiers
@@ -30,9 +31,16 @@ def upgrade():
     Upgrade the database to this revision
     '''
 
-    if context.get_context().dialect.name in ['oracle', 'mysql', 'postgresql']:
-        drop_constraint('heartbeats_pk', 'heartbeats', type_='primary')
-        schema = context.get_context().version_table_schema if context.get_context().version_table_schema else ''
+    dialect = get_current_dialect()
+
+    if dialect in ['oracle', 'mysql', 'postgresql']:
+        if dialect in ['oracle', 'postgresql']:
+            drop_current_primary_key('heartbeats')
+            for pk_name in ('heartbeats_pk', 'HEARTBEATS_PK', 'heartbeats_pkey', 'PRIMARY'):
+                try_drop_constraint(pk_name, 'heartbeats')
+        else:
+            drop_constraint('heartbeats_pk', 'heartbeats', type_='primary')
+        schema = get_effective_schema()
         drop_column('heartbeats', 'executable', schema=schema)
         add_column('heartbeats', sa.Column('executable', String(64)), schema=schema)
         add_column('heartbeats', sa.Column('readable', String(4000)), schema=schema)
@@ -44,9 +52,16 @@ def downgrade():
     Downgrade the database to the previous revision
     '''
 
-    if context.get_context().dialect.name in ['oracle', 'mysql', 'postgresql']:
-        drop_constraint('heartbeats_pk', 'heartbeats', type_='primary')
-        schema = context.get_context().version_table_schema if context.get_context().version_table_schema else ''
+    dialect = get_current_dialect()
+
+    if dialect in ['oracle', 'mysql', 'postgresql']:
+        if dialect in ['oracle', 'postgresql']:
+            drop_current_primary_key('heartbeats')
+            for pk_name in ('heartbeats_pk', 'HEARTBEATS_PK', 'heartbeats_pkey', 'PRIMARY'):
+                try_drop_constraint(pk_name, 'heartbeats')
+        else:
+            drop_constraint('heartbeats_pk', 'heartbeats', type_='primary')
+        schema = get_effective_schema()
         drop_column('heartbeats', 'executable', schema=schema)
         drop_column('heartbeats', 'readable', schema=schema)
         add_column('heartbeats', sa.Column('executable', String(767)), schema=schema)

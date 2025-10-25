@@ -14,9 +14,10 @@
 
 ''' Fix primary key for subscription_history '''
 
-
-from alembic import context
 from alembic.op import create_primary_key, drop_constraint
+
+from rucio.db.sqla.migrate_repo import drop_current_primary_key, try_drop_constraint
+from rucio.db.sqla.migrate_repo.ddl_helpers import get_current_dialect
 
 # Alembic revision identifiers
 revision = 'b5493606bbf5'
@@ -27,8 +28,15 @@ def upgrade():
     '''
     Upgrade the database to this revision
     '''
-    if context.get_context().dialect.name in ['oracle', 'mysql', 'postgresql']:
-        drop_constraint(constraint_name='SUBSCRIPTIONS_PK', table_name='subscriptions_history', type_='primary')
+    dialect = get_current_dialect()
+
+    if dialect in ['oracle', 'mysql', 'postgresql']:
+        if dialect in ['oracle', 'postgresql']:
+            drop_current_primary_key('subscriptions_history')
+            for pk_name in ('SUBSCRIPTIONS_PK', 'SUBSCRIPTIONS_HISTORY_PK', 'subscriptions_history_pk', 'subscriptions_history_pkey', 'PRIMARY'):
+                try_drop_constraint(pk_name, 'subscriptions_history')
+        else:
+            drop_constraint(constraint_name='SUBSCRIPTIONS_PK', table_name='subscriptions_history', type_='primary')
         create_primary_key('SUBSCRIPTIONS_HISTORY_PK', 'subscriptions_history', ['id', 'updated_at'])
 
 
@@ -36,6 +44,13 @@ def downgrade():
     '''
     Downgrade the database to the previous revision
     '''
-    if context.get_context().dialect.name in ['oracle', 'mysql', 'postgresql']:
-        drop_constraint(constraint_name='SUBSCRIPTIONS_HISTORY_PK', table_name='subscriptions_history', type_='primary')
+    dialect = get_current_dialect()
+
+    if dialect in ['oracle', 'mysql', 'postgresql']:
+        if dialect in ['oracle', 'postgresql']:
+            drop_current_primary_key('subscriptions_history')
+            for pk_name in ('SUBSCRIPTIONS_HISTORY_PK', 'SUBSCRIPTIONS_PK', 'subscriptions_history_pk', 'subscriptions_history_pkey', 'PRIMARY'):
+                try_drop_constraint(pk_name, 'subscriptions_history')
+        else:
+            drop_constraint(constraint_name='SUBSCRIPTIONS_HISTORY_PK', table_name='subscriptions_history', type_='primary')
         create_primary_key('SUBSCRIPTIONS_PK', 'subscriptions_history', ['id', 'updated_at'])

@@ -14,7 +14,13 @@
 
 ''' true is true '''
 
-from alembic import context, op
+from alembic import op
+
+from rucio.db.sqla.migrate_repo.ddl_helpers import (
+    get_effective_schema,
+    is_current_dialect,
+    qualify_table,
+)
 
 # Alembic revision identifiers
 revision = '9eb936a81eb1'
@@ -32,12 +38,14 @@ def upgrade():
     '''
 
     # First, change all uppercase booleanstrings to lowercase booleanstrings
-    if context.get_context().dialect.name in ['oracle', 'mysql', 'postgresql']:
-        schema = context.get_context().version_table_schema + '.' if context.get_context().version_table_schema else ''
-        op.execute("UPDATE " + schema + "account_attr_map SET value='true' WHERE value='True'")  # pylint: disable=no-member
-        op.execute("UPDATE " + schema + "account_attr_map SET value='false' WHERE value='False'")  # pylint: disable=no-member
-        op.execute("UPDATE " + schema + "rse_attr_map SET value='true' WHERE value='True'")  # pylint: disable=no-member
-        op.execute("UPDATE " + schema + "rse_attr_map SET value='false' WHERE value='False'")  # pylint: disable=no-member
+    if is_current_dialect('oracle', 'mysql', 'postgresql'):
+        schema = get_effective_schema()
+        account_attr_table = qualify_table('account_attr_map', schema)
+        rse_attr_table = qualify_table('rse_attr_map', schema)
+        op.execute(f"UPDATE {account_attr_table} SET value='true' WHERE value='True'")
+        op.execute(f"UPDATE {account_attr_table} SET value='false' WHERE value='False'")
+        op.execute(f"UPDATE {rse_attr_table} SET value='true' WHERE value='True'")
+        op.execute(f"UPDATE {rse_attr_table} SET value='false' WHERE value='False'")
 
     # Second, change __all__  0/1 which represent booleans to true/false.
     # This cannot be done automatically, as there might be 0/1 values which really are integers.
@@ -55,12 +63,14 @@ def downgrade():
     '''
 
     # First, change all lowercase booleanstrings to uppercase booleanstrings
-    if context.get_context().dialect.name in ['oracle', 'mysql', 'postgresql']:
-        schema = context.get_context().version_table_schema + '.' if context.get_context().version_table_schema else ''
-        op.execute("UPDATE " + schema + "account_attr_map SET value='True' WHERE value='true'")  # pylint: disable=no-member
-        op.execute("UPDATE " + schema + "account_attr_map SET value='False' WHERE value='false'")  # pylint: disable=no-member
-        op.execute("UPDATE " + schema + "rse_attr_map SET value='True' WHERE value='true'")  # pylint: disable=no-member
-        op.execute("UPDATE " + schema + "rse_attr_map SET value='False' WHERE value='false'")  # pylint: disable=no-member
+    if is_current_dialect('oracle', 'mysql', 'postgresql'):
+        schema = get_effective_schema()
+        account_attr_table = qualify_table('account_attr_map', schema)
+        rse_attr_table = qualify_table('rse_attr_map', schema)
+        op.execute(f"UPDATE {account_attr_table} SET value='True' WHERE value='true'")
+        op.execute(f"UPDATE {account_attr_table} SET value='False' WHERE value='false'")
+        op.execute(f"UPDATE {rse_attr_table} SET value='True' WHERE value='true'")
+        op.execute(f"UPDATE {rse_attr_table} SET value='False' WHERE value='false'")
 
     # Second, change __selected__ true/false to 0/1. This cannot be done
     # automatically, as we don't know which ones were previously stored as INT.

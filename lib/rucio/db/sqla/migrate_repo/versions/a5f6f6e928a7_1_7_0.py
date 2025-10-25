@@ -15,8 +15,9 @@
 ''' add columns for 1.7.0 release '''
 
 import sqlalchemy as sa
-from alembic import context
 from alembic.op import add_column, create_check_constraint, create_foreign_key, drop_column, drop_constraint
+
+from rucio.db.sqla.migrate_repo.ddl_helpers import get_effective_schema, is_current_dialect
 
 # Alembic revision identifiers
 revision = 'a5f6f6e928a7'
@@ -28,8 +29,8 @@ def upgrade():
     Upgrade the database to this revision
     '''
 
-    if context.get_context().dialect.name in ['oracle', 'mysql', 'postgresql']:
-        schema = context.get_context().version_table_schema if context.get_context().version_table_schema else ''
+    if is_current_dialect('oracle', 'mysql', 'postgresql'):
+        schema = get_effective_schema()
         add_column('dids', sa.Column('purge_replicas',
                                      sa.Boolean(name='DIDS_PURGE_RPLCS_CHK', create_constraint=True),
                                      server_default='1'), schema=schema)
@@ -67,9 +68,9 @@ def downgrade():
     Downgrade the database to the previous revision
     '''
 
-    schema = context.get_context().version_table_schema if context.get_context().version_table_schema else ''
+    schema = get_effective_schema()
 
-    if context.get_context().dialect.name in ['oracle', 'postgresql']:
+    if is_current_dialect('oracle', 'postgresql'):
         drop_column('dids', 'purge_replicas', schema=schema)
         drop_column('dids', 'eol_at', schema=schema)
 
@@ -94,7 +95,7 @@ def downgrade():
         drop_column('distances', 'failed', schema=schema)
         drop_column('distances', 'transfer_speed', schema=schema)
 
-    elif context.get_context().dialect.name == 'mysql':
+    elif is_current_dialect('mysql'):
         drop_column('dids', 'purge_replicas', schema=schema)
         drop_column('dids', 'eol_at', schema=schema)
 

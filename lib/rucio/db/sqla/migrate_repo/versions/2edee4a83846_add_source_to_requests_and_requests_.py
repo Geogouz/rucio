@@ -15,9 +15,9 @@
 ''' add source to requests and requests_history '''
 
 import sqlalchemy as sa
-from alembic import context
 from alembic.op import add_column, drop_column
 
+from rucio.db.sqla.migrate_repo.ddl_helpers import get_effective_schema, is_current_dialect
 from rucio.db.sqla.types import GUID
 
 # Alembic revision identifiers
@@ -30,8 +30,8 @@ def upgrade():
     Upgrade the database to this revision
     '''
 
-    if context.get_context().dialect.name in ['oracle', 'mysql', 'postgresql']:
-        schema = context.get_context().version_table_schema if context.get_context().version_table_schema else ''
+    if is_current_dialect('oracle', 'mysql', 'postgresql'):
+        schema = get_effective_schema()
         add_column('requests', sa.Column('source_rse_id', GUID()), schema=schema)
         add_column('requests_history', sa.Column('source_rse_id', GUID()), schema=schema)
 
@@ -41,7 +41,7 @@ def downgrade():
     Downgrade the database to the previous revision
     '''
 
-    if context.get_context().dialect.name in ['oracle', 'mysql', 'postgresql']:
-        schema = context.get_context().version_table_schema if context.get_context().version_table_schema else ''
+    if is_current_dialect('oracle', 'mysql', 'postgresql'):
+        schema = get_effective_schema()
         drop_column('requests', 'source_rse_id', schema=schema)
         drop_column('requests_history', 'source_rse_id', schema=schema)

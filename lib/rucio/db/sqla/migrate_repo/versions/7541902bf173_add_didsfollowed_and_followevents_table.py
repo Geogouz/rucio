@@ -17,10 +17,20 @@
 import datetime
 
 import sqlalchemy as sa
-from alembic import context
-from alembic.op import create_check_constraint, create_foreign_key, create_index, create_primary_key, create_table, drop_table
+from sqlalchemy.dialects import postgresql as pg
+from alembic import op
+from alembic.op import (
+    create_check_constraint,
+    create_foreign_key,
+    create_index,
+    create_primary_key,
+    create_table,
+    drop_table,
+)
 
 from rucio.db.sqla.constants import DIDType
+from rucio.db.sqla.migrate_repo.ddl_helpers import get_effective_schema, is_current_dialect
+from rucio.db.sqla.migrate_repo import create_enum_if_absent_block, drop_enum_sql
 
 # Alembic revision identifiers
 revision = '7541902bf173'
@@ -31,18 +41,58 @@ def upgrade():
     '''
     Upgrade the database to this revision
     '''
+    if is_current_dialect('oracle', 'mysql', 'postgresql'):
+        # Enum labels from the Python Enum (preserve original semantics)
+        did_values = [did_type.value for did_type in DIDType]
 
-    if context.get_context().dialect.name in ['oracle', 'mysql', 'postgresql']:
-        create_table('dids_followed',
-                     sa.Column('scope', sa.String(25)),
-                     sa.Column('name', sa.String(255)),
-                     sa.Column('account', sa.String(25)),
-                     sa.Column('did_type', sa.Enum(DIDType,
-                                                   name='DIDS_FOLLOWED_TYPE_CHK',
-                                                   create_constraint=True,
-                                                   values_callable=lambda obj: [e.value for e in obj])),
-                     sa.Column('updated_at', sa.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow),
-                     sa.Column('created_at', sa.DateTime, default=datetime.datetime.utcnow))
+        # On PostgreSQL: pre-create enum types idempotently and reference them without re-creating
+        if is_current_dialect('postgresql'):
+            schema = get_effective_schema()
+
+            # PG lacks CREATE TYPE IF NOT EXISTS -> emulate with DO $$ block (idempotent)
+            op.execute(create_enum_if_absent_block('DIDS_FOLLOWED_TYPE_CHK', did_values, schema=schema))
+            op.execute(create_enum_if_absent_block('DIDS_FOLLOWED_EVENTS_TYPE_CHK', did_values, schema=schema))
+
+            # Use dialect-specific ENUM and prevent SQLA from trying to CREATE TYPE again
+            dids_followed_enum = pg.ENUM(
+                *did_values,
+                name='DIDS_FOLLOWED_TYPE_CHK',
+                schema=schema,
+                create_type=False,
+            )
+            dids_followed_events_enum = pg.ENUM(
+                *did_values,
+                name='DIDS_FOLLOWED_EVENTS_TYPE_CHK',
+                schema=schema,
+                create_type=False,
+            )
+        else:
+            # On Oracle/MySQL keep using CHECK-based enums (original behavior)
+            dids_followed_enum = sa.Enum(
+                DIDType,
+                name='DIDS_FOLLOWED_TYPE_CHK',
+                create_constraint=True,
+                values_callable=lambda obj: [e.value for e in obj],
+            )
+            dids_followed_events_enum = sa.Enum(
+                DIDType,
+                name='DIDS_FOLLOWED_EVENTS_TYPE_CHK',
+                create_constraint=True,
+                values_callable=lambda obj: [e.value for e in obj],
+            )
+
+        # -------------------------------
+        # dids_followed
+        # -------------------------------
+        create_table(
+            'dids_followed',
+            sa.Column('scope', sa.String(25)),
+            sa.Column('name', sa.String(255)),
+            sa.Column('account', sa.String(25)),
+            sa.Column('did_type', dids_followed_enum),
+            sa.Column('updated_at', sa.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow),
+            sa.Column('created_at', sa.DateTime, default=datetime.datetime.utcnow),
+        )
 
         create_primary_key('DIDS_FOLLOWED_PK', 'dids_followed', ['scope', 'name', 'account'])
         create_check_constraint('DIDS_FOLLOWED_SCOPE_NN', 'dids_followed', 'scope is not null')
@@ -51,23 +101,23 @@ def upgrade():
         create_check_constraint('DIDS_FOLLOWED_DID_TYPE_NN', 'dids_followed', 'did_type is not null')
         create_check_constraint('DIDS_FOLLOWED_CREATED_NN', 'dids_followed', 'created_at is not null')
         create_check_constraint('DIDS_FOLLOWED_UPDATED_NN', 'dids_followed', 'updated_at is not null')
-        create_foreign_key('DIDS_FOLLOWED_ACCOUNT_FK', 'dids_followed', 'accounts',
-                           ['account'], ['account'])
-        create_foreign_key('DIDS_FOLLOWED_SCOPE_NAME_FK', 'dids_followed', 'dids',
-                           ['scope', 'name'], ['scope', 'name'])
+        create_foreign_key('DIDS_FOLLOWED_ACCOUNT_FK', 'dids_followed', 'accounts', ['account'], ['account'])
+        create_foreign_key('DIDS_FOLLOWED_SCOPE_NAME_FK', 'dids_followed', 'dids', ['scope', 'name'], ['scope', 'name'])
 
-        create_table('dids_followed_events',
-                     sa.Column('scope', sa.String(25)),
-                     sa.Column('name', sa.String(255)),
-                     sa.Column('account', sa.String(25)),
-                     sa.Column('did_type', sa.Enum(DIDType,
-                                                   name='DIDS_FOLLOWED_EVENTS_TYPE_CHK',
-                                                   create_constraint=True,
-                                                   values_callable=lambda obj: [e.value for e in obj])),
-                     sa.Column('event_type', sa.String(1024)),
-                     sa.Column('payload', sa.Text),
-                     sa.Column('updated_at', sa.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow),
-                     sa.Column('created_at', sa.DateTime, default=datetime.datetime.utcnow))
+        # -------------------------------
+        # dids_followed_events
+        # -------------------------------
+        create_table(
+            'dids_followed_events',
+            sa.Column('scope', sa.String(25)),
+            sa.Column('name', sa.String(255)),
+            sa.Column('account', sa.String(25)),
+            sa.Column('did_type', dids_followed_events_enum),
+            sa.Column('event_type', sa.String(1024)),
+            sa.Column('payload', sa.Text),
+            sa.Column('updated_at', sa.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow),
+            sa.Column('created_at', sa.DateTime, default=datetime.datetime.utcnow),
+        )
 
         create_primary_key('DIDS_FOLLOWED_EVENTS_PK', 'dids_followed_events', ['scope', 'name', 'account'])
         create_check_constraint('DIDS_FOLLOWED_EVENTS_SCOPE_NN', 'dids_followed_events', 'scope is not null')
@@ -76,8 +126,7 @@ def upgrade():
         create_check_constraint('DIDS_FOLLOWED_EVENTS_TYPE_NN', 'dids_followed_events', 'did_type is not null')
         create_check_constraint('DIDS_FOLLOWED_EVENTS_CRE_NN', 'dids_followed_events', 'created_at is not null')
         create_check_constraint('DIDS_FOLLOWED_EVENTS_UPD_NN', 'dids_followed_events', 'updated_at is not null')
-        create_foreign_key('DIDS_FOLLOWED_EVENTS_ACC_FK', 'dids_followed_events', 'accounts',
-                           ['account'], ['account'])
+        create_foreign_key('DIDS_FOLLOWED_EVENTS_ACC_FK', 'dids_followed_events', 'accounts', ['account'], ['account'])
         create_index('DIDS_FOLLOWED_EVENTS_ACC_IDX', 'dids_followed_events', ['account'])
 
 
@@ -85,7 +134,13 @@ def downgrade():
     '''
     Downgrade the database to the previous revision
     '''
-
-    if context.get_context().dialect.name in ['oracle', 'mysql', 'postgresql']:
-        drop_table('dids_followed')
+    if is_current_dialect('oracle', 'mysql', 'postgresql'):
+        # Drop tables first (remove dependencies on the enum types)
         drop_table('dids_followed_events')
+        drop_table('dids_followed')
+
+        # On PostgreSQL, drop the enum types created/used by this migration
+        if is_current_dialect('postgresql'):
+            schema = get_effective_schema()
+            op.execute(drop_enum_sql('DIDS_FOLLOWED_EVENTS_TYPE_CHK', schema=schema))
+            op.execute(drop_enum_sql('DIDS_FOLLOWED_TYPE_CHK', schema=schema))

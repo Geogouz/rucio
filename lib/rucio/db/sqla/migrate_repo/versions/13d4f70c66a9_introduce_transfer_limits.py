@@ -13,13 +13,24 @@
 # limitations under the License.
 
 ''' introduce transfer limits '''
+
 import datetime
 
 import sqlalchemy as sa
-from alembic import context
-from alembic.op import create_check_constraint, create_foreign_key, create_index, create_primary_key, create_table, drop_table
+from alembic import op
+from alembic.op import (
+    create_check_constraint,
+    create_foreign_key,
+    create_index,
+    create_primary_key,
+    create_table,
+    drop_table,
+)
+from sqlalchemy.dialects import postgresql as pg
 
 from rucio.common.constants import TransferLimitDirection
+from rucio.db.sqla.migrate_repo import create_enum_if_absent_block, drop_enum_sql
+from rucio.db.sqla.migrate_repo.ddl_helpers import get_effective_schema, is_current_dialect
 from rucio.db.sqla.types import GUID
 
 # Alembic revision identifiers
@@ -28,36 +39,79 @@ down_revision = '83f991c63a93'
 
 
 def upgrade():
-    if context.get_context().dialect.name in ['oracle', 'mysql', 'postgresql']:
+    if is_current_dialect('oracle', 'mysql', 'postgresql'):
+
+        # ---- PostgreSQL enum hardening (idempotent) ----
+        if is_current_dialect('postgresql'):
+            schema = get_effective_schema()
+            direction_values = [d.value for d in TransferLimitDirection]
+            # Emulate "CREATE TYPE IF NOT EXISTS" safely
+            op.execute(
+                create_enum_if_absent_block(
+                    'TRANSFER_LIMITS_DIRECTION_TYPE_CHK',
+                    direction_values,
+                    schema=schema,
+                )
+            )
+            direction_enum = pg.ENUM(
+                *direction_values,
+                name='TRANSFER_LIMITS_DIRECTION_TYPE_CHK',
+                schema=schema,
+                create_type=False,
+            )
+        else:
+            # Non-PG backends use a CHECK-based Enum
+            direction_enum = sa.Enum(
+                TransferLimitDirection,
+                name='TRANSFER_LIMITS_DIRECTION_TYPE_CHK',
+                create_constraint=True,
+                values_callable=lambda obj: [e.value for e in obj],
+            )
+
         drop_table('rse_transfer_limits')
 
-        create_table('transfer_limits',
-                     sa.Column('id', GUID()),
-                     sa.Column('rse_expression', sa.String(3000)),
-                     sa.Column('activity', sa.String(50)),
-                     sa.Column('direction', sa.Enum(TransferLimitDirection, name='TRANSFER_LIMITS_DIRECTION_TYPE_CHK',
-                                                    create_constraint=True,
-                                                    values_callable=lambda obj: [e.value for e in obj]),
-                               default=TransferLimitDirection.DESTINATION),
-                     sa.Column('max_transfers', sa.BigInteger),
-                     sa.Column('volume', sa.BigInteger),
-                     sa.Column('deadline', sa.BigInteger),
-                     sa.Column('strategy', sa.String(25)),
-                     sa.Column('transfers', sa.BigInteger),
-                     sa.Column('waitings', sa.BigInteger),
-                     sa.Column('created_at', sa.DateTime, default=datetime.datetime.utcnow),
-                     sa.Column('updated_at', sa.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow))
+        create_table(
+            'transfer_limits',
+            sa.Column('id', GUID()),
+            sa.Column('rse_expression', sa.String(3000)),
+            sa.Column('activity', sa.String(50)),
+            sa.Column(
+                'direction',
+                direction_enum,
+                default=TransferLimitDirection.DESTINATION,
+            ),
+            sa.Column('max_transfers', sa.BigInteger),
+            sa.Column('volume', sa.BigInteger),
+            sa.Column('deadline', sa.BigInteger),
+            sa.Column('strategy', sa.String(25)),
+            sa.Column('transfers', sa.BigInteger),
+            sa.Column('waitings', sa.BigInteger),
+            sa.Column('created_at', sa.DateTime, default=datetime.datetime.utcnow),
+            sa.Column(
+                'updated_at',
+                sa.DateTime,
+                default=datetime.datetime.utcnow,
+                onupdate=datetime.datetime.utcnow,
+            ),
+        )
         create_primary_key('TRANSFER_LIMITS_PK', 'transfer_limits', ['id'])
         create_index('TRANSFER_LIMITS_SELECTORS_IDX', 'transfer_limits', ['rse_expression', 'activity'])
         create_check_constraint('TRANSFER_LIMITS_RSE_EXPRESSION_NN', 'transfer_limits', 'rse_expression is not null')
         create_check_constraint('TRANSFER_LIMITS_CREATED_NN', 'transfer_limits', 'created_at is not null')
         create_check_constraint('TRANSFER_LIMITS_UPDATED_NN', 'transfer_limits', 'updated_at is not null')
 
-        create_table('rse_transfer_limits',
-                     sa.Column('limit_id', GUID()),
-                     sa.Column('rse_id', GUID()),
-                     sa.Column('created_at', sa.DateTime, default=datetime.datetime.utcnow),
-                     sa.Column('updated_at', sa.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow))
+        create_table(
+            'rse_transfer_limits',
+            sa.Column('limit_id', GUID()),
+            sa.Column('rse_id', GUID()),
+            sa.Column('created_at', sa.DateTime, default=datetime.datetime.utcnow),
+            sa.Column(
+                'updated_at',
+                sa.DateTime,
+                default=datetime.datetime.utcnow,
+                onupdate=datetime.datetime.utcnow,
+            ),
+        )
         create_primary_key('RSE_TRANSFER_LIMITS_PK', 'rse_transfer_limits', ['limit_id', 'rse_id'])
         create_foreign_key('RSE_TRANSFER_LIMITS_RSE_ID_FK', 'rse_transfer_limits', 'rses', ['rse_id'], ['id'])
         create_foreign_key('RSE_TRANSFER_LIMITS_LIMIT_ID_FK', 'rse_transfer_limits', 'transfer_limits', ['limit_id'], ['id'])
@@ -66,25 +120,37 @@ def upgrade():
 
 
 def downgrade():
-
-    if context.get_context().dialect.name in ['oracle', 'mysql', 'postgresql']:
+    if is_current_dialect('oracle', 'mysql', 'postgresql'):
+        # Drop new tables first so the enum can be removed on PG
         drop_table('rse_transfer_limits')
         drop_table('transfer_limits')
 
-        create_table('rse_transfer_limits',
-                     sa.Column('rse_id', GUID()),
-                     sa.Column('activity', sa.String(50)),
-                     sa.Column('rse_expression', sa.String(3000)),
-                     sa.Column('max_transfers', sa.BigInteger),
-                     sa.Column('volume', sa.BigInteger),
-                     sa.Column('deadline', sa.BigInteger),
-                     sa.Column('strategy', sa.String(25)),
-                     sa.Column('direction', sa.String(25)),
-                     sa.Column('transfers', sa.BigInteger),
-                     sa.Column('waitings', sa.BigInteger),
-                     sa.Column('created_at', sa.DateTime, default=datetime.datetime.utcnow),
-                     sa.Column('updated_at', sa.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow))
+        # On PostgreSQL drop the enum type introduced by this migration
+        if is_current_dialect('postgresql'):
+            schema = get_effective_schema()
+            op.execute(drop_enum_sql('TRANSFER_LIMITS_DIRECTION_TYPE_CHK', schema=schema))
 
+        # Re-create the legacy table (original downgrade)
+        create_table(
+            'rse_transfer_limits',
+            sa.Column('rse_id', GUID()),
+            sa.Column('activity', sa.String(50)),
+            sa.Column('rse_expression', sa.String(3000)),
+            sa.Column('max_transfers', sa.BigInteger),
+            sa.Column('volume', sa.BigInteger),
+            sa.Column('deadline', sa.BigInteger),
+            sa.Column('strategy', sa.String(25)),
+            sa.Column('direction', sa.String(25)),
+            sa.Column('transfers', sa.BigInteger),
+            sa.Column('waitings', sa.BigInteger),
+            sa.Column('created_at', sa.DateTime, default=datetime.datetime.utcnow),
+            sa.Column(
+                'updated_at',
+                sa.DateTime,
+                default=datetime.datetime.utcnow,
+                onupdate=datetime.datetime.utcnow,
+            ),
+        )
         create_primary_key('RSE_TRANSFER_LIMITS_PK', 'rse_transfer_limits', ['rse_id', 'activity'])
         create_foreign_key('RSE_TRANSFER_LIMITS_RSE_ID_FK', 'rse_transfer_limits', 'rses', ['rse_id'], ['id'])
         create_check_constraint('RSE_TRANSFER_LIMITS_CREATED_NN', 'rse_transfer_limits', 'created_at is not null')

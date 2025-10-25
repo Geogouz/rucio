@@ -15,8 +15,9 @@
 ''' added_columns_rse_transfer_limits '''
 
 import sqlalchemy as sa
-from alembic import context
 from alembic.op import add_column, drop_column
+
+from rucio.db.sqla.migrate_repo.ddl_helpers import get_effective_schema, is_current_dialect
 
 # Alembic revision identifiers
 revision = '810a41685bc1'
@@ -28,9 +29,9 @@ def upgrade():
     Upgrade the database to this revision
     '''
 
-    schema = context.get_context().version_table_schema if context.get_context().version_table_schema else ''
+    schema = get_effective_schema()
 
-    if context.get_context().dialect.name in ['oracle', 'postgresql', 'mysql']:
+    if is_current_dialect('oracle', 'postgresql', 'mysql'):
         add_column('rse_transfer_limits', sa.Column('deadline', sa.BigInteger), schema=schema)
         add_column('rse_transfer_limits', sa.Column('strategy', sa.String(25)), schema=schema)
         add_column('rse_transfer_limits', sa.Column('direction', sa.String(25)), schema=schema)
@@ -41,9 +42,9 @@ def downgrade():
     Downgrade the database to the previous revision
     '''
 
-    schema = context.get_context().version_table_schema if context.get_context().version_table_schema else ''
+    schema = get_effective_schema()
 
-    if context.get_context().dialect.name in ['oracle', 'postgresql', 'mysql']:
+    if is_current_dialect('oracle', 'postgresql', 'mysql'):
         drop_column('rse_transfer_limits', 'deadline', schema=schema)
         drop_column('rse_transfer_limits', 'strategy', schema=schema)
         drop_column('rse_transfer_limits', 'direction', schema=schema)

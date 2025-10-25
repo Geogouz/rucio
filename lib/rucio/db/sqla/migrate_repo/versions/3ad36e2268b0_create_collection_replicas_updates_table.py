@@ -17,10 +17,23 @@
 import datetime
 
 import sqlalchemy as sa
-from alembic import context
-from alembic.op import add_column, create_check_constraint, create_index, create_primary_key, create_table, drop_column, drop_constraint, drop_index, drop_table
+from alembic import op
+from alembic.op import (
+    add_column,
+    create_check_constraint,
+    create_index,
+    create_primary_key,
+    create_table,
+    drop_column,
+    drop_constraint,
+    drop_index,
+    drop_table,
+)
+from sqlalchemy.dialects import postgresql as pg
 
 from rucio.db.sqla.constants import DIDType
+from rucio.db.sqla.migrate_repo import create_enum_if_absent_block, drop_enum_sql
+from rucio.db.sqla.migrate_repo.ddl_helpers import get_effective_schema, is_current_dialect
 from rucio.db.sqla.types import GUID
 
 # Alembic revision identifiers
@@ -33,19 +46,39 @@ def upgrade():
     Upgrade the database to this revision
     '''
 
-    if context.get_context().dialect.name in ['oracle', 'mysql', 'postgresql']:
-        schema = context.get_context().version_table_schema if context.get_context().version_table_schema else ''
+    if is_current_dialect('oracle', 'mysql', 'postgresql'):
+        schema = get_effective_schema()
         add_column('collection_replicas', sa.Column('available_replicas_cnt', sa.BigInteger()), schema=schema)
         add_column('collection_replicas', sa.Column('available_bytes', sa.BigInteger()), schema=schema)
+
+        enum_values = [did_type.value for did_type in DIDType]
+        if is_current_dialect('postgresql'):
+            op.execute(
+                create_enum_if_absent_block(
+                    'UPDATED_COL_REP_TYPE_CHK',
+                    enum_values,
+                    schema=schema,
+                )
+            )
+            did_type_enum = pg.ENUM(
+                *enum_values,
+                name='UPDATED_COL_REP_TYPE_CHK',
+                schema=schema,
+                create_type=False,
+            )
+        else:
+            did_type_enum = sa.Enum(
+                DIDType,
+                name='UPDATED_COL_REP_TYPE_CHK',
+                create_constraint=True,
+                values_callable=lambda obj: [e.value for e in obj],
+            )
 
         create_table('updated_col_rep',
                      sa.Column('id', GUID()),
                      sa.Column('scope', sa.String(25)),
                      sa.Column('name', sa.String(255)),
-                     sa.Column('did_type', sa.Enum(DIDType,
-                                                   name='UPDATED_COL_REP_TYPE_CHK',
-                                                   create_constraint=True,
-                                                   values_callable=lambda obj: [e.value for e in obj])),
+                     sa.Column('did_type', did_type_enum),
                      sa.Column('rse_id', GUID()),
                      sa.Column('created_at', sa.DateTime, default=datetime.datetime.utcnow),
                      sa.Column('updated_at', sa.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow))
@@ -61,14 +94,24 @@ def downgrade():
     Downgrade the database to the previous revision
     '''
 
-    schema = context.get_context().version_table_schema if context.get_context().version_table_schema else ''
+    schema = get_effective_schema()
 
-    if context.get_context().dialect.name in ['oracle', 'postgresql']:
+    if is_current_dialect('oracle'):
         drop_column('collection_replicas', 'available_replicas_cnt', schema=schema)
         drop_column('collection_replicas', 'available_bytes', schema=schema)
         drop_table('updated_col_rep')
 
-    elif context.get_context().dialect.name == 'mysql':
+    elif is_current_dialect('postgresql'):
+        # Drop columns & table first so there are no remaining dependencies on the enum type.
+        drop_column('collection_replicas', 'available_replicas_cnt', schema=schema)
+        drop_column('collection_replicas', 'available_bytes', schema=schema)
+        drop_table('updated_col_rep')
+
+        # Then drop the PostgreSQL enum type created by this migration so that a subsequent
+        # upgrade can recreate it cleanly without DuplicateObject errors.
+        op.execute(drop_enum_sql('UPDATED_COL_REP_TYPE_CHK', schema=schema))
+
+    elif is_current_dialect('mysql'):
         drop_column('collection_replicas', 'available_replicas_cnt', schema=schema)
         drop_column('collection_replicas', 'available_bytes', schema=schema)
         drop_constraint('UPDATED_COL_REP_PK', 'updated_col_rep', type_='primary')

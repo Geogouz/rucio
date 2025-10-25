@@ -15,9 +15,9 @@
 ''' added columns to table requests '''
 
 import sqlalchemy as sa
-from alembic import context
 from alembic.op import add_column, drop_column
 
+from rucio.db.sqla.migrate_repo.ddl_helpers import get_effective_schema, is_current_dialect
 from rucio.db.sqla.models import String
 
 # Alembic revision identifiers
@@ -30,8 +30,8 @@ def upgrade():
     Upgrade the database to this revision
     '''
 
-    if context.get_context().dialect.name in ['oracle', 'mysql', 'postgresql']:
-        schema = context.get_context().version_table_schema if context.get_context().version_table_schema else ''
+    if is_current_dialect('oracle', 'mysql', 'postgresql'):
+        schema = get_effective_schema()
         add_column('requests', sa.Column('bytes', sa.BigInteger), schema=schema)
         add_column('requests', sa.Column('md5', String(32)), schema=schema)
         add_column('requests', sa.Column('adler32', String(8)), schema=schema)
@@ -47,8 +47,8 @@ def downgrade():
     Downgrade the database to the previous revision
     '''
 
-    if context.get_context().dialect.name in ['oracle', 'mysql', 'postgresql']:
-        schema = context.get_context().version_table_schema if context.get_context().version_table_schema else ''
+    if is_current_dialect('oracle', 'mysql', 'postgresql'):
+        schema = get_effective_schema()
         drop_column('requests', 'bytes', schema=schema)
         drop_column('requests', 'md5', schema=schema)
         drop_column('requests', 'adler32', schema=schema)
