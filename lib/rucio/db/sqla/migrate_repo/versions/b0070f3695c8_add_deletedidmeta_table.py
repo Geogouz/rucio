@@ -15,10 +15,14 @@
 ''' Add deleted_did_meta table '''
 
 import sqlalchemy as sa
+from alembic import op
 from alembic.op import create_index, create_primary_key, create_table, drop_table
+from sqlalchemy.dialects import postgresql as pg
+
+from rucio.db.sqla.migrate_repo.ddl_helpers import get_effective_schema, is_current_dialect
+from rucio.db.sqla.migrate_repo import create_enum_if_absent_block, drop_enum_sql
 
 from rucio.db.sqla.constants import DIDType
-from rucio.db.sqla.migrate_repo.ddl_helpers import is_current_dialect
 from rucio.db.sqla.types import JSON
 
 # Alembic revision identifiers
@@ -32,17 +36,43 @@ def upgrade():
     '''
 
     if is_current_dialect('oracle', 'mysql', 'postgresql'):
-        create_table('deleted_did_meta',
-                     sa.Column('scope', sa.String(25)),
-                     sa.Column('name', sa.String(255)),
-                     sa.Column('did_type', sa.Enum(DIDType,
-                                                   name='DEL_DID_META_DID_TYPE_CHK',
-                                                   create_constraint=True,
-                                                   values_callable=lambda obj: [e.value for e in obj])),
-                     sa.Column('meta', JSON()),
-                     sa.Column('created_at', sa.DateTime),
-                     sa.Column('updated_at', sa.DateTime),
-                     sa.Column('deleted_at', sa.DateTime))
+
+        # ---- PostgreSQL enum hardening (idempotent) ----
+        if is_current_dialect('postgresql'):
+            schema = get_effective_schema()
+            # Emulate "CREATE TYPE IF NOT EXISTS" safely
+            op.execute(
+                create_enum_if_absent_block(
+                    'DEL_DID_META_DID_TYPE_CHK',
+                    [e.value for e in DIDType],
+                    schema=schema
+                )
+            )
+            did_type_enum = pg.ENUM(
+                *[e.value for e in DIDType],
+                name='DEL_DID_META_DID_TYPE_CHK',
+                schema=schema,
+                create_type=False,  # reuse existing type, never create here
+            )
+        else:
+            # Non-PG backends use a CHECK-based Enum as before
+            did_type_enum = sa.Enum(
+                DIDType,
+                name='DEL_DID_META_DID_TYPE_CHK',
+                create_constraint=True,
+                values_callable=lambda obj: [e.value for e in obj],
+            )
+
+        create_table(
+            'deleted_did_meta',
+            sa.Column('scope', sa.String(25)),
+            sa.Column('name', sa.String(255)),
+            sa.Column('did_type', did_type_enum),
+            sa.Column('meta', JSON()),
+            sa.Column('created_at', sa.DateTime),
+            sa.Column('updated_at', sa.DateTime),
+            sa.Column('deleted_at', sa.DateTime)
+        )
 
         create_primary_key('DEL_DID_META_PK', 'deleted_did_meta', ['scope', 'name'])
         create_index('DEL_DID_META_DID_TYPE_IDX', 'deleted_did_meta', ['did_type'])
@@ -55,3 +85,8 @@ def downgrade():
 
     if is_current_dialect('oracle', 'mysql', 'postgresql'):
         drop_table('deleted_did_meta')
+
+        # On PostgreSQL drop the enum type once the table has been removed.
+        if is_current_dialect('postgresql'):
+            schema = get_effective_schema()
+            op.execute(drop_enum_sql('DEL_DID_META_DID_TYPE_CHK', schema=schema))
