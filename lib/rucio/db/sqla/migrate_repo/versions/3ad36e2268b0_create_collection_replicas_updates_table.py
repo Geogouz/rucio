@@ -29,10 +29,11 @@ from alembic.op import (
     drop_index,
     drop_table,
 )
+from sqlalchemy.dialects import postgresql as pg
 
 from rucio.db.sqla.constants import DIDType
+from rucio.db.sqla.migrate_repo import create_enum_if_absent_block, drop_enum_sql
 from rucio.db.sqla.migrate_repo.ddl_helpers import get_effective_schema, is_current_dialect
-from rucio.db.sqla.migrate_repo.enum_ddl_helpers import drop_enum_sql
 from rucio.db.sqla.types import GUID
 
 # Alembic revision identifiers
@@ -50,14 +51,34 @@ def upgrade():
         add_column('collection_replicas', sa.Column('available_replicas_cnt', sa.BigInteger()), schema=schema)
         add_column('collection_replicas', sa.Column('available_bytes', sa.BigInteger()), schema=schema)
 
+        enum_values = [did_type.value for did_type in DIDType]
+        if is_current_dialect('postgresql'):
+            op.execute(
+                create_enum_if_absent_block(
+                    'UPDATED_COL_REP_TYPE_CHK',
+                    enum_values,
+                    schema=schema,
+                )
+            )
+            did_type_enum = pg.ENUM(
+                *enum_values,
+                name='UPDATED_COL_REP_TYPE_CHK',
+                schema=schema,
+                create_type=False,
+            )
+        else:
+            did_type_enum = sa.Enum(
+                DIDType,
+                name='UPDATED_COL_REP_TYPE_CHK',
+                create_constraint=True,
+                values_callable=lambda obj: [e.value for e in obj],
+            )
+
         create_table('updated_col_rep',
                      sa.Column('id', GUID()),
                      sa.Column('scope', sa.String(25)),
                      sa.Column('name', sa.String(255)),
-                     sa.Column('did_type', sa.Enum(DIDType,
-                                                   name='UPDATED_COL_REP_TYPE_CHK',
-                                                   create_constraint=True,
-                                                   values_callable=lambda obj: [e.value for e in obj])),
+                     sa.Column('did_type', did_type_enum),
                      sa.Column('rse_id', GUID()),
                      sa.Column('created_at', sa.DateTime, default=datetime.datetime.utcnow),
                      sa.Column('updated_at', sa.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow))

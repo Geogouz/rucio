@@ -17,7 +17,11 @@
 from alembic import op
 from alembic.op import create_check_constraint
 
-from rucio.db.sqla.migrate_repo import try_drop_constraint
+from rucio.db.sqla.migrate_repo import (
+    create_enum_if_absent_block,
+    drop_enum_sql,
+    try_drop_constraint,
+)
 from rucio.db.sqla.migrate_repo.ddl_helpers import (
     get_effective_schema,
     is_current_dialect,
@@ -47,13 +51,18 @@ def upgrade():
                                 condition="state in ('A', 'U', 'C', 'B', 'D', 'T')")
 
     elif is_current_dialect('postgresql'):
+        new_values = ['A', 'U', 'C', 'B', 'D', 'T']
         op.execute(
             f'ALTER TABLE {replicas_table} '
             'DROP CONSTRAINT IF EXISTS "REPLICAS_STATE_CHK", ALTER COLUMN state TYPE CHAR'
         )
-        op.execute('DROP TYPE "REPLICAS_STATE_CHK"')
+        op.execute(drop_enum_sql('REPLICAS_STATE_CHK', schema=schema))
         op.execute(
-            """CREATE TYPE "REPLICAS_STATE_CHK" AS ENUM('A', 'U', 'C', 'B', 'D', 'T')"""
+            create_enum_if_absent_block(
+                'REPLICAS_STATE_CHK',
+                new_values,
+                schema=schema,
+            )
         )
         op.execute(
             f"""
@@ -67,9 +76,13 @@ def upgrade():
             f'ALTER TABLE {collection_replicas_table} '
             'DROP CONSTRAINT IF EXISTS "COLLECTION_REPLICAS_STATE_CHK", ALTER COLUMN state TYPE CHAR'
         )
-        op.execute('DROP TYPE "COLLECTION_REPLICAS_STATE_CHK"')
+        op.execute(drop_enum_sql('COLLECTION_REPLICAS_STATE_CHK', schema=schema))
         op.execute(
-            """CREATE TYPE "COLLECTION_REPLICAS_STATE_CHK" AS ENUM('A', 'U', 'C', 'B', 'D', 'T')"""
+            create_enum_if_absent_block(
+                'COLLECTION_REPLICAS_STATE_CHK',
+                new_values,
+                schema=schema,
+            )
         )
         op.execute(
             f"""
@@ -105,13 +118,18 @@ def downgrade():
                                 condition="state in ('A', 'U', 'C', 'B', 'D', 'S', 'T')")
 
     elif is_current_dialect('postgresql'):
+        old_values = ['A', 'U', 'C', 'B', 'D', 'S', 'T']
         op.execute(
             f'ALTER TABLE {replicas_table} '
             'DROP CONSTRAINT IF EXISTS "REPLICAS_STATE_CHK", ALTER COLUMN state TYPE CHAR'
         )
-        op.execute('DROP TYPE "REPLICAS_STATE_CHK"')
+        op.execute(drop_enum_sql('REPLICAS_STATE_CHK', schema=schema))
         op.execute(
-            """CREATE TYPE "REPLICAS_STATE_CHK" AS ENUM('A', 'U', 'C', 'B', 'D', 'S', 'T')"""
+            create_enum_if_absent_block(
+                'REPLICAS_STATE_CHK',
+                old_values,
+                schema=schema,
+            )
         )
         op.execute(
             f"""
@@ -125,9 +143,13 @@ def downgrade():
             f'ALTER TABLE {collection_replicas_table} '
             'DROP CONSTRAINT IF EXISTS "COLLECTION_REPLICAS_STATE_CHK", ALTER COLUMN state TYPE CHAR'
         )
-        op.execute('DROP TYPE "COLLECTION_REPLICAS_STATE_CHK"')
+        op.execute(drop_enum_sql('COLLECTION_REPLICAS_STATE_CHK', schema=schema))
         op.execute(
-            """CREATE TYPE "COLLECTION_REPLICAS_STATE_CHK" AS ENUM('A', 'U', 'C', 'B', 'D', 'S', 'T')"""
+            create_enum_if_absent_block(
+                'COLLECTION_REPLICAS_STATE_CHK',
+                old_values,
+                schema=schema,
+            )
         )
         op.execute(
             f"""

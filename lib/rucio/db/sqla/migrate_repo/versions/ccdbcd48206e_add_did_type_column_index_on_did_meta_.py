@@ -16,9 +16,14 @@
 
 import sqlalchemy as sa
 from alembic.op import add_column, create_index, drop_column, drop_index, execute
+from sqlalchemy.dialects import postgresql as pg
 
 from rucio.db.sqla.constants import DIDType
-from rucio.db.sqla.migrate_repo import try_drop_constraint
+from rucio.db.sqla.migrate_repo import (
+    create_enum_if_absent_block,
+    drop_enum_sql,
+    try_drop_constraint,
+)
 from rucio.db.sqla.migrate_repo.ddl_helpers import get_current_dialect, get_effective_schema, qualify_table
 
 # Alembic revision identifiers
@@ -43,12 +48,21 @@ def upgrade():
                                                  values_callable=lambda obj: [e.value for e in obj])),
                    schema=schema)
     elif dialect == 'postgresql':
+        enum_values = [did_type.value for did_type in DIDType]
         execute(
-            """CREATE TYPE "DID_META_DID_TYPE_CHK" AS ENUM('F', 'D', 'C', 'A', 'X', 'Y', 'Z')"""
+            create_enum_if_absent_block(
+                'DID_META_DID_TYPE_CHK',
+                enum_values,
+                schema=schema,
+            )
         )
-        execute(
-            f'ALTER TABLE {did_meta_table} ADD COLUMN did_type "DID_META_DID_TYPE_CHK"'
+        did_type_enum = pg.ENUM(
+            *enum_values,
+            name='DID_META_DID_TYPE_CHK',
+            schema=schema,
+            create_type=False,
         )
+        add_column('did_meta', sa.Column('did_type', did_type_enum), schema=schema)
     create_index('DID_META_DID_TYPE_IDX', 'did_meta', ['did_type'])
 
 
@@ -72,7 +86,7 @@ def downgrade():
             'DROP CONSTRAINT IF EXISTS "DID_META_DID_TYPE_CHK", ALTER COLUMN did_type TYPE CHAR'
         )
         execute(f'ALTER TABLE {did_meta_table} DROP COLUMN did_type')
-        execute('DROP TYPE "DID_META_DID_TYPE_CHK"')
+        execute(drop_enum_sql('DID_META_DID_TYPE_CHK', schema=schema))
 
     elif dialect == 'mysql':
         drop_column('did_meta', 'did_type', schema=schema)

@@ -17,7 +17,12 @@
 from alembic import op
 from alembic.op import create_check_constraint
 
-from rucio.db.sqla.migrate_repo import try_drop_constraint
+from rucio.db.sqla.migrate_repo import (
+    alter_enum_add_value_sql,
+    create_enum_if_absent_block,
+    drop_enum_sql,
+    try_drop_constraint,
+)
 from rucio.db.sqla.migrate_repo.ddl_helpers import (
     get_effective_schema,
     is_current_dialect,
@@ -44,19 +49,15 @@ def upgrade():
 
     elif is_current_dialect('postgresql'):
         op.execute(
-            f'ALTER TABLE {rules_table} '
-            'DROP CONSTRAINT IF EXISTS "RULES_NOTIFICATION_CHK", ALTER COLUMN notification TYPE CHAR'
-        )
-        op.execute('DROP TYPE "RULES_NOTIFICATION_CHK"')
-        op.execute(
-            """CREATE TYPE "RULES_NOTIFICATION_CHK" AS ENUM('Y', 'N', 'C', 'P')"""
+            f'ALTER TABLE {rules_table} DROP CONSTRAINT IF EXISTS "RULES_NOTIFICATION_CHK"'
         )
         op.execute(
-            f"""
-            ALTER TABLE {rules_table}
-            ALTER COLUMN notification TYPE "RULES_NOTIFICATION_CHK"
-            USING notification::"RULES_NOTIFICATION_CHK"
-            """
+            alter_enum_add_value_sql(
+                'RULES_NOTIFICATION_CHK',
+                'P',
+                schema=schema,
+                if_not_exists=True,
+            )
         )
 
     elif is_current_dialect('mysql'):
@@ -82,9 +83,13 @@ def downgrade():
             f'ALTER TABLE {rules_table} '
             'DROP CONSTRAINT IF EXISTS "RULES_NOTIFICATION_CHK", ALTER COLUMN notification TYPE CHAR'
         )
-        op.execute('DROP TYPE "RULES_NOTIFICATION_CHK"')
+        op.execute(drop_enum_sql('RULES_NOTIFICATION_CHK', schema=schema))
         op.execute(
-            """CREATE TYPE "RULES_NOTIFICATION_CHK" AS ENUM('Y', 'N', 'C')"""
+            create_enum_if_absent_block(
+                'RULES_NOTIFICATION_CHK',
+                ['Y', 'N', 'C'],
+                schema=schema,
+            )
         )
         op.execute(
             f"""

@@ -16,9 +16,12 @@
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql as pg
 
 from rucio.common.schema import get_schema_value
 from rucio.db.sqla.constants import OpenDataDIDState
+from rucio.db.sqla.migrate_repo import create_enum_if_absent_block, drop_enum_sql
+from rucio.db.sqla.migrate_repo.ddl_helpers import get_effective_schema, is_current_dialect
 from rucio.db.sqla.types import JSON
 
 # Alembic revision identifiers
@@ -27,12 +30,36 @@ down_revision = '30d5206e9cad'
 
 
 def upgrade():
+    schema = get_effective_schema()
+    enum_values = [state.value for state in OpenDataDIDState]
+
+    if is_current_dialect('postgresql'):
+        op.execute(
+            create_enum_if_absent_block(
+                'DID_OPENDATA_STATE_CHK',
+                enum_values,
+                schema=schema,
+            )
+        )
+        state_enum = pg.ENUM(
+            *enum_values,
+            name='DID_OPENDATA_STATE_CHK',
+            schema=schema,
+            create_type=False,
+        )
+    else:
+        state_enum = sa.Enum(
+            OpenDataDIDState,
+            name='DID_OPENDATA_STATE_CHK',
+            create_constraint=True,
+            values_callable=lambda obj: [e.value for e in obj],
+        )
+
     op.create_table(
         'dids_opendata',
         sa.Column('scope', sa.String(length=get_schema_value('SCOPE_LENGTH')), nullable=False),
         sa.Column('name', sa.String(length=get_schema_value('NAME_LENGTH')), nullable=False),
-        sa.Column('state', sa.Enum(OpenDataDIDState, name='DID_OPENDATA_STATE_CHK',
-                                   values_callable=lambda obj: [e.value for e in obj]), nullable=True,
+        sa.Column('state', state_enum, nullable=True,
                   server_default=OpenDataDIDState.DRAFT.value),
         sa.Column('created_at', sa.DateTime(), nullable=True),
         sa.Column('updated_at', sa.DateTime(), nullable=True),
@@ -85,5 +112,8 @@ def downgrade():
     op.drop_index('OPENDATA_DID_UPDATED_AT_IDX', table_name='dids_opendata')
     op.drop_table('dids_opendata')
 
-    # Drop enum if created in this migration
-    sa.Enum(name='DID_OPENDATA_STATE_CHK').drop(op.get_bind(), checkfirst=True)
+    schema = get_effective_schema()
+    if is_current_dialect('postgresql'):
+        op.execute(drop_enum_sql('DID_OPENDATA_STATE_CHK', schema=schema))
+    else:
+        sa.Enum(name='DID_OPENDATA_STATE_CHK').drop(op.get_bind(), checkfirst=True)

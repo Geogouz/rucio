@@ -26,11 +26,15 @@ from alembic.op import (
     create_table,
     drop_table,
 )
+from sqlalchemy.dialects import postgresql as pg
 
 from rucio.db.sqla.constants import DIDType, ReplicaState
-from rucio.db.sqla.migrate_repo import try_drop_constraint
-from rucio.db.sqla.migrate_repo.ddl_helpers import is_current_dialect
-from rucio.db.sqla.migrate_repo.enum_ddl_helpers import drop_enum_sql
+from rucio.db.sqla.migrate_repo import (
+    create_enum_if_absent_block,
+    drop_enum_sql,
+    try_drop_constraint,
+)
+from rucio.db.sqla.migrate_repo.ddl_helpers import get_effective_schema, is_current_dialect
 from rucio.db.sqla.types import GUID
 
 # Alembic revision identifiers
@@ -44,21 +48,61 @@ def upgrade():
     '''
 
     if is_current_dialect('oracle', 'mysql', 'postgresql'):
+        schema = get_effective_schema()
+        is_pg = is_current_dialect('postgresql')
+
+        type_values = [did_type.value for did_type in DIDType]
+        state_values = [state.value for state in ReplicaState]
+
+        if is_pg:
+            op.execute(
+                create_enum_if_absent_block(
+                    'COLLECTION_REPLICAS_TYPE_CHK',
+                    type_values,
+                    schema=schema,
+                )
+            )
+            op.execute(
+                create_enum_if_absent_block(
+                    'COLLECTION_REPLICAS_STATE_CHK',
+                    state_values,
+                    schema=schema,
+                )
+            )
+            did_type_enum = pg.ENUM(
+                *type_values,
+                name='COLLECTION_REPLICAS_TYPE_CHK',
+                schema=schema,
+                create_type=False,
+            )
+            state_enum = pg.ENUM(
+                *state_values,
+                name='COLLECTION_REPLICAS_STATE_CHK',
+                schema=schema,
+                create_type=False,
+            )
+        else:
+            did_type_enum = sa.Enum(
+                DIDType,
+                name='COLLECTION_REPLICAS_TYPE_CHK',
+                create_constraint=True,
+                values_callable=lambda obj: [e.value for e in obj],
+            )
+            state_enum = sa.Enum(
+                ReplicaState,
+                name='COLLECTION_REPLICAS_STATE_CHK',
+                create_constraint=True,
+                values_callable=lambda obj: [e.value for e in obj],
+            )
+
         create_table('collection_replicas',
                      sa.Column('scope', sa.String(25)),
                      sa.Column('name', sa.String(255)),
-                     sa.Column('did_type', sa.Enum(DIDType,
-                                                   name='COLLECTION_REPLICAS_TYPE_CHK',
-                                                   create_constraint=True,
-                                                   values_callable=lambda obj: [e.value for e in obj])),
+                     sa.Column('did_type', did_type_enum),
                      sa.Column('rse_id', GUID()),
                      sa.Column('bytes', sa.BigInteger),
                      sa.Column('length', sa.BigInteger),
-                     sa.Column('state', sa.Enum(ReplicaState,
-                                                name='COLLECTION_REPLICAS_STATE_CHK',
-                                                create_constraint=True,
-                                                values_callable=lambda obj: [e.value for e in obj]),
-                               default=ReplicaState.UNAVAILABLE),
+                     sa.Column('state', state_enum, default=ReplicaState.UNAVAILABLE),
                      sa.Column('accessed_at', sa.DateTime),
                      sa.Column('created_at', sa.DateTime, default=datetime.datetime.utcnow),
                      sa.Column('updated_at', sa.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow))
@@ -81,6 +125,7 @@ def downgrade():
         drop_table('collection_replicas')
 
     elif is_current_dialect('postgresql'):
+        schema = get_effective_schema()
         # Drop table first so there are no remaining dependencies on enum types.
         drop_table('collection_replicas')
 
@@ -89,7 +134,7 @@ def downgrade():
                 'COLLECTION_REPLICAS_TYPE_CHK',
                 'COLLECTION_REPLICAS_STATE_CHK',
         ):
-            op.execute(drop_enum_sql(enum_name))
+            op.execute(drop_enum_sql(enum_name, schema=schema))
 
     elif is_current_dialect('mysql'):
         drop_table('collection_replicas')

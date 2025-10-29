@@ -17,7 +17,12 @@
 from alembic import op
 from alembic.op import create_check_constraint
 
-from rucio.db.sqla.migrate_repo import try_drop_constraint
+from rucio.db.sqla.migrate_repo import (
+    alter_enum_add_value_sql,
+    create_enum_if_absent_block,
+    drop_enum_sql,
+    try_drop_constraint,
+)
 from rucio.db.sqla.migrate_repo.ddl_helpers import (
     get_effective_schema,
     is_current_dialect,
@@ -44,19 +49,16 @@ def upgrade():
 
     elif is_current_dialect('postgresql'):
         op.execute(
-            f'ALTER TABLE {replicas_table} '
-            'DROP CONSTRAINT IF EXISTS "REPLICAS_STATE_CHK", ALTER COLUMN state TYPE CHAR'
-        )
-        op.execute('DROP TYPE "REPLICAS_STATE_CHK"')
-        op.execute(
-            """CREATE TYPE "REPLICAS_STATE_CHK" AS ENUM('A', 'U', 'C', 'B', 'D', 'S', 'T')"""
+            f'ALTER TABLE {replicas_table} DROP CONSTRAINT IF EXISTS "REPLICAS_STATE_CHK"'
         )
         op.execute(
-            f"""
-            ALTER TABLE {replicas_table}
-            ALTER COLUMN state TYPE "REPLICAS_STATE_CHK"
-            USING state::"REPLICAS_STATE_CHK"
-            """
+            alter_enum_add_value_sql(
+                'REPLICAS_STATE_CHK',
+                'T',
+                schema=schema,
+                if_not_exists=True,
+                after='S',
+            )
         )
 
     elif is_current_dialect('mysql'):
@@ -83,9 +85,13 @@ def downgrade():
             f'ALTER TABLE {replicas_table} '
             'DROP CONSTRAINT IF EXISTS "REPLICAS_STATE_CHK", ALTER COLUMN state TYPE CHAR'
         )
-        op.execute('DROP TYPE "REPLICAS_STATE_CHK"')
+        op.execute(drop_enum_sql('REPLICAS_STATE_CHK', schema=schema))
         op.execute(
-            """CREATE TYPE "REPLICAS_STATE_CHK" AS ENUM('A', 'U', 'C', 'B', 'D', 'S')"""
+            create_enum_if_absent_block(
+                'REPLICAS_STATE_CHK',
+                ['A', 'U', 'C', 'B', 'D', 'S'],
+                schema=schema,
+            )
         )
         op.execute(
             f"""
