@@ -18,7 +18,7 @@ import sqlalchemy as sa
 from alembic.op import add_column, create_primary_key, drop_column, drop_constraint
 
 from rucio.db.sqla.migrate_repo import drop_current_primary_key, try_drop_constraint
-from rucio.db.sqla.migrate_repo.ddl_helpers import get_current_dialect, get_effective_schema
+from rucio.db.sqla.migrate_repo.ddl_helpers import get_effective_schema, is_current_dialect
 from rucio.db.sqla.models import String
 
 # Alembic revision identifiers
@@ -31,10 +31,8 @@ def upgrade():
     Upgrade the database to this revision
     '''
 
-    dialect = get_current_dialect()
-
-    if dialect in ['oracle', 'mysql', 'postgresql']:
-        if dialect in ['oracle', 'postgresql']:
+    if is_current_dialect('oracle', 'mysql', 'postgresql'):
+        if is_current_dialect('oracle', 'postgresql'):
             drop_current_primary_key('heartbeats')
             for pk_name in ('heartbeats_pk', 'HEARTBEATS_PK', 'heartbeats_pkey', 'PRIMARY'):
                 try_drop_constraint(pk_name, 'heartbeats')
@@ -52,10 +50,8 @@ def downgrade():
     Downgrade the database to the previous revision
     '''
 
-    dialect = get_current_dialect()
-
-    if dialect in ['oracle', 'mysql', 'postgresql']:
-        if dialect in ['oracle', 'postgresql']:
+    if is_current_dialect('oracle', 'mysql', 'postgresql'):
+        if is_current_dialect('oracle', 'postgresql'):
             drop_current_primary_key('heartbeats')
             for pk_name in ('heartbeats_pk', 'HEARTBEATS_PK', 'heartbeats_pkey', 'PRIMARY'):
                 try_drop_constraint(pk_name, 'heartbeats')

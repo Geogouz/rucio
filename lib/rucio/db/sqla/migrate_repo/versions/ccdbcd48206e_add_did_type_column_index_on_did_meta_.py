@@ -24,7 +24,7 @@ from rucio.db.sqla.migrate_repo import (
     drop_enum_sql,
     try_drop_constraint,
 )
-from rucio.db.sqla.migrate_repo.ddl_helpers import get_current_dialect, get_effective_schema, qualify_table
+from rucio.db.sqla.migrate_repo.ddl_helpers import get_effective_schema, is_current_dialect, qualify_table
 
 # Alembic revision identifiers
 revision = 'ccdbcd48206e'
@@ -37,17 +37,16 @@ def upgrade():
     '''
 
     schema = get_effective_schema()
-    dialect = get_current_dialect()
     did_meta_table = qualify_table('did_meta', schema)
 
-    if dialect in ['oracle', 'mysql']:
+    if is_current_dialect('oracle', 'mysql'):
         add_column('did_meta',
                    sa.Column('did_type', sa.Enum(DIDType,
                                                  name='DID_META_DID_TYPE_CHK',
                                                  create_constraint=True,
                                                  values_callable=lambda obj: [e.value for e in obj])),
                    schema=schema)
-    elif dialect == 'postgresql':
+    elif is_current_dialect('postgresql'):
         enum_values = [did_type.value for did_type in DIDType]
         execute(
             create_enum_if_absent_block(
@@ -73,14 +72,13 @@ def downgrade():
 
     drop_index('DID_META_DID_TYPE_IDX', 'did_meta')
     schema = get_effective_schema()
-    dialect = get_current_dialect()
     did_meta_table = qualify_table('did_meta', schema)
 
-    if dialect == 'oracle':
+    if is_current_dialect('oracle'):
         try_drop_constraint('DID_META_DID_TYPE_CHK', 'did_meta')
         drop_column('did_meta', 'did_type', schema=schema)
 
-    elif dialect == 'postgresql':
+    elif is_current_dialect('postgresql'):
         execute(
             f'ALTER TABLE {did_meta_table} '
             'DROP CONSTRAINT IF EXISTS "DID_META_DID_TYPE_CHK", ALTER COLUMN did_type TYPE CHAR'
@@ -88,5 +86,5 @@ def downgrade():
         execute(f'ALTER TABLE {did_meta_table} DROP COLUMN did_type')
         execute(drop_enum_sql('DID_META_DID_TYPE_CHK', schema=schema))
 
-    elif dialect == 'mysql':
+    elif is_current_dialect('mysql'):
         drop_column('did_meta', 'did_type', schema=schema)
