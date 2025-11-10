@@ -23,6 +23,7 @@ import time
 from typing import TYPE_CHECKING, Any, Generic, Optional, TypeVar, Union
 
 from rucio.common.logging import formatted_logger
+from rucio.common.startup_checks import run_startup_checks
 from rucio.common.utils import PriorityQueue
 from rucio.core import heartbeat as heartbeat_core
 from rucio.core.monitor import MetricManager
@@ -34,6 +35,25 @@ if TYPE_CHECKING:
 
 T = TypeVar('T')
 METRICS = MetricManager(module=__name__)
+
+_daemon_startup_checks_lock = threading.Lock()
+_daemon_startup_checks_ran = False
+
+
+def run_daemon_startup_checks(executable: str, hostname: Optional[str] = None) -> None:
+    """Execute startup diagnostics for daemon processes and perform the heartbeat sanity check."""
+
+    global _daemon_startup_checks_ran
+
+    logger = logging.getLogger(executable)
+    resolved_hostname = hostname or socket.getfqdn()
+
+    with _daemon_startup_checks_lock:
+        if not _daemon_startup_checks_ran:
+            run_startup_checks(tags={'daemon'}, logger=logger)
+            _daemon_startup_checks_ran = True
+
+    heartbeat_core.sanity_check(executable=executable, hostname=resolved_hostname)
 
 
 class HeartbeatHandler:
@@ -62,7 +82,7 @@ class HeartbeatHandler:
         self.last_payload = None
 
     def __enter__(self) -> 'HeartbeatHandler':
-        heartbeat_core.sanity_check(executable=self.executable, hostname=self.hostname)
+        run_daemon_startup_checks(executable=self.executable, hostname=self.hostname)
         self.live()
         return self
 
