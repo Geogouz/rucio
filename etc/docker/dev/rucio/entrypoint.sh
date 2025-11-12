@@ -40,6 +40,13 @@ fi
 
 echo "Generating alembic.ini and rucio.cfg"
 
+# Ensure the Apache configuration inside the container matches the local sources so
+# that dev-specific tweaks (e.g. relaxed stdout handling) take effect immediately
+# without rebuilding the base image.
+if [ -f "$CFG_PATH/rucio.conf" ]; then
+    cp "$CFG_PATH/rucio.conf" /etc/httpd/conf.d/rucio.conf
+fi
+
 if [ -z "$RDBMS" ]; then
     cp "$CFG_PATH/rucio_default.cfg" $RUCIO_HOME/etc/rucio.cfg
     cp "$CFG_PATH/alembic_default.ini" $RUCIO_HOME/etc/alembic.ini

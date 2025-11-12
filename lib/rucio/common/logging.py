@@ -16,6 +16,7 @@ import functools
 import itertools
 import json
 import logging
+import os
 import re
 import sys
 from traceback import format_tb
@@ -29,7 +30,6 @@ if TYPE_CHECKING:
 
     from _typeshed import OptExcInfo
     from flask import Flask
-
 
 # Mapping from ECS field paths
 # https://www.elastic.co/guide/en/ecs-logging/overview/current/intro.html#_field_mapping
@@ -64,7 +64,8 @@ LOG_RECORDS = Literal[
     'threadName'
 ]
 
-BUILTIN_FIELDS: tuple[tuple[ECS_FIELDS, LOG_RECORDS], ...] = tuple((x, y) for x, y in zip(get_args(ECS_FIELDS), get_args(LOG_RECORDS)))
+BUILTIN_FIELDS: tuple[tuple[ECS_FIELDS, LOG_RECORDS], ...] = tuple(
+    (x, y) for x, y in zip(get_args(ECS_FIELDS), get_args(LOG_RECORDS)))
 ECS_TO_LOG_RECORD_MAP: dict[ECS_FIELDS, LOG_RECORDS] = dict(BUILTIN_FIELDS)
 LOG_RECORD_TO_ECS_MAP: dict[LOG_RECORDS, ECS_FIELDS] = dict((f[1], f[0]) for f in BUILTIN_FIELDS)
 
@@ -136,7 +137,8 @@ def _unflatten_dict(dictionary: dict[str, Any]) -> dict[str, Any]:
     return ret
 
 
-def _get_request_data(request_path: 'Sequence[str]') -> "Callable[[LogDataSource, LogRecord], Iterator[tuple[str, Optional[Any]]]]":
+def _get_request_data(
+        request_path: 'Sequence[str]') -> "Callable[[LogDataSource, LogRecord], Iterator[tuple[str, Optional[Any]]]]":
     """
     Returns a function which, when called, will resolve the value
     in the flask request object at request_path
@@ -146,7 +148,8 @@ def _get_request_data(request_path: 'Sequence[str]') -> "Callable[[LogDataSource
     # TODO: move to top of file once we got rid of/refactored rsemanager
     from flask import has_request_context, request
 
-    def _request_data_formatter(record_formatter: "LogDataSource", record: "LogRecord") -> 'Iterator[tuple[str, Optional[Any]]]':
+    def _request_data_formatter(record_formatter: "LogDataSource",
+                                record: "LogRecord") -> 'Iterator[tuple[str, Optional[Any]]]':
         value = None
         if has_request_context() and request_path:
             value = _navigate_path(request, request_path)
@@ -155,13 +158,15 @@ def _get_request_data(request_path: 'Sequence[str]') -> "Callable[[LogDataSource
     return _request_data_formatter
 
 
-def _get_record_attribute(attribute: str) -> "Callable[[LogDataSource, LogRecord], Iterator[tuple[str, Optional[Any]]]]":
+def _get_record_attribute(
+        attribute: str) -> "Callable[[LogDataSource, LogRecord], Iterator[tuple[str, Optional[Any]]]]":
     """
     Returns a function which, when called, will generate the value of the desired attribute from
     the record passed in argument.
     """
 
-    def _record_attribute_formatter(record_formatter: "LogDataSource", record: "LogRecord") -> 'Iterator[tuple[str, Optional[Any]]]':
+    def _record_attribute_formatter(record_formatter: "LogDataSource",
+                                    record: "LogRecord") -> 'Iterator[tuple[str, Optional[Any]]]':
         value = None
         try:
             value = getattr(record, attribute)
@@ -172,11 +177,13 @@ def _get_record_attribute(attribute: str) -> "Callable[[LogDataSource, LogRecord
     return _record_attribute_formatter
 
 
-def _timestamp_formatter(record_formatter: "LogDataSource", record: "LogRecord") -> 'Iterator[tuple[str, Optional[Any]]]':
+def _timestamp_formatter(record_formatter: "LogDataSource",
+                         record: "LogRecord") -> 'Iterator[tuple[str, Optional[Any]]]':
     """
     Format a timestamp
     """
-    yield record_formatter.ecs_fields[0], datetime.datetime.utcfromtimestamp(record.created).isoformat(timespec='milliseconds') + 'Z'
+    yield record_formatter.ecs_fields[0], datetime.datetime.utcfromtimestamp(record.created).isoformat(
+        timespec='milliseconds') + 'Z'
 
 
 def _ecs_field_to_record_attribute(field_name: Union[ECS_FIELDS, str]) -> Union[LOG_RECORDS, str]:
@@ -193,6 +200,7 @@ class LogDataSource:
     """
     Represents one log data source and allows to format it into one or more json fields
     """
+
     def __init__(
             self,
             ecs_fields: tuple[str, ...],
@@ -322,7 +330,8 @@ class RucioFormatter(logging.Formatter):
                                       dst_record_attr=_ecs_field_to_record_attribute(ecs_field),
                                       formatter=_get_request_data(request_path=request_path.split('.'))))
             for ecs_field, request_path in (
-                ('client.account.name', 'headers.X-Rucio-Account'),  # this field is rucio-specific, not from the ECS specification
+                ('client.account.name', 'headers.X-Rucio-Account'),
+                # this field is rucio-specific, not from the ECS specification
                 ('network.forwarded_ip', 'access_route.0'),
                 ('source.ip', 'remote_addr'),
                 ('url.full', 'url'),
@@ -351,7 +360,8 @@ class RucioFormatter(logging.Formatter):
                     fmt = fmt.replace(f'%({field_name})', f'%({dst_record_attr})')
                     if field_name.startswith('http.request.'):
                         path = field_name.replace('http.request.', '', 1).split('.')
-                        data_source = LogDataSource((field_name,), dst_record_attr=dst_record_attr, formatter=_get_request_data(path))
+                        data_source = LogDataSource((field_name,), dst_record_attr=dst_record_attr,
+                                                    formatter=_get_request_data(path))
                 elif not data_source:
                     data_source = LogDataSource((field_name,), formatter=_get_record_attribute(field_name))
 
@@ -364,7 +374,8 @@ class RucioFormatter(logging.Formatter):
         super().__init__(fmt=fmt, style='%', **_kwargs)
 
     def format(self, record: "LogRecord") -> str:
-        json_record = dict(itertools.chain.from_iterable(f.format(record) for f in self._desired_data_sources))  # type: ignore
+        json_record = dict(
+            itertools.chain.from_iterable(f.format(record) for f in self._desired_data_sources))  # type: ignore
         if self.output_json:
             return self._to_json(_unflatten_dict(json_record))
         else:
@@ -382,7 +393,8 @@ class RucioFormatter(logging.Formatter):
 
 
 def rucio_log_formatter(process_name: Optional[str] = None) -> RucioFormatter:
-    config_logformat = config_get('common', 'logformat', raise_exception=False, default='%(asctime)s\t%(name)s\t%(process)d\t%(levelname)s\t%(message)s')
+    config_logformat = config_get('common', 'logformat', raise_exception=False,
+                                  default='%(asctime)s\t%(name)s\t%(process)d\t%(levelname)s\t%(message)s')
     output_json = config_get_bool('common', 'logjson', default=False)
     additional_fields: 'Mapping[ECS_FIELDS, str]' = {}
     if process_name:
@@ -392,18 +404,42 @@ def rucio_log_formatter(process_name: Optional[str] = None) -> RucioFormatter:
 
 def setup_logging(application: Optional["Flask"] = None, process_name: Optional[str] = None) -> None:
     """
-    Configures the logging by setting the output stream to stdout and
-    configures log level and log format.
+    Configure logging sink/format/level.
+    Defaults to stdout (backwards compatible).
+    Dev/test/CI can override via:
+      - [common] logstream = stdout|stderr
+      - [common] redirect_stdout_to_stderr = true|false
+      - env RUCIO_LOG_STREAM=stdout|stderr
+      - env RUCIO_REDIRECT_STDOUT_TO_STDERR=1/true/on
     """
     config_loglevel = getattr(logging, config_get('common', 'loglevel', raise_exception=False, default='DEBUG').upper())
 
-    stdouthandler = logging.StreamHandler(stream=sys.stdout)
-    stdouthandler.setFormatter(rucio_log_formatter(process_name=process_name))
-    stdouthandler.setLevel(config_loglevel)
-    logging.basicConfig(level=config_loglevel, handlers=[stdouthandler])
+    # Decide the handler stream (default stdout)
+    stream_choice = (os.getenv('RUCIO_LOG_STREAM', '').strip().lower()
+                     or str(config_get('common', 'logstream', raise_exception=False, default='stdout')).strip().lower())
+    stream = sys.stderr if stream_choice in ('stderr', 'err', '2') else sys.stdout
+
+    # Optionally route all process-level stdout to stderr (helps with mod_wsgi/CI)
+    redirect_env = os.getenv('RUCIO_REDIRECT_STDOUT_TO_STDERR', '').strip().lower() in ('1', 'true', 'yes', 'on')
+    redirect_cfg = config_get_bool('common', 'redirect_stdout_to_stderr', raise_exception=False, default=False)
+    if (redirect_env or redirect_cfg) and sys.stdout is not sys.stderr:
+        try:
+            sys.stdout.flush()
+        except Exception:
+            pass
+        sys.stdout = sys.stderr
+
+    handler = logging.StreamHandler(stream=stream)
+    handler.setFormatter(rucio_log_formatter(process_name=process_name))
+    handler.setLevel(config_loglevel)
+    logging.basicConfig(level=config_loglevel, handlers=[handler])
 
     if application:
-        application.logger.addHandler(stdouthandler)
+        # avoid duplicate emissions from app logger + root
+        application.logger.handlers[:] = []
+        application.logger.addHandler(handler)
+        application.logger.setLevel(config_loglevel)
+        application.logger.propagate = False
 
 
 def formatted_logger(innerfunc: 'Callable', formatstr: str = "%s") -> 'Callable':
@@ -414,7 +450,9 @@ def formatted_logger(innerfunc: 'Callable', formatstr: str = "%s") -> 'Callable'
     :param innerfunc: function to be decorated. Must take (level, msg) arguments.
     :param formatstr: format string with %s as placeholder.
     """
+
     @functools.wraps(innerfunc)
     def log_format(level: int, msg: object, *args, **kwargs) -> 'Callable':
         return innerfunc(level, formatstr % msg, *args, **kwargs)
+
     return log_format
