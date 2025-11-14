@@ -12,16 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-''' add didtype_chck to requests '''
+""" add didtype_chck to requests """
 
 import sqlalchemy as sa
-from alembic import op
-from alembic.op import add_column, drop_column
+from alembic.op import execute
 from sqlalchemy.dialects import postgresql as pg
 
 from rucio.db.sqla.constants import DIDType
-from rucio.db.sqla.migrate_repo import create_enum_if_absent_block, drop_enum_sql
-from rucio.db.sqla.migrate_repo.ddl_helpers import get_effective_schema, is_current_dialect
+from rucio.db.sqla.migrate_repo import (
+    add_column,
+    create_enum_if_absent_block,
+    drop_column,
+    get_effective_schema,
+    is_current_dialect,
+    try_drop_enum,
+)
 
 # Alembic revision identifiers
 revision = '1a29d6a9504c'
@@ -29,9 +34,9 @@ down_revision = '436827b13f82'
 
 
 def upgrade():
-    '''
+    """
     Upgrade the database to this revision
-    '''
+    """
 
     schema = get_effective_schema()
 
@@ -41,13 +46,13 @@ def upgrade():
                                                  name='REQUESTS_DIDTYPE_CHK',
                                                  create_constraint=True,
                                                  values_callable=lambda obj: [e.value for e in obj]),
-                                         default=DIDType.FILE), schema=schema)
+                                         default=DIDType.FILE))
         # we don't want checks on the history table, fake the DID type
-        add_column('requests_history', sa.Column('did_type', sa.String(1)), schema=schema)
+        add_column('requests_history', sa.Column('did_type', sa.String(1)))
 
     elif is_current_dialect('postgresql'):
         enum_values = [did_type.value for did_type in DIDType]
-        op.execute(
+        execute(
             create_enum_if_absent_block(
                 'REQUESTS_DIDTYPE_CHK',
                 enum_values,
@@ -63,22 +68,19 @@ def upgrade():
         add_column(
             'requests',
             sa.Column('did_type', did_type_enum, default=DIDType.FILE),
-            schema=schema,
         )
         # we don't want checks on the history table, fake the DID type
-        add_column('requests_history', sa.Column('did_type', sa.String(1)), schema=schema)
+        add_column('requests_history', sa.Column('did_type', sa.String(1)))
 
 
 def downgrade():
-    '''
+    """
     Downgrade the database to the previous revision
-    '''
-
-    schema = get_effective_schema()
+    """
 
     if is_current_dialect('oracle', 'mysql', 'postgresql'):
-        drop_column('requests', 'did_type', schema=schema)
-        drop_column('requests_history', 'did_type', schema=schema)
+        drop_column('requests', 'did_type')
+        drop_column('requests_history', 'did_type')
 
     if is_current_dialect('postgresql'):
-        op.execute(drop_enum_sql('REQUESTS_DIDTYPE_CHK', schema=schema))
+        try_drop_enum('REQUESTS_DIDTYPE_CHK')

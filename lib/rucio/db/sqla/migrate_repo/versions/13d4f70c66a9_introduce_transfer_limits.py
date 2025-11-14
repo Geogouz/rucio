@@ -12,25 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-''' introduce transfer limits '''
+""" introduce transfer limits """
 
 import datetime
 
 import sqlalchemy as sa
-from alembic import op
-from alembic.op import (
+from alembic.op import create_foreign_key, execute
+from sqlalchemy.dialects import postgresql as pg
+
+from rucio.common.constants import TransferLimitDirection
+from rucio.db.sqla.migrate_repo import (
     create_check_constraint,
-    create_foreign_key,
+    create_enum_if_absent_block,
     create_index,
     create_primary_key,
     create_table,
     drop_table,
+    get_effective_schema,
+    is_current_dialect,
+    try_drop_enum,
 )
-from sqlalchemy.dialects import postgresql as pg
-
-from rucio.common.constants import TransferLimitDirection
-from rucio.db.sqla.migrate_repo import create_enum_if_absent_block, drop_enum_sql
-from rucio.db.sqla.migrate_repo.ddl_helpers import get_effective_schema, is_current_dialect
 from rucio.db.sqla.types import GUID
 
 # Alembic revision identifiers
@@ -46,11 +47,10 @@ def upgrade():
             schema = get_effective_schema()
             direction_values = [d.value for d in TransferLimitDirection]
             # Emulate "CREATE TYPE IF NOT EXISTS" safely
-            op.execute(
+            execute(
                 create_enum_if_absent_block(
                     'TRANSFER_LIMITS_DIRECTION_TYPE_CHK',
                     direction_values,
-                    schema=schema,
                 )
             )
             direction_enum = pg.ENUM(
@@ -120,6 +120,7 @@ def upgrade():
 
 
 def downgrade():
+
     if is_current_dialect('oracle', 'mysql', 'postgresql'):
         # Drop new tables first so the enum can be removed on PG
         drop_table('rse_transfer_limits')
@@ -127,8 +128,7 @@ def downgrade():
 
         # On PostgreSQL drop the enum type introduced by this migration
         if is_current_dialect('postgresql'):
-            schema = get_effective_schema()
-            op.execute(drop_enum_sql('TRANSFER_LIMITS_DIRECTION_TYPE_CHK', schema=schema))
+            try_drop_enum('TRANSFER_LIMITS_DIRECTION_TYPE_CHK')
 
         # Re-create the legacy table (original downgrade)
         create_table(

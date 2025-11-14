@@ -12,16 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-''' extend waiting request state '''
+""" extend waiting request state """
 
-from alembic import op
-from alembic.op import create_check_constraint
-
-from rucio.db.sqla.migrate_repo import try_drop_constraint
-from rucio.db.sqla.migrate_repo.ddl_helpers import (
-    get_effective_schema,
+from rucio.db.sqla.migrate_repo import (
+    create_check_constraint,
     is_current_dialect,
-    qualify_table,
+    try_drop_constraint,
 )
 
 # Alembic revision identifiers
@@ -30,12 +26,9 @@ down_revision = '2edee4a83846'
 
 
 def upgrade():
-    '''
+    """
     Upgrade the database to this revision
-    '''
-
-    schema = get_effective_schema()
-    requests_table = qualify_table('requests', schema)
+    """
 
     if is_current_dialect('oracle', 'postgresql'):
         try_drop_constraint('REQUESTS_STATE_CHK', 'requests')
@@ -43,18 +36,15 @@ def upgrade():
                                 condition="state in ('Q', 'G', 'S', 'D', 'F', 'L', 'N', 'O', 'A', 'U','W')")
 
     elif is_current_dialect('mysql'):
-        op.execute(f'ALTER TABLE {requests_table} DROP CHECK REQUESTS_STATE_CHK')
+        try_drop_constraint('REQUESTS_STATE_CHK', 'requests')
         create_check_constraint(constraint_name='REQUESTS_STATE_CHK', table_name='requests',
                                 condition="state in ('Q', 'G', 'S', 'D', 'F', 'L', 'N', 'O', 'A', 'U','W')")
 
 
 def downgrade():
-    '''
+    """
     Downgrade the database to the previous revision
-    '''
-
-    schema = get_effective_schema()
-    requests_table = qualify_table('requests', schema)
+    """
 
     if is_current_dialect('oracle', 'postgresql'):
         try_drop_constraint('REQUESTS_STATE_CHK', 'requests')
@@ -62,6 +52,6 @@ def downgrade():
                                 condition="state in ('Q', 'G', 'S', 'D', 'F', 'L', 'N', 'O', 'A', 'U')")
 
     elif is_current_dialect('mysql'):
-        op.execute(f'ALTER TABLE {requests_table} DROP CHECK REQUESTS_STATE_CHK')
+        try_drop_constraint('REQUESTS_STATE_CHK', 'requests')
         create_check_constraint(constraint_name='REQUESTS_STATE_CHK', table_name='requests',
                                 condition="state in ('Q', 'G', 'S', 'D', 'F', 'L', 'N', 'O', 'A', 'U')")

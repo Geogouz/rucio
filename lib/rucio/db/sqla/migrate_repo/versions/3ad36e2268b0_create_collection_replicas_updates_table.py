@@ -12,28 +12,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-''' create collection_replicas_updates table '''
+""" create collection_replicas_updates table """
 
 import datetime
 
 import sqlalchemy as sa
-from alembic import op
-from alembic.op import (
+from sqlalchemy.dialects import postgresql as pg
+
+from rucio.db.sqla.constants import DIDType
+from rucio.db.sqla.migrate_repo import (
     add_column,
     create_check_constraint,
+    create_enum_if_absent_block,
     create_index,
     create_primary_key,
     create_table,
     drop_column,
-    drop_constraint,
-    drop_index,
     drop_table,
+    is_current_dialect,
+    try_drop_enum,
+    try_drop_index,
+    try_drop_primary_key,
 )
-from sqlalchemy.dialects import postgresql as pg
-
-from rucio.db.sqla.constants import DIDType
-from rucio.db.sqla.migrate_repo import create_enum_if_absent_block, drop_enum_sql
-from rucio.db.sqla.migrate_repo.ddl_helpers import get_effective_schema, is_current_dialect
 from rucio.db.sqla.types import GUID
 
 # Alembic revision identifiers
@@ -42,14 +42,13 @@ down_revision = '42db2617c364'
 
 
 def upgrade():
-    '''
+    """
     Upgrade the database to this revision
-    '''
+    """
 
     if is_current_dialect('oracle', 'mysql', 'postgresql'):
-        schema = get_effective_schema()
-        add_column('collection_replicas', sa.Column('available_replicas_cnt', sa.BigInteger()), schema=schema)
-        add_column('collection_replicas', sa.Column('available_bytes', sa.BigInteger()), schema=schema)
+        add_column('collection_replicas', sa.Column('available_replicas_cnt', sa.BigInteger()))
+        add_column('collection_replicas', sa.Column('available_bytes', sa.BigInteger()))
 
         enum_values = [did_type.value for did_type in DIDType]
         if is_current_dialect('postgresql'):
@@ -57,13 +56,11 @@ def upgrade():
                 create_enum_if_absent_block(
                     'UPDATED_COL_REP_TYPE_CHK',
                     enum_values,
-                    schema=schema,
                 )
             )
             did_type_enum = pg.ENUM(
                 *enum_values,
                 name='UPDATED_COL_REP_TYPE_CHK',
-                schema=schema,
                 create_type=False,
             )
         else:
@@ -90,30 +87,24 @@ def upgrade():
 
 
 def downgrade():
-    '''
+    """
     Downgrade the database to the previous revision
-    '''
+    """
 
-    schema = get_effective_schema()
-
-    if is_current_dialect('oracle'):
-        drop_column('collection_replicas', 'available_replicas_cnt', schema=schema)
-        drop_column('collection_replicas', 'available_bytes', schema=schema)
-        drop_table('updated_col_rep')
-
-    elif is_current_dialect('postgresql'):
+    if is_current_dialect('oracle', 'postgresql'):
         # Drop columns & table first so there are no remaining dependencies on the enum type.
-        drop_column('collection_replicas', 'available_replicas_cnt', schema=schema)
-        drop_column('collection_replicas', 'available_bytes', schema=schema)
+        drop_column('collection_replicas', 'available_replicas_cnt')
+        drop_column('collection_replicas', 'available_bytes')
         drop_table('updated_col_rep')
 
-        # Then drop the PostgreSQL enum type created by this migration so that a subsequent
-        # upgrade can recreate it cleanly without DuplicateObject errors.
-        op.execute(drop_enum_sql('UPDATED_COL_REP_TYPE_CHK', schema=schema))
+        if is_current_dialect('postgresql'):
+            # Then drop the PostgreSQL enum type created by this migration so that a
+            # subsequent upgrade can recreate it cleanly without DuplicateObject errors.
+            try_drop_enum('UPDATED_COL_REP_TYPE_CHK')
 
     elif is_current_dialect('mysql'):
-        drop_column('collection_replicas', 'available_replicas_cnt', schema=schema)
-        drop_column('collection_replicas', 'available_bytes', schema=schema)
-        drop_constraint('UPDATED_COL_REP_PK', 'updated_col_rep', type_='primary')
-        drop_index('UPDATED_COL_REP_SNR_IDX', 'updated_col_rep')
+        drop_column('collection_replicas', 'available_replicas_cnt')
+        drop_column('collection_replicas', 'available_bytes')
+        try_drop_primary_key('updated_col_rep')
+        try_drop_index('UPDATED_COL_REP_SNR_IDX', 'updated_col_rep')
         drop_table('updated_col_rep')

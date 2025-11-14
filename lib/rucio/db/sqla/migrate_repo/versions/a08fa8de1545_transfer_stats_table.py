@@ -12,14 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-''' transfer_stats table '''
+""" transfer_stats table """
 
 import datetime
 
 import sqlalchemy as sa
-from alembic.op import create_check_constraint, create_foreign_key, create_index, create_primary_key, create_table, drop_table
+from alembic.op import create_foreign_key
 
-from rucio.db.sqla.migrate_repo.ddl_helpers import is_current_dialect
+from rucio.db.sqla.migrate_repo import (
+    create_check_constraint,
+    create_index,
+    create_primary_key,
+    create_table,
+    drop_table,
+    is_current_dialect,
+)
 from rucio.db.sqla.types import GUID
 
 # Alembic revision identifiers

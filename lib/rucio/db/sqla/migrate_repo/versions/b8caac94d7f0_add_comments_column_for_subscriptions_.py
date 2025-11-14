@@ -12,12 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-''' add comments column for subscriptions_history '''
+""" add comments column for subscriptions_history """
 
 import sqlalchemy as sa
-from alembic.op import add_column, drop_column
 
-from rucio.db.sqla.migrate_repo.ddl_helpers import get_effective_schema, is_current_dialect
+from rucio.db.sqla.migrate_repo import (
+    add_column,
+    drop_column,
+    is_current_dialect,
+)
 
 # Alembic revision identifiers
 revision = 'b8caac94d7f0'
@@ -25,20 +28,18 @@ down_revision = '8523998e2e76'
 
 
 def upgrade():
-    '''
+    """
     Upgrade the database to this revision
-    '''
+    """
 
     if is_current_dialect('oracle', 'mysql', 'postgresql'):
-        schema = get_effective_schema()
-        add_column('subscriptions_history', sa.Column('comments', sa.String(4000)), schema=schema)
+        add_column('subscriptions_history', sa.Column('comments', sa.String(4000)))
 
 
 def downgrade():
-    '''
+    """
     Downgrade the database to the previous revision
-    '''
+    """
 
     if is_current_dialect('oracle', 'mysql', 'postgresql'):
-        schema = get_effective_schema()
-        drop_column('subscriptions_history', 'comments', schema=schema)
+        drop_column('subscriptions_history', 'comments')

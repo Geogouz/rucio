@@ -12,14 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-''' new account_limits table '''
+""" new account_limits table """
 
 import datetime
 
 import sqlalchemy as sa
-from alembic.op import create_check_constraint, create_foreign_key, create_primary_key, create_table, drop_table
+from alembic.op import create_foreign_key
 
-from rucio.db.sqla.migrate_repo.ddl_helpers import is_current_dialect
+from rucio.db.sqla.migrate_repo import (
+    create_check_constraint,
+    create_primary_key,
+    create_table,
+    drop_table,
+    is_current_dialect,
+)
 from rucio.db.sqla.types import GUID
 
 # Alembic revision identifiers
@@ -28,9 +34,9 @@ down_revision = '469d262be19'
 
 
 def upgrade():
-    '''
+    """
     Upgrade the database to this revision
-    '''
+    """
 
     if is_current_dialect('oracle', 'postgresql'):
         drop_table('account_limits')
@@ -66,9 +72,9 @@ def upgrade():
 
 
 def downgrade():
-    '''
+    """
     Downgrade the database to the previous revision
-    '''
+    """
 
     if is_current_dialect('oracle', 'mysql', 'postgresql'):
         drop_table('account_limits')

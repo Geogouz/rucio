@@ -12,29 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-''' create collection replica table '''
+""" create collection replica table """
 
 import datetime
 
 import sqlalchemy as sa
-from alembic import op
-from alembic.op import (
-    create_check_constraint,
-    create_foreign_key,
-    create_index,
-    create_primary_key,
-    create_table,
-    drop_table,
-)
+from alembic.op import create_foreign_key, execute
 from sqlalchemy.dialects import postgresql as pg
 
 from rucio.db.sqla.constants import DIDType, ReplicaState
 from rucio.db.sqla.migrate_repo import (
+    create_check_constraint,
     create_enum_if_absent_block,
-    drop_enum_sql,
+    create_index,
+    create_primary_key,
+    create_table,
+    drop_table,
+    get_effective_schema,
+    is_current_dialect,
     try_drop_constraint,
+    try_drop_enum,
 )
-from rucio.db.sqla.migrate_repo.ddl_helpers import get_effective_schema, is_current_dialect
 from rucio.db.sqla.types import GUID
 
 # Alembic revision identifiers
@@ -43,9 +41,9 @@ down_revision = 'a93e4e47bda'
 
 
 def upgrade():
-    '''
+    """
     Upgrade the database to this revision
-    '''
+    """
 
     if is_current_dialect('oracle', 'mysql', 'postgresql'):
         schema = get_effective_schema()
@@ -55,18 +53,16 @@ def upgrade():
         state_values = [state.value for state in ReplicaState]
 
         if is_pg:
-            op.execute(
+            execute(
                 create_enum_if_absent_block(
                     'COLLECTION_REPLICAS_TYPE_CHK',
                     type_values,
-                    schema=schema,
                 )
             )
-            op.execute(
+            execute(
                 create_enum_if_absent_block(
                     'COLLECTION_REPLICAS_STATE_CHK',
                     state_values,
-                    schema=schema,
                 )
             )
             did_type_enum = pg.ENUM(
@@ -116,16 +112,15 @@ def upgrade():
 
 
 def downgrade():
-    '''
+    """
     Downgrade the database to the previous revision
-    '''
+    """
 
     if is_current_dialect('oracle'):
         try_drop_constraint('COLLECTION_REPLICAS_STATE_CHK', 'collection_replicas')
         drop_table('collection_replicas')
 
     elif is_current_dialect('postgresql'):
-        schema = get_effective_schema()
         # Drop table first so there are no remaining dependencies on enum types.
         drop_table('collection_replicas')
 
@@ -134,7 +129,7 @@ def downgrade():
                 'COLLECTION_REPLICAS_TYPE_CHK',
                 'COLLECTION_REPLICAS_STATE_CHK',
         ):
-            op.execute(drop_enum_sql(enum_name, schema=schema))
+            try_drop_enum(enum_name)
 
     elif is_current_dialect('mysql'):
         drop_table('collection_replicas')

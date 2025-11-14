@@ -12,12 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-''' adding transient metadata '''
+""" adding transient metadata """
 
 import sqlalchemy as sa
-from alembic.op import add_column, drop_column
 
-from rucio.db.sqla.migrate_repo.ddl_helpers import get_effective_schema, is_current_dialect
+from rucio.db.sqla.migrate_repo import (
+    add_column,
+    drop_column,
+    is_current_dialect,
+)
 
 # Alembic revision identifiers
 revision = '4cf0a2e127d4'
@@ -25,20 +28,18 @@ down_revision = '271a46ea6244'
 
 
 def upgrade():
-    '''
+    """
     Upgrade the database to this revision
-    '''
+    """
 
     if is_current_dialect('oracle', 'mysql', 'postgresql'):
-        schema = get_effective_schema()
-        add_column('dids', sa.Column('transient', sa.Boolean(name='DID_TRANSIENT_CHK', create_constraint=True), server_default='0'), schema=schema)
+        add_column('dids', sa.Column('transient', sa.Boolean(name='DID_TRANSIENT_CHK', create_constraint=True), server_default='0'))
 
 
 def downgrade():
-    '''
+    """
     Downgrade the database to the previous revision
-    '''
+    """
 
     if is_current_dialect('oracle', 'mysql', 'postgresql'):
-        schema = get_effective_schema()
-        drop_column('dids', 'transient', schema=schema)
+        drop_column('dids', 'transient')

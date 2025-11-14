@@ -12,12 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-''' New payload column for heartbeats '''
+""" New payload column for heartbeats """
 
 import sqlalchemy as sa
-from alembic.op import add_column, create_index, drop_column, drop_index
 
-from rucio.db.sqla.migrate_repo.ddl_helpers import get_effective_schema, is_current_dialect
+from rucio.db.sqla.migrate_repo import (
+    add_column,
+    create_index,
+    drop_column,
+    is_current_dialect,
+    try_drop_index,
+)
 from rucio.db.sqla.models import String
 
 # Alembic revision identifiers
@@ -26,22 +31,20 @@ down_revision = 'b7d287de34fd'
 
 
 def upgrade():
-    '''
+    """
     Upgrade the database to this revision
-    '''
+    """
 
     if is_current_dialect('oracle', 'mysql', 'postgresql'):
-        schema = get_effective_schema()
-        drop_index('HEARTBEATS_UPDATED_AT', 'heartbeats')
-        add_column('heartbeats', sa.Column('payload', String(3000)), schema=schema)
+        try_drop_index('HEARTBEATS_UPDATED_AT', 'heartbeats')
+        add_column('heartbeats', sa.Column('payload', String(3000)))
 
 
 def downgrade():
-    '''
+    """
     Downgrade the database to the previous revision
-    '''
+    """
 
     if is_current_dialect('oracle', 'mysql', 'postgresql'):
-        schema = get_effective_schema()
         create_index('HEARTBEATS_UPDATED_AT', 'heartbeats', ['updated_at'])
-        drop_column('heartbeats', 'payload', schema=schema)
+        drop_column('heartbeats', 'payload')

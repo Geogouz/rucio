@@ -12,15 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-''' true is true '''
+""" true is true """
 
-from alembic import op
+from alembic.op import execute
 
-from rucio.db.sqla.migrate_repo.ddl_helpers import (
-    get_effective_schema,
-    is_current_dialect,
-    qualify_table,
-)
+from rucio.db.sqla.migrate_repo import is_current_dialect, qualify_table
 
 # Alembic revision identifiers
 revision = '9eb936a81eb1'
@@ -33,19 +29,43 @@ down_revision = 'b96a1c7e1cc4'
 
 
 def upgrade():
-    '''
+    """
     Upgrade the database to this revision
-    '''
+    """
+
+    account_attr_table = qualify_table('account_attr_map')
+    rse_attr_table = qualify_table('rse_attr_map')
 
     # First, change all uppercase booleanstrings to lowercase booleanstrings
     if is_current_dialect('oracle', 'mysql', 'postgresql'):
-        schema = get_effective_schema()
-        account_attr_table = qualify_table('account_attr_map', schema)
-        rse_attr_table = qualify_table('rse_attr_map', schema)
-        op.execute(f"UPDATE {account_attr_table} SET value='true' WHERE value='True'")
-        op.execute(f"UPDATE {account_attr_table} SET value='false' WHERE value='False'")
-        op.execute(f"UPDATE {rse_attr_table} SET value='true' WHERE value='True'")
-        op.execute(f"UPDATE {rse_attr_table} SET value='false' WHERE value='False'")
+        execute(
+            f"""
+            UPDATE {account_attr_table}
+            SET value='true'
+            WHERE value='True'
+            """
+        )
+        execute(
+            f"""
+            UPDATE {account_attr_table}
+            SET value='false'
+            WHERE value='False'
+            """
+        )
+        execute(
+            f"""
+            UPDATE {rse_attr_table}
+            SET value='true'
+            WHERE value='True'
+            """
+        )
+        execute(
+            f"""
+            UPDATE {rse_attr_table}
+            SET value='false'
+            WHERE value='False'
+            """
+        )
 
     # Second, change __all__  0/1 which represent booleans to true/false.
     # This cannot be done automatically, as there might be 0/1 values which really are integers.
@@ -58,19 +78,43 @@ def upgrade():
 
 
 def downgrade():
-    '''
+    """
     Downgrade the database to the previous revision
-    '''
+    """
+
+    account_attr_table = qualify_table('account_attr_map')
+    rse_attr_table = qualify_table('rse_attr_map')
 
     # First, change all lowercase booleanstrings to uppercase booleanstrings
     if is_current_dialect('oracle', 'mysql', 'postgresql'):
-        schema = get_effective_schema()
-        account_attr_table = qualify_table('account_attr_map', schema)
-        rse_attr_table = qualify_table('rse_attr_map', schema)
-        op.execute(f"UPDATE {account_attr_table} SET value='True' WHERE value='true'")
-        op.execute(f"UPDATE {account_attr_table} SET value='False' WHERE value='false'")
-        op.execute(f"UPDATE {rse_attr_table} SET value='True' WHERE value='true'")
-        op.execute(f"UPDATE {rse_attr_table} SET value='False' WHERE value='false'")
+        execute(
+            f"""
+            UPDATE {account_attr_table}
+            SET value='True'
+            WHERE value='true'
+            """
+        )
+        execute(
+            f"""
+            UPDATE {account_attr_table}
+            SET value='False'
+            WHERE value='false'
+            """
+        )
+        execute(
+            f"""
+            UPDATE {rse_attr_table}
+            SET value='True'
+            WHERE value='true'
+            """
+        )
+        execute(
+            f"""
+            UPDATE {rse_attr_table}
+            SET value='False'
+            WHERE value='false'
+            """
+        )
 
     # Second, change __selected__ true/false to 0/1. This cannot be done
     # automatically, as we don't know which ones were previously stored as INT.

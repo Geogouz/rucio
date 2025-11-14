@@ -12,12 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-''' remove history table pks '''
+""" remove history table pks """
 
-from alembic.op import create_primary_key, drop_constraint
-
-from rucio.db.sqla.migrate_repo import drop_current_primary_key, try_drop_constraint
-from rucio.db.sqla.migrate_repo.ddl_helpers import is_current_dialect
+from rucio.db.sqla.migrate_repo import (
+    create_primary_key,
+    is_current_dialect,
+    try_drop_primary_key,
+)
 
 # Alembic revision identifiers
 revision = '739064d31565'
@@ -25,28 +26,20 @@ down_revision = 'ccdbcd48206e'
 
 
 def upgrade():
-    '''
+    """
     Upgrade the database to this revision
-    '''
+    """
 
     if is_current_dialect('oracle', 'mysql', 'postgresql'):
         # CONFIGS_HISTORY
-        if is_current_dialect('oracle', 'postgresql'):
-            drop_current_primary_key('configs_history')
-            for pk_name in ('CONFIGS_HISTORY_PK', 'configs_history_pk', 'configs_history_pkey', 'PRIMARY'):
-                try_drop_constraint(pk_name, 'configs_history')
-        else:
-            drop_constraint('CONFIGS_HISTORY_PK', 'configs_history', type_='primary')
+        try_drop_primary_key('configs_history')
 
 
 def downgrade():
-    '''
+    """
     Downgrade the database to the previous revision
-    '''
+    """
 
     if is_current_dialect('oracle', 'mysql', 'postgresql'):
-        if is_current_dialect('oracle', 'postgresql'):
-            drop_current_primary_key('configs_history')
-            for pk_name in ('CONFIGS_HISTORY_PK', 'configs_history_pk', 'configs_history_pkey', 'PRIMARY'):
-                try_drop_constraint(pk_name, 'configs_history')
+        try_drop_primary_key('configs_history')
         create_primary_key('CONFIGS_HISTORY_PK', 'configs_history', ['section', 'opt', 'updated_at'])

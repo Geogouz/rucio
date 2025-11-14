@@ -12,18 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-''' new table for lifetime model exceptions '''
+""" new table for lifetime model exceptions """
 
 import datetime
 
 import sqlalchemy as sa
-from alembic import op
-from alembic.op import create_check_constraint, create_primary_key, create_table, drop_table
+from alembic.op import execute
 from sqlalchemy.dialects import postgresql as pg
 
 from rucio.db.sqla.constants import DIDType, LifetimeExceptionsState
-from rucio.db.sqla.migrate_repo import create_enum_if_absent_block, drop_enum_sql
-from rucio.db.sqla.migrate_repo.ddl_helpers import get_effective_schema, is_current_dialect
+from rucio.db.sqla.migrate_repo import (
+    create_check_constraint,
+    create_enum_if_absent_block,
+    create_primary_key,
+    create_table,
+    drop_table,
+    get_effective_schema,
+    is_current_dialect,
+    try_drop_enum,
+)
 from rucio.db.sqla.types import GUID
 
 # Alembic revision identifiers
@@ -32,9 +39,9 @@ down_revision = 'fe8ea2fa9788'
 
 
 def upgrade():
-    '''
+    """
     Upgrade the database to this revision
-    '''
+    """
 
     if is_current_dialect('oracle', 'mysql', 'postgresql'):
         schema = get_effective_schema()
@@ -44,14 +51,14 @@ def upgrade():
         state_values = [state.value for state in LifetimeExceptionsState]
 
         if is_pg:
-            op.execute(
+            execute(
                 create_enum_if_absent_block(
                     'LIFETIME_EXCEPT_TYPE_CHK',
                     did_type_values,
                     schema=schema,
                 )
             )
-            op.execute(
+            execute(
                 create_enum_if_absent_block(
                     'LIFETIME_EXCEPT_STATE_CHK',
                     state_values,
@@ -104,16 +111,16 @@ def upgrade():
 
 
 def downgrade():
-    '''
+    """
     Downgrade the database to the previous revision
-    '''
+    """
+
     # Handle PostgreSQL separately to drop enum types after dropping the table.
     if is_current_dialect('postgresql'):
-        schema = get_effective_schema()
         drop_table('lifetime_except')
         # Drop enums so a subsequent upgrade can recreate them cleanly.
-        op.execute(drop_enum_sql('LIFETIME_EXCEPT_TYPE_CHK', schema=schema))
-        op.execute(drop_enum_sql('LIFETIME_EXCEPT_STATE_CHK', schema=schema))
+        try_drop_enum('LIFETIME_EXCEPT_TYPE_CHK')
+        try_drop_enum('LIFETIME_EXCEPT_STATE_CHK')
 
     # Other dialects: just drop the table.
     elif is_current_dialect('oracle', 'mysql'):

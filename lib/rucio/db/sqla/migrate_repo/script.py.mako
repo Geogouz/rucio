@@ -16,7 +16,7 @@
 
 import sqlalchemy as sa
 from alembic.op import execute
-from rucio.db.sqla.migrate_repo.ddl_helpers import (
+from rucio.db.sqla.migrate_repo import (
     get_effective_schema,
     is_current_dialect,
 )

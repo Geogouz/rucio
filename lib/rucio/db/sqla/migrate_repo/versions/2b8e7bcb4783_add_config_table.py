@@ -12,15 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-''' add config table '''
+""" add config table """
 
 import datetime
 
 import sqlalchemy as sa
-from alembic.op import create_check_constraint, create_primary_key, create_table, drop_table
 
-from rucio.db.sqla.migrate_repo import try_drop_constraint
-from rucio.db.sqla.migrate_repo.ddl_helpers import is_current_dialect
+from rucio.db.sqla.migrate_repo import (
+    create_check_constraint,
+    create_primary_key,
+    create_table,
+    drop_table,
+    is_current_dialect,
+    try_drop_constraint,
+    try_drop_primary_key,
+)
 
 # Alembic revision identifiers
 revision = '2b8e7bcb4783'
@@ -28,9 +34,9 @@ down_revision = 'd91002c5841'
 
 
 def upgrade():
-    '''
+    """
     Upgrade the database to this revision
-    '''
+    """
 
     if is_current_dialect('oracle', 'mysql', 'postgresql'):
         create_table('configs',
@@ -54,16 +60,16 @@ def upgrade():
 
 
 def downgrade():
-    '''
+    """
     Downgrade the database to the previous revision
-    '''
+    """
 
     if is_current_dialect('oracle', 'mysql', 'postgresql'):
         drop_table('configs')
         drop_table('configs_history')
 
     elif is_current_dialect('postgresql'):
-        try_drop_constraint('configs_pk', 'configs')
+        try_drop_primary_key('configs')
         try_drop_constraint('configs_created_nn', 'configs')
         try_drop_constraint('configs_updated_nn', 'configs')
         drop_table('configs')

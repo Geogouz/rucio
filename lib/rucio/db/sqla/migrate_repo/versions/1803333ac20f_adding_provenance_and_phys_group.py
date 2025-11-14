@@ -12,12 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-''' adding provenance and phys_group '''
+""" adding provenance and phys_group """
 
 import sqlalchemy as sa
-from alembic.op import add_column, drop_column
 
-from rucio.db.sqla.migrate_repo.ddl_helpers import get_effective_schema, is_current_dialect
+from rucio.db.sqla.migrate_repo import (
+    add_column,
+    drop_column,
+    is_current_dialect,
+)
 
 # Alembic revision identifiers
 revision = '1803333ac20f'
@@ -25,22 +28,20 @@ down_revision = '4c3a4acfe006'
 
 
 def upgrade():
-    '''
+    """
     Upgrade the database to this revision
-    '''
+    """
 
     if is_current_dialect('oracle', 'mysql', 'postgresql'):
-        schema = get_effective_schema()
-        add_column('dids', sa.Column('provenance', sa.String(2)), schema=schema)
-        add_column('dids', sa.Column('phys_group', sa.String(25)), schema=schema)
+        add_column('dids', sa.Column('provenance', sa.String(2)))
+        add_column('dids', sa.Column('phys_group', sa.String(25)))
 
 
 def downgrade():
-    '''
+    """
     Downgrade the database to the previous revision
-    '''
+    """
 
     if is_current_dialect('oracle', 'mysql', 'postgresql'):
-        schema = get_effective_schema()
-        drop_column('dids', 'provenance', schema=schema)
-        drop_column('dids', 'phys_group', schema=schema)
+        drop_column('dids', 'provenance')
+        drop_column('dids', 'phys_group')

@@ -12,17 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-''' Add deleted_did_meta table '''
+""" Add deleted_did_meta table """
 
 import sqlalchemy as sa
-from alembic import op
-from alembic.op import create_index, create_primary_key, create_table, drop_table
+from alembic.op import execute
 from sqlalchemy.dialects import postgresql as pg
 
-from rucio.db.sqla.migrate_repo.ddl_helpers import get_effective_schema, is_current_dialect
-from rucio.db.sqla.migrate_repo import create_enum_if_absent_block, drop_enum_sql
-
 from rucio.db.sqla.constants import DIDType
+from rucio.db.sqla.migrate_repo import (
+    create_enum_if_absent_block,
+    create_index,
+    create_primary_key,
+    create_table,
+    drop_table,
+    get_effective_schema,
+    is_current_dialect,
+    try_drop_enum,
+)
 from rucio.db.sqla.types import JSON
 
 # Alembic revision identifiers
@@ -31,9 +37,9 @@ down_revision = 'b5493606bbf5'
 
 
 def upgrade():
-    '''
+    """
     Upgrade the database to this revision
-    '''
+    """
 
     if is_current_dialect('oracle', 'mysql', 'postgresql'):
 
@@ -41,11 +47,10 @@ def upgrade():
         if is_current_dialect('postgresql'):
             schema = get_effective_schema()
             # Emulate "CREATE TYPE IF NOT EXISTS" safely
-            op.execute(
+            execute(
                 create_enum_if_absent_block(
                     'DEL_DID_META_DID_TYPE_CHK',
                     [e.value for e in DIDType],
-                    schema=schema
                 )
             )
             did_type_enum = pg.ENUM(
@@ -79,14 +84,13 @@ def upgrade():
 
 
 def downgrade():
-    '''
+    """
     Downgrade the database to the previous revision
-    '''
+    """
 
     if is_current_dialect('oracle', 'mysql', 'postgresql'):
         drop_table('deleted_did_meta')
 
         # On PostgreSQL drop the enum type once the table has been removed.
         if is_current_dialect('postgresql'):
-            schema = get_effective_schema()
-            op.execute(drop_enum_sql('DEL_DID_META_DID_TYPE_CHK', schema=schema))
+            try_drop_enum('DEL_DID_META_DID_TYPE_CHK')

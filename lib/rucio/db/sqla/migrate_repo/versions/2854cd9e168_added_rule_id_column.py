@@ -12,12 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-''' added_rule_id_column '''
+""" added_rule_id_column """
 
 import sqlalchemy as sa
-from alembic.op import add_column, drop_column
 
-from rucio.db.sqla.migrate_repo.ddl_helpers import get_effective_schema, is_current_dialect
+from rucio.db.sqla.migrate_repo import (
+    add_column,
+    drop_column,
+    is_current_dialect,
+)
 from rucio.db.sqla.types import GUID
 
 # Alembic revision identifiers
@@ -26,22 +29,20 @@ down_revision = '35ef10d1e11b'
 
 
 def upgrade():
-    '''
+    """
     Upgrade the database to this revision
-    '''
+    """
 
     if is_current_dialect('oracle', 'mysql', 'postgresql'):
-        schema = get_effective_schema()
-        add_column('requests', sa.Column('rule_id', GUID()), schema=schema)
-        add_column('requests_history', sa.Column('rule_id', GUID()), schema=schema)
+        add_column('requests', sa.Column('rule_id', GUID()))
+        add_column('requests_history', sa.Column('rule_id', GUID()))
 
 
 def downgrade():
-    '''
+    """
     Downgrade the database to the previous revision
-    '''
+    """
 
     if is_current_dialect('oracle', 'mysql', 'postgresql'):
-        schema = get_effective_schema()
-        drop_column('requests', 'rule_id', schema=schema)
-        drop_column('requests_history', 'rule_id', schema=schema)
+        drop_column('requests', 'rule_id')
+        drop_column('requests_history', 'rule_id')

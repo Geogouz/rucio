@@ -12,22 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-''' add notification column to rules '''
+""" add notification column to rules """
 
 import sqlalchemy as sa
-from alembic import op
-from alembic.op import add_column, drop_column
+from alembic.op import execute
 
 from rucio.db.sqla.constants import RuleNotification
 from rucio.db.sqla.migrate_repo import (
+    add_column,
     create_enum_if_absent_block,
-    drop_enum_sql,
-    try_drop_constraint,
-)
-from rucio.db.sqla.migrate_repo.ddl_helpers import (
-    get_effective_schema,
+    drop_column,
     is_current_dialect,
     qualify_table,
+    try_drop_constraint,
+    try_drop_enum,
 )
 
 # Alembic revision identifiers
@@ -36,52 +34,60 @@ down_revision = '14ec5aeb64cf'
 
 
 def upgrade():
-    '''
+    """
     Upgrade the database to this revision
-    '''
+    """
 
-    schema = get_effective_schema()
-    rules_table = qualify_table('rules', schema)
+    rules_table = qualify_table('rules')
 
     if is_current_dialect('oracle', 'mysql'):
         add_column('rules', sa.Column('notification', sa.Enum(RuleNotification,
                                                               name='RULES_NOTIFICATION_CHK',
                                                               create_constraint=True,
                                                               values_callable=lambda obj: [e.value for e in obj]),
-                                      default=RuleNotification.NO), schema=schema)
+                                      default=RuleNotification.NO))
     elif is_current_dialect('postgresql'):
         enum_values = [notification.value for notification in RuleNotification]
-        op.execute(
+        execute(
             create_enum_if_absent_block(
                 'RULES_NOTIFICATION_CHK',
                 enum_values,
-                schema=schema,
             )
         )
-        op.execute(
-            f'ALTER TABLE {rules_table} ADD COLUMN notification "RULES_NOTIFICATION_CHK"'
+        execute(
+            f"""
+            ALTER TABLE {rules_table}
+            ADD COLUMN notification {rules_notification_enum}
+            """
         )
 
 
 def downgrade():
-    '''
+    """
     Downgrade the database to the previous revision
-    '''
+    """
 
-    schema = get_effective_schema()
-    rules_table = qualify_table('rules', schema)
+    rules_table = qualify_table('rules')
 
     if is_current_dialect('oracle'):
         try_drop_constraint('RULES_NOTIFICATION_CHK', 'rules')
-        drop_column('rules', 'notification', schema=schema)
+        drop_column('rules', 'notification')
 
     elif is_current_dialect('postgresql'):
-        op.execute(
-            f'ALTER TABLE {rules_table} '
-            'DROP CONSTRAINT IF EXISTS "RULES_NOTIFICATION_CHK", ALTER COLUMN notification TYPE CHAR'
+        execute(
+            f"""
+            ALTER TABLE {rules_table}
+            DROP CONSTRAINT IF EXISTS "RULES_NOTIFICATION_CHK",
+            ALTER COLUMN notification TYPE CHAR
+            """
         )
-        op.execute(f'ALTER TABLE {rules_table} DROP COLUMN notification')
-        op.execute(drop_enum_sql('RULES_NOTIFICATION_CHK', schema=schema))
+        execute(
+            f"""
+            ALTER TABLE {rules_table}
+            DROP COLUMN notification
+            """
+        )
+        try_drop_enum('RULES_NOTIFICATION_CHK')
 
     elif is_current_dialect('mysql'):
-        drop_column('rules', 'notification', schema=schema)
+        drop_column('rules', 'notification')

@@ -12,12 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-''' add request external_host '''
+""" add request external_host """
 
 import sqlalchemy as sa
-from alembic.op import add_column, drop_column
 
-from rucio.db.sqla.migrate_repo.ddl_helpers import get_effective_schema, is_current_dialect
+from rucio.db.sqla.migrate_repo import (
+    add_column,
+    drop_column,
+    is_current_dialect,
+)
 
 # Alembic revision identifiers
 revision = '14ec5aeb64cf'
@@ -25,20 +28,18 @@ down_revision = '52fd9f4916fa'
 
 
 def upgrade():
-    '''
+    """
     Upgrade the database to this revision
-    '''
+    """
 
     if is_current_dialect('oracle', 'mysql', 'postgresql'):
-        schema = get_effective_schema()
-        add_column('requests', sa.Column('external_host', sa.String(256)), schema=schema)
+        add_column('requests', sa.Column('external_host', sa.String(256)))
 
 
 def downgrade():
-    '''
+    """
     Downgrade the database to the previous revision
-    '''
+    """
 
     if is_current_dialect('oracle', 'mysql', 'postgresql'):
-        schema = get_effective_schema()
-        drop_column('requests', 'external_host', schema=schema)
+        drop_column('requests', 'external_host')

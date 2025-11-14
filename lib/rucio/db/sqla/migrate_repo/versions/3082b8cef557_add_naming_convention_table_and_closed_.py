@@ -12,27 +12,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-''' add convention table and closed_at to DIDs '''
+""" add convention table and closed_at to DIDs """
 
 import datetime
 
 import sqlalchemy as sa
-from alembic import op
-from alembic.op import (
-    add_column,
-    create_check_constraint,
-    create_foreign_key,
-    create_primary_key,
-    create_table,
-    drop_column,
-    drop_table,
-)
+from alembic.op import create_foreign_key, execute
 from sqlalchemy.dialects import postgresql as pg
 
 from rucio.common.schema import get_schema_value
 from rucio.db.sqla.constants import KeyType
-from rucio.db.sqla.migrate_repo import create_enum_if_absent_block, drop_enum_sql
-from rucio.db.sqla.migrate_repo.ddl_helpers import get_effective_schema, is_current_dialect
+from rucio.db.sqla.migrate_repo import (
+    add_column,
+    create_check_constraint,
+    create_enum_if_absent_block,
+    create_primary_key,
+    create_table,
+    drop_column,
+    drop_table,
+    get_effective_schema,
+    is_current_dialect,
+    try_drop_enum,
+)
 
 # Alembic revision identifiers
 revision = '3082b8cef557'
@@ -40,23 +41,22 @@ down_revision = '269fee20dee9'
 
 
 def upgrade():
-    '''
+    """
     Upgrade the database to this revision
-    '''
+    """
 
     if is_current_dialect('oracle', 'mysql', 'postgresql'):
         schema = get_effective_schema()
 
-        add_column('dids', sa.Column('closed_at', sa.DateTime), schema=schema)
-        add_column('contents_history', sa.Column('deleted_at', sa.DateTime), schema=schema)
+        add_column('dids', sa.Column('closed_at', sa.DateTime))
+        add_column('contents_history', sa.Column('deleted_at', sa.DateTime))
 
         enum_values = [key_type.value for key_type in KeyType]
         if is_current_dialect('postgresql'):
-            op.execute(
+            execute(
                 create_enum_if_absent_block(
                     'CVT_TYPE_CHK',
                     enum_values,
-                    schema=schema,
                 )
             )
             convention_type = pg.ENUM(
@@ -89,20 +89,19 @@ def upgrade():
 
 
 def downgrade():
-    '''
+    """
     Downgrade the database to the previous revision
-    '''
-    schema = get_effective_schema()
+    """
 
     if is_current_dialect('oracle', 'mysql'):
-        drop_column('dids', 'closed_at', schema=schema)
-        drop_column('contents_history', 'deleted_at', schema=schema)
-        drop_table('naming_conventions', schema=schema)
+        drop_column('dids', 'closed_at')
+        drop_column('contents_history', 'deleted_at')
+        drop_table('naming_conventions')
 
     elif is_current_dialect('postgresql'):
         # Drop the table first to remove dependencies, then drop the enum type,
         # then remove the added columns.
-        drop_table('naming_conventions', schema=schema)
-        op.execute(drop_enum_sql('CVT_TYPE_CHK', schema=schema))
-        drop_column('dids', 'closed_at', schema=schema)
-        drop_column('contents_history', 'deleted_at', schema=schema)
+        drop_table('naming_conventions')
+        try_drop_enum('CVT_TYPE_CHK')
+        drop_column('dids', 'closed_at')
+        drop_column('contents_history', 'deleted_at')

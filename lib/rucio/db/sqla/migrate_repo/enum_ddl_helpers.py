@@ -48,120 +48,28 @@ Operational notes
   schema argument directly when enums live elsewhere.
 """
 
-from collections.abc import Iterable, Sequence
-from typing import Optional, Tuple
-from sqlalchemy.engine.default import DefaultDialect
-from rucio.db.sqla.migrate_repo.ddl_helpers import get_migration_context, get_effective_schema
+from typing import TYPE_CHECKING
+
+from alembic import op
+
+from .ddl_helpers import (
+    get_current_dialect,
+    get_effective_schema,
+    get_server_version_info,
+    quote_identifier,
+    quote_literal,
+)
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Sequence
+    from typing import Optional
 
 
-def _get_identifier_preparer():
-    """
-    Return an SQLAlchemy identifier preparer for the current dialect.
-
-    When no migration context is present, the preparer from
-    `sqlalchemy.engine.default.DefaultDialect` is used so quoting continues
-    to work in unit tests and REPL sessions.
-
-    Returns
-    -------
-    sqlalchemy.sql.compiler.IdentifierPreparer
-        The identifier preparer appropriate for the active (or default) dialect.
-
-    Examples
-    --------
-    >>> preparer = _get_identifier_preparer()
-    >>> preparer.quote_identifier("request_state")
-    '"request_state"'
-    """
-
-    ctx = get_migration_context()
-    dialect = getattr(ctx, "dialect", None) if ctx else None
-    if dialect is None:
-        dialect = DefaultDialect()
-    return dialect.identifier_preparer
-
-
-def _quote_identifier(identifier: str) -> str:
-    """
-    Quote a SQL identifier for safe use in raw statements.
-
-    Parameters
-    ----------
-    identifier : str
-        The identifier to quote. Empty strings are returned unchanged so that
-        callers can forward optional schema names directly.
-
-    Returns
-    -------
-    str
-        The quoted identifier (or the empty string if *identifier* was empty).
-
-    Examples
-    --------
-    >>> _quote_identifier("rucio")
-    '"rucio"'
-    >>> _quote_identifier("request_state")
-    '"request_state"'
-    """
-
-    preparer = _get_identifier_preparer()
-    if not identifier:
-        return identifier
-    return preparer.quote_identifier(identifier)
-
-
-def _quote_literal(value: str) -> str:
-    """
-    Quote an enum label as a SQL literal using single quotes.
-
-    Embedded single quotes are doubled to preserve the literal value exactly as
-    PostgreSQL expects.
-
-    Parameters
-    ----------
-    value : str
-        The enum label to quote.
-
-    Returns
-    -------
-    str
-        The quoted SQL literal.
-
-    Examples
-    --------
-    >>> _quote_literal("REPLICATING")
-    "'REPLICATING'"
-    >>> _quote_literal("DON'T_RETRY")
-    "'DON''T_RETRY'"
-    """
-
-    escaped = value.replace("'", "''")
-    return f"'{escaped}'"
-
-
-def _server_version_info():
-    """
-    Return the server version tuple reported by the current dialect.
-
-    Returns
-    -------
-    tuple[int, int, int] | tuple[int, int] | None
-        The tuple provided by ``dialect.server_version_info`` (commonly
-        ``(major, minor[, patch])``) when the dialect exposes version
-        information, or ``None`` when the details are unavailable.
-
-    Examples
-    --------
-    >>> v = _server_version_info()
-    >>> if v and v >= (12, 0):  # enable PG12+ behavior
-    ...     pass
-    """
-
-    ctx = get_migration_context()
-    return getattr(getattr(ctx, "dialect", None), "server_version_info", None)
-
-
-def _validate_identifier(name: str, *, allow_qualified: bool = False) -> None:
+def _validate_identifier(
+        name: str,
+        *,
+        allow_qualified: bool = False
+) -> None:
     """
     Validate that *name* satisfies PostgreSQL identifier requirements.
 
@@ -170,7 +78,7 @@ def _validate_identifier(name: str, *, allow_qualified: bool = False) -> None:
     * identifiers must be strings and non-empty;
     * unqualified identifiers must not contain dots when ``allow_qualified`` is ``False``;
     * qualified identifiers must not contain empty segments or exceed the 63-byte limit per segment;
-    * the NUL byte (``"\x00"``) is rejected in every case.
+    * the NUL byte (``"\\x00"``) is rejected in every case.
 
     Parameters
     ----------
@@ -233,7 +141,7 @@ def _validate_identifier(name: str, *, allow_qualified: bool = False) -> None:
         _check(name)
 
 
-def _validate_enum_labels(values: Iterable[str]) -> Tuple[str, ...]:
+def _validate_enum_labels(values: 'Iterable[str]') -> tuple[str, ...]:
     """
     Validate enum labels and return them in a tuple.
 
@@ -255,11 +163,11 @@ def _validate_enum_labels(values: Iterable[str]) -> Tuple[str, ...]:
     Raises
     ------
     TypeError
-        If any label is not a string (excluding ``None`` values, which raise
-        ``ValueError``).
+        If *values* is a string instead of an iterable, or any label is not a
+        string (excluding ``None`` values, which raise ``ValueError``).
     ValueError
-        If any label is ``None`` or empty, contains the NUL byte, exceeds 63
-        bytes in UTF‑8, or duplicates another label.
+        If no labels are supplied, or any label is ``None`` or empty, contains
+        the NUL byte, exceeds 63 bytes in UTF‑8, or duplicates another label.
 
     Examples
     --------
@@ -267,7 +175,13 @@ def _validate_enum_labels(values: Iterable[str]) -> Tuple[str, ...]:
     ('FILE', 'DATASET', 'CONTAINER')
     """
 
+    if isinstance(values, str):
+        raise TypeError("Enum labels must be provided as an iterable of strings, not a single string.")
+
     labels = tuple(values)
+    if not labels:
+        raise ValueError("Enum labels iterable must not be empty.")
+
     seen = set()
     for label in labels:
         if label is None:
@@ -286,12 +200,13 @@ def _validate_enum_labels(values: Iterable[str]) -> Tuple[str, ...]:
     return labels
 
 
-def _assert_postgresql():
+def _assert_postgresql() -> None:
     """
-    Ensure the active Alembic dialect is PostgreSQL (or unknown).
+    Ensure the active Alembic dialect is PostgreSQL (or unknown/offline).
 
     The helpers are implemented exclusively for PostgreSQL. When the dialect is
-    known and differs, a clear exception is raised.
+    known and differs, a clear exception is raised. Uses the shared helpers so
+    that offline SQL rendering (no live MigrationContext) is also checked.
 
     Raises
     ------
@@ -303,15 +218,14 @@ def _assert_postgresql():
     >>> _assert_postgresql()  # no-op under PostgreSQL/unknown
     """
 
-    ctx = get_migration_context()
-    name = getattr(getattr(ctx, "dialect", None), "name", None)
+    name = get_current_dialect()
     if name is not None and name != "postgresql":
         raise NotImplementedError("These enum DDL helpers are for PostgreSQL only.")
 
 
 def render_enum_name(
         name: str,
-        schema: Optional[str] = None
+        schema: 'Optional[str]' = None
 ) -> str:
     """
     Render a schema-qualified, safely-quoted enum type name.
@@ -321,7 +235,8 @@ def render_enum_name(
     * Validates that ``name`` is an unqualified PostgreSQL identifier
       (no dots, non-empty, <= 63 bytes, no NULs).
     * Chooses the effective schema:
-      - ``schema`` argument if provided and non-empty, otherwise
+      - ``schema`` argument if provided and non-empty; an empty string (``""``) is
+        treated like ``None``, otherwise
       - `get_effective_schema` when available, else no schema.
     * Quotes schema and name with SQLAlchemy's identifier preparer so the
       result is safe to interpolate into raw SQL.
@@ -330,9 +245,9 @@ def render_enum_name(
     ----------
     name : str
         Unqualified enum type name (e.g. ``"request_state"``).
-    schema : str | None, optional
-        Target schema. If ``None``, uses `get_effective_schema` when available;
-        otherwise emits an unqualified type name.
+    schema : Optional[str]
+        Target schema. If ``None`` or an empty string (``""``), uses `get_effective_schema`
+        when available; otherwise emits an unqualified type name.
 
     Returns
     -------
@@ -358,15 +273,15 @@ def render_enum_name(
     """
 
     _validate_identifier(name, allow_qualified=False)
-    effective_schema = get_effective_schema() if schema is None else schema
+    effective_schema = get_effective_schema() if schema in (None, "") else schema
     if effective_schema:
         _validate_identifier(effective_schema, allow_qualified=False)
-        return f"{_quote_identifier(effective_schema)}.{_quote_identifier(name)}"
-    return _quote_identifier(name)
+        return f"{quote_identifier(effective_schema)}.{quote_identifier(name)}"
+    return quote_identifier(name)
 
 
 def enum_values_clause(
-        values: Iterable[str]
+        values: 'Iterable[str]'
 ) -> str:
     """
     Return a comma-separated list of quoted enum labels.
@@ -388,14 +303,11 @@ def enum_values_clause(
     Raises
     ------
     TypeError
-        If any label is not a string.
+        If *values* is a string instead of an iterable, or any label is not a
+        string.
     ValueError
-        If any label is ``None`` or empty, contains the NUL byte, exceeds 63
-        bytes in UTF‑8, or duplicates another label.
-
-    See Also
-    --------
-    create_enum_sql : Builds the full ``CREATE TYPE ... AS ENUM (...)`` SQL.
+        If no labels are supplied, or any label is ``None`` or empty, contains
+        the NUL byte, exceeds 63 bytes in UTF‑8, or duplicates another label.
 
     Examples
     --------
@@ -404,14 +316,14 @@ def enum_values_clause(
     """
 
     validated = _validate_enum_labels(values)
-    return ", ".join(_quote_literal(value) for value in validated)
+    return ", ".join(quote_literal(value) for value in validated)
 
 
 def create_enum_sql(
         name: str,
-        values: Iterable[str],
+        values: 'Iterable[str]',
         *,
-        schema: Optional[str] = None,
+        schema: 'Optional[str]' = None,
         if_not_exists: bool = False,
 ) -> str:
     """
@@ -427,12 +339,12 @@ def create_enum_sql(
         Unqualified enum type name.
     values : Iterable[str]
         Iterable of enum labels. Order defines the enum's sort ordering.
-    schema : str | None, optional
+    schema : Optional[str]
         Target schema. If omitted, `get_effective_schema` is used when available;
         otherwise the type name is unqualified.
     if_not_exists : bool, optional
         Not implemented. Kept for parity with other helpers.
-        Use :func:`create_enum_if_absent_block` for idempotent creation.
+        Use :func:`create_enum_if_absent_sql` for idempotent creation.
 
     Returns
     -------
@@ -443,7 +355,7 @@ def create_enum_sql(
     Raises
     ------
     NotImplementedError
-        If ``if_not_exists=True`` (use :func:`create_enum_if_absent_block` instead).
+        If ``if_not_exists=True`` (use :func:`create_enum_if_absent_sql` instead).
     TypeError
         If ``name`` or any label fails type validation.
     ValueError
@@ -464,7 +376,7 @@ def create_enum_sql(
     _assert_postgresql()
     if if_not_exists:
         raise NotImplementedError(
-            "PostgreSQL lacks 'CREATE TYPE IF NOT EXISTS'; use create_enum_if_absent_block()."
+            "PostgreSQL lacks 'CREATE TYPE IF NOT EXISTS'; use create_enum_if_absent_sql()."
         )
 
     _validate_identifier(name, allow_qualified=False)
@@ -477,7 +389,7 @@ def create_enum_sql(
 def drop_enum_sql(
         name: str,
         *,
-        schema: Optional[str] = None,
+        schema: 'Optional[str]' = None,
         if_exists: bool = True,
         cascade: bool = False,
 ) -> str:
@@ -488,7 +400,7 @@ def drop_enum_sql(
     ----------
     name : str
         Unqualified enum type name.
-    schema : str | None, optional
+    schema : Optional[str]
         Schema of the type. If omitted, `get_effective_schema` is used when available;
         otherwise an unqualified name is emitted.
     if_exists : bool, default True
@@ -530,17 +442,45 @@ def drop_enum_sql(
     return " ".join(parts)
 
 
+def try_drop_enum(
+        name: str,
+        *,
+        schema: 'Optional[str]' = None,
+        if_exists: bool = True,
+        cascade: bool = False,
+) -> None:
+    """
+    Execute :func:`drop_enum_sql` via Alembic's :func:`op.execute`.
+
+    This thin wrapper keeps migrations readable by skipping the explicit
+    ``op.execute(drop_enum_sql(...))`` pattern when no additional SQL needs to
+    be composed.
+
+    Examples
+    --------
+    >>> try_drop_enum("request_state", schema="rucio")
+    >>> try_drop_enum("request_state", schema="rucio", cascade=True)
+    """
+
+    op.execute(drop_enum_sql(
+        name,
+        schema=schema,
+        if_exists=if_exists,
+        cascade=cascade,
+    ))
+
+
 def alter_enum_add_value_sql(
         name: str,
         value: str,
         *,
-        schema: Optional[str] = None,
-        before: Optional[str] = None,
-        after: Optional[str] = None,
+        schema: 'Optional[str]' = None,
+        before: 'Optional[str]' = None,
+        after: 'Optional[str]' = None,
         if_not_exists: bool = False,
 ) -> str:
     """
-    Build an ``ALTER TYPE ... ADD VALUE`` statement (PostgreSQL ≥ 10 is preferred).
+    Build an ``ALTER TYPE ... ADD VALUE`` statement for PostgreSQL.
 
     The statement can place the new label before or after an existing label.
     On newer PostgreSQL versions, ``IF NOT EXISTS`` may be used to make the
@@ -552,16 +492,16 @@ def alter_enum_add_value_sql(
         Unqualified enum type name.
     value : str
         New label to add.
-    before : str | None, optional
-        Insert the new label before this existing label.
-    after : str | None, optional
-        Insert the new label after this existing label.
-    schema : str | None, optional
+    schema : Optional[str]
         Optional schema where the type exists.
+    before : Optional[str]
+        Insert the new label before this existing label.
+    after : Optional[str]
+        Insert the new label after this existing label.
     if_not_exists : bool, optional
         If ``True``, prefer ``IF NOT EXISTS`` on PostgreSQL 9.3+; otherwise
-        emit an idempotent DO block that ignores duplicate_object on older
-        servers or when the version is unknown.
+        emit an idempotent DO block that ignores ``duplicate_object`` on
+        older servers or when the version is unknown.
 
     Returns
     -------
@@ -572,15 +512,19 @@ def alter_enum_add_value_sql(
 
     Raises
     ------
+    TypeError
+        If ``name`` or any provided label (``value``, ``before``, ``after``)
+        is not a string.
     ValueError
-        If both ``before`` and ``after`` are provided; if a position label is empty;
-        if a position label equals ``value``; or if ``value`` itself is invalid
-        (``None``, empty, contains NUL, exceeds 63 bytes).
+        If both ``before`` and ``after`` are provided; if a position label is
+        empty or equals ``value``; or if any label is otherwise invalid
+        (``None``, empty, contains NUL, or exceeds the 63‑byte limit).
 
     Notes
     -----
-    * On PostgreSQL < 12, ``ALTER TYPE ... ADD VALUE`` cannot run inside a transaction block.
-      On 12+, it can, but the new label remains unusable until the transaction commits.
+    * On PostgreSQL < 12, ``ALTER TYPE ... ADD VALUE`` cannot run inside a
+      transaction block. On 12+, it can, but the new label remains unusable
+      until the transaction commits.
 
     Examples
     --------
@@ -588,25 +532,41 @@ def alter_enum_add_value_sql(
     >>> # Add a value after an existing label
     >>> op.execute(alter_enum_add_value_sql("request_state", "ARCHIVED", after="DONE", schema="rucio"))
     >>> # Idempotent add (uses native IF NOT EXISTS when available; otherwise a DO block)
-    >>> op.execute(alter_enum_add_value_sql("request_state", "RETRYING", before="SUBMITTED", schema="rucio", if_not_exists=True))
+    >>> op.execute(alter_enum_add_value_sql(
+    ...     "request_state",
+    ...     "RETRYING",
+    ...     before="SUBMITTED",
+    ...     schema="rucio",
+    ...     if_not_exists=True,
+    ... ))
     """
 
     _assert_postgresql()
     _validate_identifier(name, allow_qualified=False)
 
-    if before and after:
+    # Disallow contradictory positioning instructions explicitly.
+    if before is not None and after is not None:
         raise ValueError("'before' and 'after' are mutually exclusive")
 
+    # Validate the new label itself (type, length, NUL, emptiness, etc.).
     _validate_enum_labels((value,))
 
+    # Empty position labels are rejected explicitly for clearer error messages.
     if before == "" or after == "":
         raise ValueError("Position labels (before/after) must be non-empty if provided.")
-    if before is not None and before == value:
-        raise ValueError("'before' label cannot equal the value being added.")
-    if after is not None and after == value:
-        raise ValueError("'after' label cannot equal the value being added.")
 
-    ver = _server_version_info()
+    # Validate position labels when supplied (they are enum labels, not identifiers).
+    if before is not None:
+        _validate_enum_labels((before,))
+        if before == value:
+            raise ValueError("'before' label cannot equal the value being added.")
+
+    if after is not None:
+        _validate_enum_labels((after,))
+        if after == value:
+            raise ValueError("'after' label cannot equal the value being added.")
+
+    ver = get_server_version_info()
 
     # Build the core ALTER TYPE ... ADD VALUE statement parts
     parts = ["ALTER TYPE", render_enum_name(name, schema), "ADD VALUE"]
@@ -621,11 +581,11 @@ def alter_enum_add_value_sql(
         else:
             use_do_block = True
 
-    parts.append(_quote_literal(value))
+    parts.append(quote_literal(value))
     if before:
-        parts.extend(["BEFORE", _quote_literal(before)])
+        parts.extend(["BEFORE", quote_literal(before)])
     elif after:
-        parts.extend(["AFTER", _quote_literal(after)])
+        parts.extend(["AFTER", quote_literal(after)])
 
     stmt = " ".join(parts)
 
@@ -680,11 +640,11 @@ def enum_rename_sql(
     return " ".join(parts)
 
 
-def create_enum_if_absent_block(
+def create_enum_if_absent_sql(
         name: str,
-        values: Sequence[str],
+        values: 'Sequence[str]',
         *,
-        schema: Optional[str] = None,
+        schema: 'Optional[str]' = None,
 ) -> str:
     """
     Return a PL/pgSQL ``DO`` block that creates an enum only if missing.
@@ -699,7 +659,7 @@ def create_enum_if_absent_block(
         Unqualified enum type name.
     values : Sequence[str]
         Enum labels. Order defines the enum's sort ordering.
-    schema : str | None, optional
+    schema : Optional[str]
         Optional schema where the type should be created.
 
     Returns
@@ -717,11 +677,31 @@ def create_enum_if_absent_block(
     --------
     >>> from alembic import op
     >>> # Create the enum if it's not already present (idempotent)
-    >>> op.execute(create_enum_if_absent_block("did_type", ["FILE", "DATASET", "CONTAINER"], schema="rucio"))
+    >>> op.execute(create_enum_if_absent_sql("did_type", ["FILE", "DATASET", "CONTAINER"], schema="rucio"))
     """
 
     create_stmt = create_enum_sql(name, values, schema=schema, if_not_exists=False)
     return f"DO $$ BEGIN {create_stmt}; EXCEPTION WHEN duplicate_object THEN NULL; END $$ LANGUAGE plpgsql;"
+
+
+def try_create_enum_if_absent(
+        name: str,
+        values: 'Sequence[str]',
+        *,
+        schema: 'Optional[str]' = None,
+) -> None:
+    """
+    Execute :func:`create_enum_if_absent_sql` via Alembic's :func:`op.execute`.
+
+    This wrapper mirrors other helper functions to keep migrations concise when
+    no additional SQL composition is required.
+
+    Examples
+    --------
+    >>> try_create_enum_if_absent("did_type", ["FILE", "DATASET", "CONTAINER"], schema="rucio")
+    """
+
+    op.execute(create_enum_if_absent_sql(name, values, schema=schema))
 
 
 def enum_rename_value_sql(
@@ -827,9 +807,46 @@ def enum_set_schema_sql(
     return " ".join(["ALTER TYPE", render_enum_name(name, schema), "SET SCHEMA", _quote_identifier(new_schema)])
 
 
+def try_alter_enum_add_value(
+        name: str,
+        value: str,
+        *,
+        schema: 'Optional[str]' = None,
+        before: 'Optional[str]' = None,
+        after: 'Optional[str]' = None,
+        if_not_exists: bool = False,
+) -> None:
+    """
+    Execute :func:`alter_enum_add_value_sql` via Alembic's :func:`op.execute`.
+
+    This wrapper mirrors :func:`try_drop_enum` to keep migrations concise when
+    no additional SQL composition is required.
+
+    Examples
+    --------
+    >>> try_alter_enum_add_value("request_state", "ARCHIVED", after="DONE", schema="rucio")
+    >>> try_alter_enum_add_value(
+    ...     "request_state",
+    ...     "RETRYING",
+    ...     before="SUBMITTED",
+    ...     schema="rucio",
+    ...     if_not_exists=True,
+    ... )
+    """
+
+    op.execute(alter_enum_add_value_sql(
+        name,
+        value,
+        schema=schema,
+        before=before,
+        after=after,
+        if_not_exists=if_not_exists,
+    ))
+
+
 __all__ = [
-    "create_enum_if_absent_block",
     "alter_enum_add_value_sql",
+    "create_enum_if_absent_sql",
     "create_enum_sql",
     "drop_enum_sql",
     "enum_rename_value_sql",
@@ -837,4 +854,7 @@ __all__ = [
     "enum_set_schema_sql",
     "enum_values_clause",
     "render_enum_name",
+    "try_alter_enum_add_value",
+    "try_create_enum_if_absent",
+    "try_drop_enum",
 ]

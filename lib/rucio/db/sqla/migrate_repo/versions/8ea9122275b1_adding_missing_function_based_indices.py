@@ -12,11 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-''' Adding missing function based indices '''
+""" Adding missing function based indices """
 
-from alembic.op import create_foreign_key, create_index, drop_constraint, drop_index
+from alembic.op import create_foreign_key
 
-from rucio.db.sqla.migrate_repo.ddl_helpers import is_current_dialect
+from rucio.db.sqla.migrate_repo import (
+    create_index,
+    is_current_dialect,
+    try_drop_constraint,
+    try_drop_index,
+)
 
 # Alembic revision identifiers
 revision = '8ea9122275b1'
@@ -24,9 +29,9 @@ down_revision = '50280c53117c'
 
 
 def upgrade():
-    '''
+    """
     Upgrade the database to this revision
-    '''
+    """
     create_index('SUBSCRIPTIONS_STATE_IDX', 'subscriptions', ['state'])
     create_index('CONTENTS_RULE_EVAL_FB_IDX', 'contents', ['rule_evaluation'])
     create_index('REPLICAS_STATE_IDX', 'replicas', ['state'])
@@ -35,19 +40,19 @@ def upgrade():
 
 
 def downgrade():
-    '''
+    """
     Downgrade the database to the previous revision
-    '''
+    """
 
     if is_current_dialect('mysql'):
-        drop_constraint('BAD_REPLICAS_ACCOUNT_FK', 'bad_replicas', type_='foreignkey')
-        drop_constraint('REQUESTS_RSES_FK', 'requests', type_='foreignkey')
+        try_drop_constraint('BAD_REPLICAS_ACCOUNT_FK', 'bad_replicas')
+        try_drop_constraint('REQUESTS_RSES_FK', 'requests')
 
-    drop_index('SUBSCRIPTIONS_STATE_IDX', 'subscriptions')
-    drop_index('CONTENTS_RULE_EVAL_FB_IDX', 'contents')
-    drop_index('REPLICAS_STATE_IDX', 'replicas')
-    drop_index('BAD_REPLICAS_ACCOUNT_IDX', 'bad_replicas')
-    drop_index('REQUESTS_DEST_RSE_ID_IDX', 'requests')
+    try_drop_index('SUBSCRIPTIONS_STATE_IDX', 'subscriptions')
+    try_drop_index('CONTENTS_RULE_EVAL_FB_IDX', 'contents')
+    try_drop_index('REPLICAS_STATE_IDX', 'replicas')
+    try_drop_index('BAD_REPLICAS_ACCOUNT_IDX', 'bad_replicas')
+    try_drop_index('REQUESTS_DEST_RSE_ID_IDX', 'requests')
 
     if is_current_dialect('mysql'):
         create_foreign_key('BAD_REPLICAS_ACCOUNT_FK', 'bad_replicas', 'accounts', ['account'], ['account'])

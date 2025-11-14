@@ -12,11 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-''' add index to quarantined replicas '''
+""" add index to quarantined replicas """
 
-from alembic.op import create_index, drop_index
-
-from rucio.db.sqla.migrate_repo.ddl_helpers import is_current_dialect
+from rucio.db.sqla.migrate_repo import (
+    create_index,
+    is_current_dialect,
+    try_drop_index,
+)
 
 # revision identifiers, used by Alembic.
 revision = 'b818052fa670'
@@ -24,18 +26,18 @@ down_revision = '2962ece31cf4'
 
 
 def upgrade():
-    '''
+    """
     Upgrade the database to this revision
-    '''
+    """
 
     if is_current_dialect('oracle', 'mysql', 'postgresql'):
         create_index('QUARANTINED_REPLICAS_PATH_IDX', 'quarantined_replicas', ['path', 'rse_id'], unique=True)
 
 
 def downgrade():
-    '''
+    """
     Downgrade the database to the previous revision
-    '''
+    """
 
     if is_current_dialect('oracle', 'mysql', 'postgresql'):
-        drop_index('QUARANTINED_REPLICAS_PATH_IDX', 'quarantined_replicas')
+        try_drop_index('QUARANTINED_REPLICAS_PATH_IDX', 'quarantined_replicas')

@@ -12,13 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-''' correct PK and IDX for history tables '''
+""" correct PK and IDX for history tables """
 
 import sqlalchemy as sa
-from alembic.op import add_column, create_primary_key, drop_column, drop_constraint, drop_index
 
-from rucio.db.sqla.migrate_repo import drop_current_primary_key, try_drop_constraint
-from rucio.db.sqla.migrate_repo.ddl_helpers import get_effective_schema, is_current_dialect
+from rucio.db.sqla.migrate_repo import (
+    add_column,
+    create_primary_key,
+    drop_column,
+    is_current_dialect,
+    try_drop_index,
+    try_drop_primary_key,
+)
 from rucio.db.sqla.types import GUID
 
 # Alembic revision identifiers
@@ -27,82 +32,72 @@ down_revision = '9eb936a81eb1'
 
 
 def upgrade():
-    '''
+    """
     Upgrade the database to this revision
-    '''
+    """
 
     if is_current_dialect('oracle', 'mysql', 'postgresql'):
         # CONTENTS_HISTORY
-        if is_current_dialect('oracle', 'postgresql'):
-            drop_current_primary_key('contents_history')
-            for pk_name in ('CONTENTS_HIST_PK', 'contents_history_pk', 'contents_history_pkey', 'PRIMARY'):
-                try_drop_constraint(pk_name, 'contents_history')
-        else:
-            drop_constraint('CONTENTS_HIST_PK', 'contents_history', type_='primary')
-
+        try_drop_primary_key(
+            'contents_history',
+            legacy_names=('CONTENTS_HIST_PK', 'contents_history_pk', 'contents_history_pkey'),
+        )
         # ARCHIVE_CONTENTS_HISTORY
-        if is_current_dialect('oracle', 'postgresql'):
-            drop_current_primary_key('archive_contents_history')
-            for pk_name in ('ARCH_CONT_HIST_PK', 'archive_contents_history_pk', 'archive_contents_history_pkey', 'PRIMARY'):
-                try_drop_constraint(pk_name, 'archive_contents_history')
-        else:
-            drop_constraint(constraint_name='ARCH_CONT_HIST_PK', table_name='archive_contents_history', type_='primary')
-
+        try_drop_primary_key(
+            'archive_contents_history',
+            legacy_names=('ARCH_CONT_HIST_PK', 'archive_contents_history_pk', 'archive_contents_history_pkey'),
+        )
         # RULES_HIST_RECENT
-        schema = get_effective_schema()
-        if is_current_dialect('oracle', 'postgresql'):
-            drop_current_primary_key('rules_hist_recent')
-            for pk_name in ('RULES_HIST_RECENT_PK', 'rules_hist_recent_pk', 'rules_hist_recent_pkey', 'PRIMARY'):
-                try_drop_constraint(pk_name, 'rules_hist_recent')
-        else:
-            drop_constraint(constraint_name='RULES_HIST_RECENT_PK', table_name='rules_hist_recent', type_='primary')
-        drop_column('rules_hist_recent', 'history_id', schema=schema)
+        try_drop_primary_key(
+            'rules_hist_recent',
+            legacy_names=('RULES_HIST_RECENT_PK', 'rules_hist_recent_pk', 'rules_hist_recent_pkey'),
+        )
+        drop_column('rules_hist_recent', 'history_id')
 
         # RULES_HISTORY
-        drop_column('rules_history', 'history_id', schema=schema)
+        drop_column('rules_history', 'history_id')
 
 
 def downgrade():
-    '''
+    """
     Downgrade the database to the previous revision
-    '''
+    """
 
     if is_current_dialect('oracle', 'mysql', 'postgresql'):
         # CONTENTS_HISTORY
-        if is_current_dialect('oracle', 'postgresql'):
-            drop_current_primary_key('contents_history')
-            for pk_name in ('CONTENTS_HIST_PK', 'contents_history_pk', 'contents_history_pkey', 'PRIMARY'):
-                try_drop_constraint(pk_name, 'contents_history')
+        try_drop_primary_key(
+            'contents_history',
+            legacy_names=('CONTENTS_HIST_PK', 'contents_history_pk', 'contents_history_pkey'),
+        )
         create_primary_key('CONTENTS_HIST_PK', 'contents_history', ['scope', 'name', 'child_scope', 'child_name'])
 
         # ARCHIVE_CONTENTS_HISTORY
-        if is_current_dialect('oracle', 'postgresql'):
-            drop_current_primary_key('archive_contents_history')
-            for pk_name in ('ARCH_CONT_HIST_PK', 'archive_contents_history_pk', 'archive_contents_history_pkey', 'PRIMARY'):
-                try_drop_constraint(pk_name, 'archive_contents_history')
+        try_drop_primary_key(
+            'archive_contents_history',
+            legacy_names=('ARCH_CONT_HIST_PK', 'archive_contents_history_pk', 'archive_contents_history_pkey'),
+        )
         create_primary_key('ARCH_CONT_HIST_PK', 'archive_contents_history', ['scope', 'name', 'child_scope', 'child_name'])
-        drop_index('ARCH_CONT_HIST_IDX', 'archive_contents_history')
+        try_drop_index('ARCH_CONT_HIST_IDX', 'archive_contents_history')
 
         # RULES_HIST_RECENT
-        schema = get_effective_schema()
-        add_column('rules_hist_recent', sa.Column('history_id', GUID()), schema=schema)
-        if is_current_dialect('oracle', 'postgresql'):
-            drop_current_primary_key('rules_hist_recent')
-            for pk_name in ('RULES_HIST_RECENT_PK', 'rules_hist_recent_pk', 'rules_hist_recent_pkey', 'PRIMARY'):
-                try_drop_constraint(pk_name, 'rules_hist_recent')
+        add_column('rules_hist_recent', sa.Column('history_id', GUID()))
+        try_drop_primary_key(
+            'rules_hist_recent',
+            legacy_names=('RULES_HIST_RECENT_PK', 'rules_hist_recent_pk', 'rules_hist_recent_pkey'),
+        )
         create_primary_key('RULES_HIST_RECENT_PK', 'rules_hist_recent', ['history_id'])
 
         # RULES_HISTORY
-        add_column('rules_history', sa.Column('history_id', GUID()), schema=schema)
-        if is_current_dialect('oracle', 'postgresql'):
-            drop_current_primary_key('rules_history')
-            for pk_name in ('RULES_HIST_LONGTERM_PK', 'rules_history_pk', 'rules_history_pkey', 'PRIMARY'):
-                try_drop_constraint(pk_name, 'rules_history')
+        add_column('rules_history', sa.Column('history_id', GUID()))
+        try_drop_primary_key(
+            'rules_history',
+            legacy_names=('RULES_HIST_LONGTERM_PK', 'rules_history_pk', 'rules_history_pkey'),
+        )
         create_primary_key('RULES_HIST_LONGTERM_PK', 'rules_history', ['history_id'])
 
         # MESSAGES_HISTORY
-        if is_current_dialect('oracle', 'postgresql'):
-            drop_current_primary_key('messages_history')
-            for pk_name in ('MESSAGES_HIST_ID_PK', 'messages_history_pk', 'messages_history_pkey', 'PRIMARY'):
-                try_drop_constraint(pk_name, 'messages_history')
+        try_drop_primary_key(
+            'messages_history',
+            legacy_names=('MESSAGES_HIST_ID_PK', 'messages_history_pk', 'messages_history_pkey'),
+        )
         create_primary_key('MESSAGES_HIST_ID_PK', 'messages_history', ['id'])

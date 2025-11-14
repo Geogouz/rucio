@@ -12,12 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-''' add qos class to rse '''
+""" add qos class to rse """
 
 import sqlalchemy as sa
-from alembic.op import add_column, drop_column
 
-from rucio.db.sqla.migrate_repo.ddl_helpers import get_effective_schema, is_current_dialect
+from rucio.db.sqla.migrate_repo import (
+    add_column,
+    drop_column,
+    is_current_dialect,
+)
 
 # Alembic revision identifiers
 revision = '50280c53117c'
@@ -25,22 +28,18 @@ down_revision = 'c0937668555f'
 
 
 def upgrade():
-    '''
+    """
     Upgrade the database to this revision
-    '''
-
-    schema = get_effective_schema()
+    """
 
     if is_current_dialect('oracle', 'postgresql', 'mysql'):
-        add_column('rses', sa.Column('qos_class', sa.String(64)), schema=schema)
+        add_column('rses', sa.Column('qos_class', sa.String(64)))
 
 
 def downgrade():
-    '''
+    """
     Downgrade the database to the previous revision
-    '''
-
-    schema = get_effective_schema()
+    """
 
     if is_current_dialect('oracle', 'postgresql', 'mysql'):
-        drop_column('rses', 'qos_class', schema=schema)
+        drop_column('rses', 'qos_class')

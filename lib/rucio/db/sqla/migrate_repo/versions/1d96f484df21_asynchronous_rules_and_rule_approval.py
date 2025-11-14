@@ -12,22 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-''' asynchronous rules and rule approval '''
+""" asynchronous rules and rule approval """
 
 import sqlalchemy as sa
-from alembic import op
-from alembic.op import add_column, create_check_constraint, drop_column
+from alembic.op import execute
 
 from rucio.db.sqla.migrate_repo import (
-    alter_enum_add_value_sql,
-    create_enum_if_absent_block,
-    drop_enum_sql,
-    try_drop_constraint,
-)
-from rucio.db.sqla.migrate_repo.ddl_helpers import (
-    get_effective_schema,
+    add_column,
+    create_check_constraint,
+    drop_column,
+    enum_values_clause,
     is_current_dialect,
     qualify_table,
+    try_alter_enum_add_value,
+    try_create_enum_if_absent,
+    try_drop_constraint,
+    try_drop_enum,
 )
 
 # Alembic revision identifiers
@@ -36,83 +36,102 @@ down_revision = '3d9813fab443'
 
 
 def upgrade():
-    '''
+    """
     Upgrade the database to this revision
-    '''
+    """
 
-    schema = get_effective_schema()
-    rules_table = qualify_table('rules', schema)
+    rules_table = qualify_table('rules')
+    rules_state_values = ['S', 'R', 'U', 'O', 'W', 'I']
 
     if is_current_dialect('oracle'):
         add_column('rules', sa.Column('ignore_account_limit', sa.Boolean(name='RULES_IGNORE_ACCOUNT_LIMIT_CHK', create_constraint=True), default=False))
         try_drop_constraint('RULES_STATE_CHK', 'rules')
-        create_check_constraint('RULES_STATE_CHK', 'rules', "state IN ('S', 'R', 'U', 'O', 'W', 'I')")
+        create_check_constraint(
+            'RULES_STATE_CHK',
+            'rules',
+            f"state IN ({enum_values_clause(rules_state_values)})",
+        )
 
     elif is_current_dialect('postgresql'):
-        add_column('rules', sa.Column('ignore_account_limit', sa.Boolean(name='RULES_IGNORE_ACCOUNT_LIMIT_CHK', create_constraint=True), default=False), schema=schema)
-        op.execute(
-            f'ALTER TABLE {rules_table} DROP CONSTRAINT IF EXISTS "RULES_STATE_CHK"'
-        )
-        op.execute(
-            alter_enum_add_value_sql(
-                'RULES_STATE_CHK',
-                'W',
-                schema=schema,
-                if_not_exists=True,
-                after='O',
-            )
-        )
-        op.execute(
-            alter_enum_add_value_sql(
-                'RULES_STATE_CHK',
-                'I',
-                schema=schema,
-                if_not_exists=True,
-                after='W',
-            )
-        )
+        rules_state_enum = render_enum_name('RULES_STATE_CHK')
+        add_column('rules', sa.Column('ignore_account_limit', sa.Boolean(name='RULES_IGNORE_ACCOUNT_LIMIT_CHK', create_constraint=True), default=False))
 
-    elif is_current_dialect('mysql'):
-        add_column('rules', sa.Column('ignore_account_limit', sa.Boolean(name='RULES_IGNORE_ACCOUNT_LIMIT_CHK', create_constraint=True), default=False), schema=schema)
-        op.execute(f'ALTER TABLE {rules_table} DROP CHECK RULES_STATE_CHK')
-        create_check_constraint('RULES_STATE_CHK', 'rules', "state IN ('S', 'R', 'U', 'O', 'W', 'I')")
-
-
-def downgrade():
-    '''
-    Downgrade the database to the previous revision
-    '''
-
-    schema = get_effective_schema()
-    rules_table = qualify_table('rules', schema)
-
-    if is_current_dialect('oracle'):
-        drop_column('rules', 'ignore_account_limit')
+        # 1) Remove legacy CHECK if still present.
         try_drop_constraint('RULES_STATE_CHK', 'rules')
-        create_check_constraint('RULES_STATE_CHK', 'rules', "state IN ('S', 'R', 'U', 'O')")
 
-    elif is_current_dialect('postgresql'):
-        drop_column('rules', 'ignore_account_limit', schema=schema)
-        op.execute(
-            f'ALTER TABLE {rules_table} '
-            'DROP CONSTRAINT IF EXISTS "RULES_STATE_CHK", ALTER COLUMN state TYPE CHAR'
+        # 2) Ensure the enum exists (for CHAR+CHECK installs).
+        try_create_enum_if_absent('RULES_STATE_CHK', rules_state_values)
+
+        # 3) Extend the enum on existing enum-based installs.
+        try_alter_enum_add_value(
+            'RULES_STATE_CHK',
+            'W',
+            after='O',
+            if_not_exists=True,
         )
-        op.execute(drop_enum_sql('RULES_STATE_CHK', schema=schema))
-        op.execute(
-            create_enum_if_absent_block(
-                'RULES_STATE_CHK',
-                ['S', 'R', 'U', 'O'],
-                schema=schema,
-            )
+        try_alter_enum_add_value(
+            'RULES_STATE_CHK',
+            'I',
+            after='W',
+            if_not_exists=True,
         )
-        op.execute(
+
+        # 4) Attach/re-attach the enum type to the column.
+        execute(
             f"""
             ALTER TABLE {rules_table}
-            ALTER COLUMN state TYPE "RULES_STATE_CHK"
-            USING state::"RULES_STATE_CHK"
+            ALTER COLUMN state TYPE {rules_state_enum}
+            USING state::text::{rules_state_enum}
             """
         )
 
     elif is_current_dialect('mysql'):
-        drop_column('rules', 'ignore_account_limit', schema=schema)
-        create_check_constraint('RULES_STATE_CHK', 'rules', "state IN ('S', 'R', 'U', 'O')")
+        add_column('rules', sa.Column('ignore_account_limit', sa.Boolean(name='RULES_IGNORE_ACCOUNT_LIMIT_CHK', create_constraint=True), default=False))
+        try_drop_constraint('RULES_STATE_CHK', 'rules')
+        create_check_constraint(
+            'RULES_STATE_CHK',
+            'rules',
+            f"state IN ({enum_values_clause(rules_state_values)})",
+        )
+
+
+def downgrade():
+    """
+    Downgrade the database to the previous revision
+    """
+
+    rules_table = qualify_table('rules')
+    rules_state_values = ['S', 'R', 'U', 'O']
+
+    if is_current_dialect('oracle', 'mysql'):
+        drop_column('rules', 'ignore_account_limit')
+        try_drop_constraint('RULES_STATE_CHK', 'rules')
+        create_check_constraint(
+            'RULES_STATE_CHK',
+            'rules',
+            f"state IN ({enum_values_clause(rules_state_values)})",
+        )
+
+    elif is_current_dialect('postgresql'):
+        drop_column('rules', 'ignore_account_limit')
+        execute(
+            f"""
+            ALTER TABLE {rules_table}
+            DROP CONSTRAINT IF EXISTS "RULES_STATE_CHK",
+            ALTER COLUMN state TYPE CHAR
+            """
+        )
+        try_drop_enum('RULES_STATE_CHK')
+        execute(
+            create_enum_if_absent_block(
+                'RULES_STATE_CHK',
+                ['S', 'R', 'U', 'O'],
+            )
+        )
+        execute(
+            f"""
+            ALTER TABLE {rules_table}
+            ALTER COLUMN state TYPE {rules_state_enum}
+            USING state::{rules_state_enum}
+            """
+        )

@@ -12,12 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-''' add clob payload to messages '''
+""" add clob payload to messages """
 
 import sqlalchemy as sa
-from alembic.op import add_column, drop_column
 
-from rucio.db.sqla.migrate_repo.ddl_helpers import get_effective_schema, is_current_dialect
+from rucio.db.sqla.migrate_repo import (
+    add_column,
+    drop_column,
+    is_current_dialect,
+)
 
 # Alembic revision identifiers
 revision = '90f47792bb76'
@@ -25,22 +28,20 @@ down_revision = 'bf3baa1c1474'
 
 
 def upgrade():
-    '''
+    """
     Upgrade the database to this revision
-    '''
+    """
 
     if is_current_dialect('oracle', 'mysql', 'postgresql'):
-        schema = get_effective_schema()
-        add_column('messages', sa.Column('payload_nolimit', sa.Text), schema=schema)
-        add_column('messages_history', sa.Column('payload_nolimit', sa.Text), schema=schema)
+        add_column('messages', sa.Column('payload_nolimit', sa.Text))
+        add_column('messages_history', sa.Column('payload_nolimit', sa.Text))
 
 
 def downgrade():
-    '''
+    """
     Downgrade the database to the previous revision
-    '''
+    """
 
     if is_current_dialect('oracle', 'mysql', 'postgresql'):
-        schema = get_effective_schema()
-        drop_column('messages', 'payload_nolimit', schema=schema)
-        drop_column('messages_history', 'payload_nolimit', schema=schema)
+        drop_column('messages', 'payload_nolimit')
+        drop_column('messages_history', 'payload_nolimit')

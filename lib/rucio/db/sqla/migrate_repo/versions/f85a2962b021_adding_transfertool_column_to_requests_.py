@@ -12,12 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-''' adding transfertool column and index to requests table'''
+""" adding transfertool column and index to requests table """
 
 import sqlalchemy as sa
-from alembic.op import add_column, create_index, drop_column, drop_index
 
-from rucio.db.sqla.migrate_repo.ddl_helpers import get_effective_schema, is_current_dialect
+from rucio.db.sqla.migrate_repo import (
+    add_column,
+    create_index,
+    drop_column,
+    is_current_dialect,
+    try_drop_index,
+)
 
 # Alembic revision identifiers
 revision = 'f85a2962b021'
@@ -25,24 +30,22 @@ down_revision = 'd23453595260'
 
 
 def upgrade():
-    '''
+    """
     Upgrade the database to this revision
-    '''
+    """
 
     if is_current_dialect('oracle', 'postgresql', 'mysql'):
-        schema = get_effective_schema()
-        add_column('requests', sa.Column('transfertool', sa.String(64)), schema=schema)
-        add_column('requests_history', sa.Column('transfertool', sa.String(64)), schema=schema)
+        add_column('requests', sa.Column('transfertool', sa.String(64)))
+        add_column('requests_history', sa.Column('transfertool', sa.String(64)))
         create_index('REQUESTS_TYP_STA_TRA_ACT_IDX', 'requests', ['request_type', 'state', 'transfertool', 'activity'])
 
 
 def downgrade():
-    '''
+    """
     Downgrade the database to the previous revision
-    '''
+    """
 
     if is_current_dialect('oracle', 'postgresql', 'mysql'):
-        schema = get_effective_schema()
-        drop_index('REQUESTS_TYP_STA_TRA_ACT_IDX', 'requests')
-        drop_column('requests', 'transfertool', schema=schema)
-        drop_column('requests_history', 'transfertool', schema=schema)
+        try_drop_index('REQUESTS_TYP_STA_TRA_ACT_IDX', 'requests')
+        drop_column('requests', 'transfertool')
+        drop_column('requests_history', 'transfertool')

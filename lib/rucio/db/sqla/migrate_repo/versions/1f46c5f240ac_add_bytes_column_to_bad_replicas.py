@@ -12,12 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-''' add bytes column to bad_replicas '''
+""" add bytes column to bad_replicas """
 
 import sqlalchemy as sa
-from alembic.op import add_column, drop_column
 
-from rucio.db.sqla.migrate_repo.ddl_helpers import get_effective_schema, is_current_dialect
+from rucio.db.sqla.migrate_repo import (
+    add_column,
+    drop_column,
+    is_current_dialect,
+)
 
 # Alembic revision identifiers
 revision = '1f46c5f240ac'
@@ -25,20 +28,18 @@ down_revision = '688ef1840840'
 
 
 def upgrade():
-    '''
+    """
     Upgrade the database to this revision
-    '''
+    """
 
     if is_current_dialect('oracle', 'mysql', 'postgresql'):
-        schema = get_effective_schema()
-        add_column('bad_replicas', sa.Column('bytes', sa.BigInteger), schema=schema)
+        add_column('bad_replicas', sa.Column('bytes', sa.BigInteger))
 
 
 def downgrade():
-    '''
+    """
     Downgrade the database to the previous revision
-    '''
+    """
 
     if is_current_dialect('oracle', 'mysql', 'postgresql'):
-        schema = get_effective_schema()
-        drop_column('bad_replicas', 'bytes', schema=schema)
+        drop_column('bad_replicas', 'bytes')

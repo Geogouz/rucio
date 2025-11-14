@@ -12,11 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-''' create index on table replicas(path) '''
+""" create index on table replicas(path) """
 
-from alembic.op import create_index, drop_index
-
-from rucio.db.sqla.migrate_repo.ddl_helpers import is_current_dialect
+from rucio.db.sqla.migrate_repo import (
+    create_index,
+    is_current_dialect,
+    try_drop_index,
+)
 
 # Alembic revision identifiers
 revision = '16a0aca82e12'
@@ -24,18 +26,18 @@ down_revision = None
 
 
 def upgrade():
-    '''
+    """
     Upgrade the database to this revision
-    '''
+    """
 
     if is_current_dialect('oracle', 'mysql', 'postgresql'):
         create_index('REPLICAS_PATH_IDX', 'replicas', ['path'])
 
 
 def downgrade():
-    '''
+    """
     Downgrade the database to the previous revision
-    '''
+    """
 
     if is_current_dialect('oracle', 'mysql', 'postgresql'):
-        drop_index('REPLICAS_PATH_IDX', 'replicas')
+        try_drop_index('REPLICAS_PATH_IDX', 'replicas')

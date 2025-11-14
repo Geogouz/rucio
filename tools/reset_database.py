@@ -84,9 +84,7 @@ if __name__ == '__main__':
     if args.purge_build or args.purge:
         purge_db()
     else:
-        # drop_orm_tables()
-        # purge_db()  # TODO[DX]: temp bypass
-        exit(0)     # TODO[DX]: temp bypass
+        drop_orm_tables()
 
     # ------------------------------------------------------------------
     # 2. Decide what to rebuild

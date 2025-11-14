@@ -12,12 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-''' change tokens pk '''
+""" change tokens pk """
 
-from alembic.op import create_foreign_key, create_primary_key, drop_constraint
+from alembic.op import create_foreign_key
 
-from rucio.db.sqla.migrate_repo import drop_current_primary_key, try_drop_constraint
-from rucio.db.sqla.migrate_repo.ddl_helpers import is_current_dialect
+from rucio.db.sqla.migrate_repo import (
+    create_primary_key,
+    is_current_dialect,
+    try_drop_constraint,
+    try_drop_primary_key,
+)
 
 # Alembic revision identifiers
 revision = '2eef46be23d4'
@@ -25,34 +29,24 @@ down_revision = '58c8b78301ab'
 
 
 def upgrade():
-    '''
+    """
     Upgrade the database to this revision
-    '''
+    """
 
     if is_current_dialect('oracle', 'mysql', 'postgresql'):
-        drop_constraint('TOKENS_ACCOUNT_FK', 'tokens', type_='foreignkey')
-        if is_current_dialect('oracle', 'postgresql'):
-            drop_current_primary_key('tokens')
-            for pk_name in ('TOKENS_PK', 'TOKENS_PRIMARY', 'TOKENS_PK_OLD', 'tokens_pk', 'tokens_pkey', 'PRIMARY'):
-                try_drop_constraint(pk_name, 'tokens')
-        else:
-            drop_constraint('TOKENS_PK', 'tokens', type_='primary')
+        try_drop_constraint('TOKENS_ACCOUNT_FK', 'tokens')
+        try_drop_primary_key('tokens', legacy_names=('TOKENS_PK', 'tokens_pk', 'tokens_pkey'))
         create_primary_key('TOKENS_PK', 'tokens', ['token'])
         create_foreign_key('TOKENS_ACCOUNT_FK', 'tokens', 'accounts', ['account'], ['account'])
 
 
 def downgrade():
-    '''
+    """
     Downgrade the database to the previous revision
-    '''
+    """
 
     if is_current_dialect('oracle', 'mysql', 'postgresql'):
-        drop_constraint('TOKENS_ACCOUNT_FK', 'tokens', type_='foreignkey')
-        if is_current_dialect('oracle', 'postgresql'):
-            drop_current_primary_key('tokens')
-            for pk_name in ('TOKENS_PK', 'TOKENS_PRIMARY', 'TOKENS_PK_OLD', 'tokens_pk', 'tokens_pkey', 'PRIMARY'):
-                try_drop_constraint(pk_name, 'tokens')
-        else:
-            drop_constraint('TOKENS_PK', 'tokens', type_='primary')
+        try_drop_constraint('TOKENS_ACCOUNT_FK', 'tokens')
+        try_drop_primary_key('tokens', legacy_names=('TOKENS_PK', 'tokens_pk', 'tokens_pkey'))
         create_primary_key('TOKENS_PK', 'tokens', ['account', 'token'])
         create_foreign_key('TOKENS_ACCOUNT_FK', 'tokens', 'accounts', ['account'], ['account'])

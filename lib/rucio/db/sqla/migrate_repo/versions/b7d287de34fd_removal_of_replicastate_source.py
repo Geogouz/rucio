@@ -12,20 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-''' Removal of ReplicaState.SOURCE '''
+""" Removal of ReplicaState.SOURCE """
 
-from alembic import op
-from alembic.op import create_check_constraint
+from alembic.op import execute
 
 from rucio.db.sqla.migrate_repo import (
+    create_check_constraint,
     create_enum_if_absent_block,
-    drop_enum_sql,
-    try_drop_constraint,
-)
-from rucio.db.sqla.migrate_repo.ddl_helpers import (
-    get_effective_schema,
+    enum_values_clause,
     is_current_dialect,
     qualify_table,
+    try_drop_constraint,
+    try_drop_enum,
 )
 
 # Alembic revision identifiers
@@ -34,133 +32,167 @@ down_revision = 'f1b14a8c2ac1'
 
 
 def upgrade():
-    '''
+    """
     Upgrade the database to this revision
-    '''
+    """
 
-    schema = get_effective_schema()
-    replicas_table = qualify_table('replicas', schema)
-    collection_replicas_table = qualify_table('collection_replicas', schema)
+    collection_replicas_table = qualify_table('collection_replicas')
+    replicas_table = qualify_table('replicas')
+    replicas_state_values = ['A', 'U', 'C', 'B', 'D', 'T']
 
     if is_current_dialect('oracle'):
         try_drop_constraint('REPLICAS_STATE_CHK', 'replicas')
-        create_check_constraint(constraint_name='REPLICAS_STATE_CHK', table_name='replicas',
-                                condition="state in ('A', 'U', 'C', 'B', 'D', 'T')")
+        create_check_constraint(
+            constraint_name='REPLICAS_STATE_CHK',
+            table_name='replicas',
+            condition=f"state in ({enum_values_clause(replicas_state_values)})",
+        )
         try_drop_constraint('COLLECTION_REPLICAS_STATE_CHK', 'collection_replicas')
-        create_check_constraint(constraint_name='COLLECTION_REPLICAS_STATE_CHK', table_name='collection_replicas',
-                                condition="state in ('A', 'U', 'C', 'B', 'D', 'T')")
+        create_check_constraint(
+            constraint_name='COLLECTION_REPLICAS_STATE_CHK',
+            table_name='collection_replicas',
+            condition=f"state in ({enum_values_clause(replicas_state_values)})",
+        )
 
     elif is_current_dialect('postgresql'):
         new_values = ['A', 'U', 'C', 'B', 'D', 'T']
-        op.execute(
-            f'ALTER TABLE {replicas_table} '
-            'DROP CONSTRAINT IF EXISTS "REPLICAS_STATE_CHK", ALTER COLUMN state TYPE CHAR'
+        execute(
+            f"""
+            ALTER TABLE {replicas_table}
+            DROP CONSTRAINT IF EXISTS "REPLICAS_STATE_CHK",
+            ALTER COLUMN state TYPE CHAR
+            """
         )
-        op.execute(drop_enum_sql('REPLICAS_STATE_CHK', schema=schema))
-        op.execute(
+        try_drop_enum('REPLICAS_STATE_CHK')
+        execute(
             create_enum_if_absent_block(
                 'REPLICAS_STATE_CHK',
                 new_values,
-                schema=schema,
             )
         )
-        op.execute(
+        execute(
             f"""
             ALTER TABLE {replicas_table}
-            ALTER COLUMN state TYPE "REPLICAS_STATE_CHK"
-            USING state::"REPLICAS_STATE_CHK"
+            ALTER COLUMN state TYPE {replicas_state_enum}
+            USING state::{replicas_state_enum}
             """
         )
 
-        op.execute(
-            f'ALTER TABLE {collection_replicas_table} '
-            'DROP CONSTRAINT IF EXISTS "COLLECTION_REPLICAS_STATE_CHK", ALTER COLUMN state TYPE CHAR'
+        execute(
+            f"""
+            ALTER TABLE {collection_replicas_table}
+            DROP CONSTRAINT IF EXISTS "COLLECTION_REPLICAS_STATE_CHK",
+            ALTER COLUMN state TYPE CHAR
+            """
         )
-        op.execute(drop_enum_sql('COLLECTION_REPLICAS_STATE_CHK', schema=schema))
-        op.execute(
+        try_drop_enum('COLLECTION_REPLICAS_STATE_CHK')
+        execute(
             create_enum_if_absent_block(
                 'COLLECTION_REPLICAS_STATE_CHK',
                 new_values,
-                schema=schema,
             )
         )
-        op.execute(
+        execute(
             f"""
             ALTER TABLE {collection_replicas_table}
-            ALTER COLUMN state TYPE "COLLECTION_REPLICAS_STATE_CHK"
-            USING state::"COLLECTION_REPLICAS_STATE_CHK"
+            ALTER COLUMN state TYPE {collection_replicas_state_enum}
+            USING state::{collection_replicas_state_enum}
             """
         )
 
     elif is_current_dialect('mysql'):
-        op.execute(f'ALTER TABLE {replicas_table} DROP CHECK REPLICAS_STATE_CHK')
-        create_check_constraint(constraint_name='REPLICAS_STATE_CHK', table_name='replicas',
-                                condition="state in ('A', 'U', 'C', 'B', 'D', 'T')")
-        create_check_constraint(constraint_name='COLLECTION_REPLICAS_STATE_CHK', table_name='collection_replicas',
-                                condition="state in ('A', 'U', 'C', 'B', 'D', 'T')")
+        try_drop_constraint('REPLICAS_STATE_CHK', 'replicas')
+        create_check_constraint(
+            constraint_name='REPLICAS_STATE_CHK',
+            table_name='replicas',
+            condition=f"state in ({enum_values_clause(replicas_state_values)})",
+        )
+        create_check_constraint(
+            constraint_name='COLLECTION_REPLICAS_STATE_CHK',
+            table_name='collection_replicas',
+            condition=f"state in ({enum_values_clause(replicas_state_values)})",
+        )
 
 
 def downgrade():
-    '''
+    """
     Downgrade the database to the previous revision
-    '''
+    """
 
-    schema = get_effective_schema()
-    replicas_table = qualify_table('replicas', schema)
-    collection_replicas_table = qualify_table('collection_replicas', schema)
+    collection_replicas_table = qualify_table('collection_replicas')
+    replicas_table = qualify_table('replicas')
+    replicas_state_values = ['A', 'U', 'C', 'B', 'D', 'S', 'T']
 
     if is_current_dialect('oracle'):
         try_drop_constraint('REPLICAS_STATE_CHK', 'replicas')
-        create_check_constraint(constraint_name='REPLICAS_STATE_CHK', table_name='replicas',
-                                condition="state in ('A', 'U', 'C', 'B', 'D', 'S', 'T')")
+        create_check_constraint(
+            constraint_name='REPLICAS_STATE_CHK',
+            table_name='replicas',
+            condition=f"state in ({enum_values_clause(replicas_state_values)})",
+        )
         try_drop_constraint('COLLECTION_REPLICAS_STATE_CHK', 'collection_replicas')
-        create_check_constraint(constraint_name='COLLECTION_REPLICAS_STATE_CHK', table_name='collection_replicas',
-                                condition="state in ('A', 'U', 'C', 'B', 'D', 'S', 'T')")
+        create_check_constraint(
+            constraint_name='COLLECTION_REPLICAS_STATE_CHK',
+            table_name='collection_replicas',
+            condition=f"state in ({enum_values_clause(replicas_state_values)})",
+        )
 
     elif is_current_dialect('postgresql'):
         old_values = ['A', 'U', 'C', 'B', 'D', 'S', 'T']
-        op.execute(
-            f'ALTER TABLE {replicas_table} '
-            'DROP CONSTRAINT IF EXISTS "REPLICAS_STATE_CHK", ALTER COLUMN state TYPE CHAR'
+        execute(
+            f"""
+            ALTER TABLE {replicas_table}
+            DROP CONSTRAINT IF EXISTS "REPLICAS_STATE_CHK",
+            ALTER COLUMN state TYPE CHAR
+            """
         )
-        op.execute(drop_enum_sql('REPLICAS_STATE_CHK', schema=schema))
-        op.execute(
+        try_drop_enum('REPLICAS_STATE_CHK')
+        execute(
             create_enum_if_absent_block(
                 'REPLICAS_STATE_CHK',
                 old_values,
-                schema=schema,
             )
         )
-        op.execute(
+        execute(
             f"""
             ALTER TABLE {replicas_table}
-            ALTER COLUMN state TYPE "REPLICAS_STATE_CHK"
-            USING state::"REPLICAS_STATE_CHK"
+            ALTER COLUMN state TYPE {replicas_state_enum}
+            USING state::{replicas_state_enum}
             """
         )
 
-        op.execute(
-            f'ALTER TABLE {collection_replicas_table} '
-            'DROP CONSTRAINT IF EXISTS "COLLECTION_REPLICAS_STATE_CHK", ALTER COLUMN state TYPE CHAR'
+        execute(
+            f"""
+            ALTER TABLE {collection_replicas_table}
+            DROP CONSTRAINT IF EXISTS "COLLECTION_REPLICAS_STATE_CHK",
+            ALTER COLUMN state TYPE CHAR
+            """
         )
-        op.execute(drop_enum_sql('COLLECTION_REPLICAS_STATE_CHK', schema=schema))
-        op.execute(
+        try_drop_enum('COLLECTION_REPLICAS_STATE_CHK')
+        execute(
             create_enum_if_absent_block(
                 'COLLECTION_REPLICAS_STATE_CHK',
                 old_values,
-                schema=schema,
             )
         )
-        op.execute(
+        execute(
             f"""
             ALTER TABLE {collection_replicas_table}
-            ALTER COLUMN state TYPE "COLLECTION_REPLICAS_STATE_CHK"
-            USING state::"COLLECTION_REPLICAS_STATE_CHK"
+            ALTER COLUMN state TYPE {collection_replicas_state_enum}
+            USING state::{collection_replicas_state_enum}
             """
         )
 
     elif is_current_dialect('mysql'):
-        create_check_constraint(constraint_name='REPLICAS_STATE_CHK', table_name='replicas',
-                                condition="state in ('A', 'U', 'C', 'B', 'D', 'S', 'T')")
-        create_check_constraint(constraint_name='COLLECTION_REPLICAS_STATE_CHK', table_name='collection_replicas',
-                                condition="state in ('A', 'U', 'C', 'B', 'D', 'S', 'T')")
+        try_drop_constraint('REPLICAS_STATE_CHK', 'replicas')
+        create_check_constraint(
+            constraint_name='REPLICAS_STATE_CHK',
+            table_name='replicas',
+            condition=f"state in ({enum_values_clause(replicas_state_values)})",
+        )
+        try_drop_constraint('COLLECTION_REPLICAS_STATE_CHK', 'collection_replicas')
+        create_check_constraint(
+            constraint_name='COLLECTION_REPLICAS_STATE_CHK',
+            table_name='collection_replicas',
+            condition=f"state in ({enum_values_clause(replicas_state_values)})",
+        )

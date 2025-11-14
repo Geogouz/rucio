@@ -12,14 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-''' added heartbeats '''
+""" added heartbeats """
 
 import datetime
 
 import sqlalchemy as sa
-from alembic.op import create_check_constraint, create_index, create_primary_key, create_table, drop_constraint, drop_table
 
-from rucio.db.sqla.migrate_repo.ddl_helpers import is_current_dialect
+from rucio.db.sqla.migrate_repo import (
+    create_check_constraint,
+    create_index,
+    create_primary_key,
+    create_table,
+    drop_table,
+    is_current_dialect,
+    try_drop_primary_key,
+)
 
 # Alembic revision identifiers
 revision = 'a93e4e47bda'
@@ -27,9 +34,9 @@ down_revision = '2af3291ec4c'
 
 
 def upgrade():
-    '''
+    """
     Upgrade the database to this revision
-    '''
+    """
 
     if is_current_dialect('oracle', 'mysql', 'postgresql'):
         create_table('heartbeats',
@@ -48,18 +55,13 @@ def upgrade():
 
 
 def downgrade():
-    '''
+    """
     Downgrade the database to the previous revision
-    '''
+    """
 
     if is_current_dialect('oracle', 'mysql', 'postgresql'):
-        drop_constraint('heartbeats_pk', 'configs', type_='primary')
+        try_drop_primary_key('configs')
         drop_table('heartbeats')
 
     elif is_current_dialect('postgresql'):
-        # drop_constraint('heartbeats_pk', 'configs', type_='primary')
-        # drop_index('heartbeats_updated_at', 'heartbeats')
-        # drop_constraint('heartbeats_created_nn', 'heartbeats', type_='check')
-        # drop_constraint('heartbeats_updated_nn', 'heartbeats', type_='check')
-        # drop_table('heartbeats')
         pass

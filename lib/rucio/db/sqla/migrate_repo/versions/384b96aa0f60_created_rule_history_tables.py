@@ -12,18 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-''' created rule history tables '''
+""" created rule history tables """
 
 import datetime
 
 import sqlalchemy as sa
-from alembic import op
-from alembic.op import create_index, create_primary_key, create_table, drop_index, drop_table
+from alembic.op import execute
 from sqlalchemy.dialects import postgresql as pg
 
 from rucio.db.sqla.constants import DIDType, RuleGrouping, RuleNotification, RuleState
-from rucio.db.sqla.migrate_repo import create_enum_if_absent_block, drop_enum_sql
-from rucio.db.sqla.migrate_repo.ddl_helpers import get_effective_schema, is_current_dialect
+from rucio.db.sqla.migrate_repo import (
+    create_enum_if_absent_block,
+    create_index,
+    create_primary_key,
+    create_table,
+    drop_table,
+    get_effective_schema,
+    is_current_dialect,
+    try_drop_enum,
+    try_drop_index,
+)
 from rucio.db.sqla.types import GUID
 
 # Alembic revision identifiers
@@ -32,9 +40,9 @@ down_revision = '4cf0a2e127d4'
 
 
 def upgrade():
-    '''
+    """
     Upgrade the database to this revision
-    '''
+    """
     if is_current_dialect('oracle', 'mysql', 'postgresql'):
         schema = get_effective_schema()
         is_pg = is_current_dialect('postgresql')
@@ -42,11 +50,10 @@ def upgrade():
         def enum_type(enum_cls, name):
             values = [member.value for member in enum_cls]
             if is_pg:
-                op.execute(
+                execute(
                     create_enum_if_absent_block(
                         name,
                         values,
-                        schema=schema,
                     )
                 )
                 return pg.ENUM(
@@ -127,22 +134,22 @@ def upgrade():
 
 
 def downgrade():
-    '''
+    """
     Downgrade the database to the previous revision
-    '''
+    """
 
     if is_current_dialect('oracle', 'mysql'):
-        drop_index('RULES_HIST_RECENT_ID_IDX', 'rules_hist_recent')
+        try_drop_index('RULES_HIST_RECENT_ID_IDX', 'rules_hist_recent')
         drop_table('rules_hist_recent')
         drop_table('rules_history')
 
     elif is_current_dialect('postgresql'):
-        # Drop tables first so there are no remaining dependencies on the enum types.
+        # Drop tables first (which also drops the indices), so there are no remaining
+        # dependencies on the enum types.
         drop_table('rules_hist_recent')
         drop_table('rules_history')
 
         # Then drop the PostgreSQL enum types so the next upgrade can recreate them cleanly.
-        schema = get_effective_schema()
         for enum_name in (
                 'RULES_HIST_RECENT_DIDTYPE_CHK',
                 'RULES_HIST_RECENT_STATE_CHK',
@@ -153,4 +160,4 @@ def downgrade():
                 'RULES_HISTORY_GROUPING_CHK',
                 'RULES_HISTORY_NOTIFY_CHK',
         ):
-            op.execute(drop_enum_sql(enum_name, schema=schema))
+            try_drop_enum(enum_name)
