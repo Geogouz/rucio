@@ -30,6 +30,7 @@ from .ddl_helpers import (
     is_current_dialect,
     qualify_table,
     rename_table,
+    try_drop_constraint,
 )
 
 __all__ = [
@@ -48,4 +49,5 @@ __all__ = [
     "is_current_dialect",
     "get_effective_schema",
     "qualify_table",
+    "try_drop_constraint",
 ]
