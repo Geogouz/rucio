@@ -370,7 +370,110 @@ def qualify_table(
     return _quoted_table(table_name, schema)
 
 
+# ---------------------------------------------------------------------------
+# Schema-defaulting wrappers for alembic.op
+# ---------------------------------------------------------------------------
+
+def _with_default_schema(kwargs: dict) -> dict:
+    """
+    Ensure a default schema is present in ``kwargs['schema']``.
+
+    If the caller did not pass ``schema`` or passed a falsy value (``None`` or empty string),
+    this function injects the value from :func:`get_effective_schema`,  when available.
+    Keep in mind that schema is keyword-only in the caller method, so it cannot be in args.
+    """
+    if "schema" not in kwargs or kwargs.get("schema") in (None, ""):
+        eff = get_effective_schema()
+        if eff:
+            kwargs["schema"] = eff
+    return kwargs
+
+
+def add_column(*args, **kwargs):
+    """Replacement for :func:`alembic.op.add_column` with schema defaulting."""
+    kwargs = _with_default_schema(dict(kwargs))
+    return op.add_column(*args, **kwargs)
+
+
+def alter_column(*args, **kwargs):
+    """Replacement for :func:`alembic.op.alter_column` with schema defaulting."""
+    kwargs = _with_default_schema(dict(kwargs))
+    return op.alter_column(*args, **kwargs)
+
+
+def create_check_constraint(*args, **kwargs):
+    """Replacement for :func:`alembic.op.create_check_constraint` with schema defaulting."""
+    kwargs = _with_default_schema(dict(kwargs))
+    return op.create_check_constraint(*args, **kwargs)
+
+
+def create_index(*args, **kwargs):
+    """Replacement for :func:`alembic.op.create_index` with schema defaulting."""
+    kwargs = _with_default_schema(dict(kwargs))
+    return op.create_index(*args, **kwargs)
+
+
+def create_primary_key(*args, **kwargs):
+    """Replacement for :func:`alembic.op.create_primary_key` with schema defaulting."""
+    kwargs = _with_default_schema(dict(kwargs))
+    return op.create_primary_key(*args, **kwargs)
+
+
+def create_table(*args, **kwargs):
+    """Replacement for :func:`alembic.op.create_table` with schema defaulting."""
+    kwargs = _with_default_schema(dict(kwargs))
+    return op.create_table(*args, **kwargs)
+
+
+def create_unique_constraint(*args, **kwargs):
+    """Replacement for :func:`alembic.op.create_unique_constraint` with schema defaulting."""
+    kwargs = _with_default_schema(dict(kwargs))
+    return op.create_unique_constraint(*args, **kwargs)
+
+
+def drop_column(*args, **kwargs):
+    """Replacement for :func:`alembic.op.drop_column` with schema defaulting."""
+    kwargs = _with_default_schema(dict(kwargs))
+    return op.drop_column(*args, **kwargs)
+
+
+def drop_constraint(*args, **kwargs):
+    """Replacement for :func:`alembic.op.drop_constraint` with schema defaulting."""
+    kwargs = _with_default_schema(dict(kwargs))
+    return op.drop_constraint(*args, **kwargs)
+
+
+def drop_index(*args, **kwargs):
+    """Replacement for :func:`alembic.op.drop_index` with schema defaulting."""
+    kwargs = _with_default_schema(dict(kwargs))
+    return op.drop_index(*args, **kwargs)
+
+
+def drop_table(*args, **kwargs):
+    """Replacement for :func:`alembic.op.drop_table` with schema defaulting."""
+    kwargs = _with_default_schema(dict(kwargs))
+    return op.drop_table(*args, **kwargs)
+
+
+def rename_table(*args, **kwargs):
+    """Replacement for :func:`alembic.op.rename_table` with schema defaulting."""
+    kwargs = _with_default_schema(dict(kwargs))
+    return op.rename_table(*args, **kwargs)
+
+
 __all__ = [
+    "add_column",
+    "alter_column",
+    "create_check_constraint",
+    "create_index",
+    "create_primary_key",
+    "create_table",
+    "create_unique_constraint",
+    "drop_column",
+    "drop_constraint",
+    "drop_index",
+    "drop_table",
+    "rename_table",
     "is_current_dialect",
     "get_effective_schema",
     "qualify_table",
