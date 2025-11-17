@@ -28,12 +28,17 @@ from .ddl_helpers import (
     drop_index,
     drop_table,
     get_effective_schema,
+    get_identifier_preparer,
+    get_migration_context,
     is_current_dialect,
     qualify_index,
     qualify_table,
     rename_table,
     try_drop_constraint,
     try_drop_index,
+)
+from .enum_ddl_helpers import (
+    render_enum_name,
 )
 
 __all__ = [
@@ -50,10 +55,13 @@ __all__ = [
     "drop_index",
     "drop_table",
     "get_effective_schema",
+    "get_identifier_preparer",
+    "get_migration_context",
     "is_current_dialect",
     "qualify_index",
     "qualify_table",
     "rename_table",
+    "render_enum_name",
     "try_drop_constraint",
     "try_drop_index",
 ]
