@@ -144,12 +144,14 @@ else
 fi
 
 if test ${alembic}; then
-    echo 'Running full alembic migration'
-    ALEMBIC_CONFIG="$RUCIO_HOME/etc/alembic.ini" tools/alembic_migration.sh
-    if [ $? != 0 ]; then
-        echo 'Failed to run alembic migration!'
-        exit 1
-    fi
+    for migration_cycle in {1..10}; do
+        echo "Running full alembic migration (cycle ${migration_cycle}/10)"
+        ALEMBIC_CONFIG="$RUCIO_HOME/etc/alembic.ini" tools/alembic_migration.sh
+        if [ $? != 0 ]; then
+            echo 'Failed to run alembic migration!'
+            exit 1
+        fi
+    done
 fi
 
 echo 'Graceful restart of Apache'
