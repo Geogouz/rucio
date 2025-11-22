@@ -37,6 +37,7 @@ from .ddl_helpers import (
     rename_table,
     try_drop_constraint,
     try_drop_index,
+    try_drop_primary_key,
 )
 from .enum_ddl_helpers import (
     drop_enum_sql,
@@ -70,4 +71,5 @@ __all__ = [
     "try_drop_constraint",
     "try_drop_enum",
     "try_drop_index",
+    "try_drop_primary_key",
 ]
