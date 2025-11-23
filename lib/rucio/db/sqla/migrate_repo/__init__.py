@@ -34,6 +34,7 @@ from .ddl_helpers import (
     is_current_dialect,
     qualify_index,
     qualify_table,
+    quote_literal,
     rename_table,
     try_create_table,
     try_drop_constraint,
@@ -42,6 +43,7 @@ from .ddl_helpers import (
 )
 from .enum_ddl_helpers import (
     drop_enum_sql,
+    enum_values_clause,
     render_enum_name,
     try_drop_enum,
 )
@@ -60,6 +62,7 @@ __all__ = [
     "drop_enum_sql",
     "drop_index",
     "drop_table",
+    "enum_values_clause",
     "get_current_dialect",
     "get_effective_schema",
     "get_identifier_preparer",
@@ -67,6 +70,7 @@ __all__ = [
     "is_current_dialect",
     "qualify_index",
     "qualify_table",
+    "quote_literal",
     "rename_table",
     "render_enum_name",
     "try_create_table",
