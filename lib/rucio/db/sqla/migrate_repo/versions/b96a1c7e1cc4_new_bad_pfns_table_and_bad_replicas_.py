@@ -17,18 +17,20 @@
 import datetime
 
 import sqlalchemy as sa
-from alembic.op import create_foreign_key
+from alembic.op import create_foreign_key, execute
+from sqlalchemy.dialects import postgresql as pg
 
 from rucio.db.sqla.constants import BadPFNStatus
 from rucio.db.sqla.migrate_repo import (
     add_column,
-    alter_column,
     create_check_constraint,
+    create_enum_if_absent_block,
     create_index,
     create_primary_key,
     create_table,
     drop_column,
     drop_table,
+    get_effective_schema,
     is_current_dialect,
     try_drop_constraint,
     try_drop_enum,
@@ -46,15 +48,36 @@ def upgrade():
     Upgrade the database to this revision
     """
 
+    schema = get_effective_schema()
+    state_values = [status.value for status in BadPFNStatus]
+
     if is_current_dialect('oracle', 'postgresql'):
+        is_pg = is_current_dialect('postgresql')
+        if is_pg:
+            execute(
+                create_enum_if_absent_block(
+                    'BAD_PFNS_STATE_CHK',
+                    state_values,
+                )
+            )
+            bad_pfns_state = pg.ENUM(
+                *state_values,
+                name='BAD_PFNS_STATE_CHK',
+                schema=schema,
+                create_type=False,
+            )
+        else:
+            bad_pfns_state = sa.Enum(
+                BadPFNStatus,
+                name='BAD_PFNS_STATE_CHK',
+                create_constraint=True,
+                values_callable=lambda obj: [e.value for e in obj],
+            )
+
         # Create new bad_pfns table
         create_table('bad_pfns',
                      sa.Column('path', sa.String(2048)),
-                     sa.Column('state', sa.Enum(BadPFNStatus,
-                                                name='BAD_PFNS_STATE_CHK',
-                                                create_constraint=True,
-                                                values_callable=lambda obj: [e.value for e in obj]),
-                               default=BadPFNStatus.SUSPICIOUS),
+                     sa.Column('state', bad_pfns_state, default=BadPFNStatus.SUSPICIOUS),
                      sa.Column('reason', sa.String(255)),
                      sa.Column('account', sa.String(25)),
                      sa.Column('expires_at', sa.DateTime),
@@ -81,14 +104,17 @@ def upgrade():
         create_index('BAD_REPLICAS_EXPIRES_AT_IDX', 'bad_replicas', ['expires_at'])
 
     elif is_current_dialect('mysql'):
+        bad_pfns_state = sa.Enum(
+            BadPFNStatus,
+            name='BAD_PFNS_STATE_CHK',
+            create_constraint=True,
+            values_callable=lambda obj: [e.value for e in obj],
+        )
+
         # Create new bad_pfns table
         create_table('bad_pfns',
                      sa.Column('path', sa.String(2048)),
-                     sa.Column('state', sa.Enum(BadPFNStatus,
-                                                name='BAD_PFNS_STATE_CHK',
-                                                create_constraint=True,
-                                                values_callable=lambda obj: [e.value for e in obj]),
-                               default=BadPFNStatus.SUSPICIOUS),
+                     sa.Column('state', bad_pfns_state, default=BadPFNStatus.SUSPICIOUS),
                      sa.Column('reason', sa.String(255)),
                      sa.Column('account', sa.String(25)),
                      sa.Column('expires_at', sa.DateTime),

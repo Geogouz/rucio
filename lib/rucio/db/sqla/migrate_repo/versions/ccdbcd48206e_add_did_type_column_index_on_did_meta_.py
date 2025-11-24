@@ -16,16 +16,17 @@
 
 import sqlalchemy as sa
 from alembic.op import execute
+from sqlalchemy.dialects import postgresql as pg
 
+from rucio.db.sqla.constants import DIDType
 from rucio.db.sqla.migrate_repo import (
     add_column,
-    alter_column,
+    create_enum_if_absent_block,
     create_index,
     drop_column,
+    get_effective_schema,
     is_current_dialect,
     qualify_table,
-    render_enum_name,
-    try_create_enum_if_absent,
     try_drop_constraint,
     try_drop_enum,
     try_drop_index,
@@ -41,29 +42,29 @@ def upgrade():
     Upgrade the database to this revision
     """
 
+    schema = get_effective_schema()
     did_meta_table = qualify_table('did_meta')
-    did_meta_values = ['F', 'D', 'C', 'A', 'X', 'Y', 'Z']
     if is_current_dialect('oracle', 'mysql'):
-        add_column(
-            'did_meta',
-            sa.Column(
-                'did_type',
-                sa.Enum(
-                    *did_meta_values,
-                    name='DID_META_DID_TYPE_CHK',
-                    create_constraint=True,
-                ),
-            ),
-        )
+        add_column('did_meta',
+                   sa.Column('did_type', sa.Enum(DIDType,
+                                                 name='DID_META_DID_TYPE_CHK',
+                                                 create_constraint=True,
+                                                 values_callable=lambda obj: [e.value for e in obj])))
     elif is_current_dialect('postgresql'):
-        did_meta_enum = render_enum_name('DID_META_DID_TYPE_CHK')
-        try_create_enum_if_absent('DID_META_DID_TYPE_CHK', did_meta_values)
+        enum_values = [did_type.value for did_type in DIDType]
         execute(
-            f"""
-            ALTER TABLE {did_meta_table}
-            ADD COLUMN did_type {did_meta_enum}
-            """
+            create_enum_if_absent_block(
+                'DID_META_DID_TYPE_CHK',
+                enum_values,
+            )
         )
+        did_type_enum = pg.ENUM(
+            *enum_values,
+            name='DID_META_DID_TYPE_CHK',
+            schema=schema,
+            create_type=False,
+        )
+        add_column('did_meta', sa.Column('did_type', did_type_enum))
     create_index('DID_META_DID_TYPE_IDX', 'did_meta', ['did_type'])
 
 

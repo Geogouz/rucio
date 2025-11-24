@@ -17,17 +17,20 @@
 import datetime
 
 import sqlalchemy as sa
-from alembic.op import create_foreign_key
+from alembic.op import create_foreign_key, execute
+from sqlalchemy.dialects import postgresql as pg
 
 from rucio.common.schema import get_schema_value
 from rucio.db.sqla.constants import KeyType
 from rucio.db.sqla.migrate_repo import (
     add_column,
     create_check_constraint,
+    create_enum_if_absent_block,
     create_primary_key,
     create_table,
     drop_column,
     drop_table,
+    get_effective_schema,
     is_current_dialect,
     try_drop_enum,
 )
@@ -43,15 +46,37 @@ def upgrade():
     """
 
     if is_current_dialect('oracle', 'mysql', 'postgresql'):
+        schema = get_effective_schema()
+
         add_column('dids', sa.Column('closed_at', sa.DateTime))
         add_column('contents_history', sa.Column('deleted_at', sa.DateTime))
+
+        enum_values = [key_type.value for key_type in KeyType]
+        if is_current_dialect('postgresql'):
+            execute(
+                create_enum_if_absent_block(
+                    'CVT_TYPE_CHK',
+                    enum_values,
+                )
+            )
+            convention_type = pg.ENUM(
+                *enum_values,
+                name='CVT_TYPE_CHK',
+                schema=schema,
+                create_type=False,
+            )
+        else:
+            convention_type = sa.Enum(
+                KeyType,
+                name='CVT_TYPE_CHK',
+                create_constraint=True,
+                values_callable=lambda obj: [e.value for e in obj],
+            )
+
         create_table('naming_conventions',
                      sa.Column('scope', sa.String(get_schema_value('SCOPE_LENGTH'))),
                      sa.Column('regexp', sa.String(255)),
-                     sa.Column('convention_type', sa.Enum(KeyType,
-                                                          name='CVT_TYPE_CHK',
-                                                          create_constraint=True,
-                                                          values_callable=lambda obj: [e.value for e in obj])),
+                     sa.Column('convention_type', convention_type),
                      sa.Column('updated_at', sa.DateTime, default=datetime.datetime.utcnow),
                      sa.Column('created_at', sa.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow))
         create_primary_key('NAMING_CONVENTIONS_PK', 'naming_conventions', ['scope'])

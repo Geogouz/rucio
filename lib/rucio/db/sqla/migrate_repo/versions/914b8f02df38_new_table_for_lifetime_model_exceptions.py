@@ -17,13 +17,17 @@
 import datetime
 
 import sqlalchemy as sa
+from alembic.op import execute
+from sqlalchemy.dialects import postgresql as pg
 
 from rucio.db.sqla.constants import DIDType, LifetimeExceptionsState
 from rucio.db.sqla.migrate_repo import (
     create_check_constraint,
+    create_enum_if_absent_block,
     create_primary_key,
     create_table,
     drop_table,
+    get_effective_schema,
     is_current_dialect,
     try_drop_enum,
 )
@@ -40,21 +44,62 @@ def upgrade():
     """
 
     if is_current_dialect('oracle', 'mysql', 'postgresql'):
+        schema = get_effective_schema()
+        is_pg = is_current_dialect('postgresql')
+
+        did_type_values = [did_type.value for did_type in DIDType]
+        state_values = [state.value for state in LifetimeExceptionsState]
+
+        if is_pg:
+            execute(
+                create_enum_if_absent_block(
+                    'LIFETIME_EXCEPT_TYPE_CHK',
+                    did_type_values,
+                    schema=schema,
+                )
+            )
+            execute(
+                create_enum_if_absent_block(
+                    'LIFETIME_EXCEPT_STATE_CHK',
+                    state_values,
+                    schema=schema,
+                )
+            )
+            did_type_enum = pg.ENUM(
+                *did_type_values,
+                name='LIFETIME_EXCEPT_TYPE_CHK',
+                schema=schema,
+                create_type=False,
+            )
+            state_enum = pg.ENUM(
+                *state_values,
+                name='LIFETIME_EXCEPT_STATE_CHK',
+                schema=schema,
+                create_type=False,
+            )
+        else:
+            did_type_enum = sa.Enum(
+                DIDType,
+                name='LIFETIME_EXCEPT_TYPE_CHK',
+                create_constraint=True,
+                values_callable=lambda obj: [e.value for e in obj],
+            )
+            state_enum = sa.Enum(
+                LifetimeExceptionsState,
+                name='LIFETIME_EXCEPT_STATE_CHK',
+                create_constraint=True,
+                values_callable=lambda obj: [e.value for e in obj],
+            )
+
         create_table('lifetime_except',
                      sa.Column('id', GUID()),
                      sa.Column('scope', sa.String(25)),
                      sa.Column('name', sa.String(255)),
-                     sa.Column('did_type', sa.Enum(DIDType,
-                                                   name='LIFETIME_EXCEPT_TYPE_CHK',
-                                                   create_constraint=True,
-                                                   values_callable=lambda obj: [e.value for e in obj])),
+                     sa.Column('did_type', did_type_enum),
                      sa.Column('account', sa.String(25)),
                      sa.Column('comments', sa.String(4000)),
                      sa.Column('pattern', sa.String(255)),
-                     sa.Column('state', sa.Enum(LifetimeExceptionsState,
-                                                name='LIFETIME_EXCEPT_STATE_CHK',
-                                                create_constraint=True,
-                                                values_callable=lambda obj: [e.value for e in obj])),
+                     sa.Column('state', state_enum),
                      sa.Column('created_at', sa.DateTime, default=datetime.datetime.utcnow),
                      sa.Column('updated_at', sa.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow),
                      sa.Column('expires_at', sa.DateTime))
