@@ -123,6 +123,7 @@ exclude_also = [
 [tool.ruff]
 line-length = 256
 target-version = "py39"
+preview = true
 
 extend-include = [
     "bin/*",
@@ -160,6 +161,9 @@ exclude = [
 
 [tool.ruff.lint]
 select = [
+    "E",    # All default pycodestyle error families
+    "W",    # All default pycodestyle warning families
+    "F",    # Default pyflakes rules
     "I",    # isort
     "N",    # pep8-naming
     "S",    # bandit
@@ -184,7 +188,6 @@ extend-select = [
 ]
 
 ignore = [
-    "ALL",
     "E731", # Do not assign a lambda expression, use a def
     "N818",  # Unnecessary - we have valid suffixes like 'NotFound', 'Denied', 'Mismatch', etc.
     "UP008", # Use `super()` instead of `super(__class__, self)`
