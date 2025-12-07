@@ -27,7 +27,7 @@ import os.path
 import re
 import signal
 import socket
-import subprocess
+import subprocess  # noqa: S404
 import tempfile
 import threading
 import time
