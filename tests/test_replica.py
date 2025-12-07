@@ -19,10 +19,10 @@ from datetime import datetime, timedelta
 from json import dumps
 from typing import TYPE_CHECKING
 from unittest import mock
-from xml.etree import ElementTree
 
 import pytest
 import xmltodict
+from defusedxml import ElementTree
 from werkzeug.datastructures import Headers, MultiDict
 
 from rucio.client.ruleclient import RuleClient

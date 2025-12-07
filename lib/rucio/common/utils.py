@@ -40,9 +40,9 @@ from itertools import zip_longest
 from typing import TYPE_CHECKING, Any, Optional, TypeVar, Union, cast
 from urllib.parse import parse_qsl, quote, urlencode, urlparse, urlunparse
 from uuid import uuid4 as uuid
-from xml.etree import ElementTree
 
 import requests
+from defusedxml import ElementTree
 from typing_extensions import ParamSpec
 
 from rucio.common.config import config_get, config_get_bool

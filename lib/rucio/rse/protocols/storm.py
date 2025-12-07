@@ -14,9 +14,9 @@
 
 import logging
 import os
-from xml.dom import minidom
 
 import requests
+from defusedxml import minidom
 
 from rucio.common import exception
 from rucio.common.utils import run_cmd_process

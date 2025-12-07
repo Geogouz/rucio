@@ -18,9 +18,9 @@ import sys
 from dataclasses import dataclass
 from typing import Any, Optional
 from urllib.parse import urlparse
-from xml.etree import ElementTree
 
 import requests
+from defusedxml import ElementTree
 from requests.adapters import HTTPAdapter
 from urllib3.poolmanager import PoolManager
 
