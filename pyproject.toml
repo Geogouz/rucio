@@ -159,6 +159,10 @@ exclude = [
 
 [tool.ruff.lint]
 select = [
+    "E4",   # Default pycodestyle import errors
+    "E7",   # Default pycodestyle statement errors
+    "E9",   # Default pycodestyle runtime errors
+    "F",    # Default pyflakes rules
     "I",    # isort
     "N",    # pep8-naming
     "S",    # bandit
@@ -183,7 +187,6 @@ extend-select = [
 ]
 
 ignore = [
-    "ALL",
     "E731", # Do not assign a lambda expression, use a def
     "N818",  # Unnecessary - we have valid suffixes like 'NotFound', 'Denied', 'Mismatch', etc.
     "UP008", # Use `super()` instead of `super(__class__, self)`
