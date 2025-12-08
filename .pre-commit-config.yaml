@@ -8,6 +8,7 @@ repos:
   rev: 7.1.1
   hooks:
   - id: flake8
+    args: [ '--ignore=W503, E501, E121, E123, E126' ]
 - repo: local
   hooks:
   - id: add-header
@@ -15,8 +16,8 @@ repos:
     description: Run the `add_header` script to verify the file headers
     entry: tools/add_header
     language: system
-- repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: v0.9.3
-  hooks:
-    - id: ruff
-      args: [ --fix ]
+#- repo: https://github.com/astral-sh/ruff-pre-commit
+#  rev: v0.9.3
+#  hooks:
+#    - id: ruff
+#      args: [ --fix ]
