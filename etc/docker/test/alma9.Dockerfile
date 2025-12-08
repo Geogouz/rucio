@@ -96,7 +96,7 @@ FROM python as rucio-runtime
     COPY requirements requirements
     COPY pyproject.server.toml pyproject.toml
     COPY MANIFEST.server.in MANIFEST.in
-    COPY .pep8 .pycodestyle ./
+    COPY .pep8 ./
 
     # Include packaging manifest so templates ship with the wheel
     COPY MANIFEST.server.in MANIFEST.in
@@ -139,7 +139,7 @@ FROM rucio-runtime as requirements
     COPY pyproject.server.toml pyproject.toml
     COPY MANIFEST.server.in MANIFEST.in
 
-    COPY .pep8 .pycodestyle ./
+    COPY .pep8 ./
     RUN python3 -m pip --no-cache-dir install --upgrade .[oracle,postgresql,mysql,kerberos,saml,dev] && \
         python3 -m pip list
 
