@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 import re
 from configparser import DuplicateSectionError, NoOptionError
 
@@ -34,10 +35,16 @@ skip_unsupported_json = pytest.mark.skipif(
     reason="JSON support is not implemented in this database"
 )
 
-skip_unsupported_dialect = pytest.mark.skipif(
-    get_session().bind.dialect.name in ['oracle', 'sqlite'],
-    reason=f"Unsupported dialect: {get_session().bind.dialect.name}"
-)
+
+def skip_unsupported_dialect(*unsupported_dialects):
+    session = get_session()
+    if not session.bind:
+        return pytest.mark.skipif(False, reason="Database not bound")
+
+    dialect: str = session.bind.dialect.name
+    should_skip = dialect in unsupported_dialects
+    reason = f"Unsupported dialect: {dialect}" if should_skip else "Dialect supported"
+    return pytest.mark.skipif(should_skip, reason=reason)
 
 
 class TestOpenDataCommon:
@@ -50,6 +57,7 @@ class TestOpenDataCommon:
         opendata_did_state_from_enum = set([state.name for state in OpenDataDIDState])
 
         assert opendata_did_state_from_common == opendata_did_state_from_enum, "'OpenDataDIDState' enum does not match expected states from 'OPENDATA_DID_STATE_LITERAL'"
+
 
 @pytest.mark.noparallel(reason="Changes in configuration values and race conditions")
 class TestOpenDataCore:
@@ -195,7 +203,7 @@ class TestOpenDataCore:
 
         assert state == OpenDataDIDState.PUBLIC
 
-    @skip_unsupported_dialect
+    @skip_unsupported_dialect("oracle", "sqlite")
     def test_opendata_dids_meta_update(self, mock_scope, root_account, db_write_session):
         name = did_name_generator(did_type="dataset")
 
@@ -290,7 +298,8 @@ class TestOpenDataCore:
         assert record_id_after == record_id_first, f"Record ID should be updated to {record_id_first}, fetched from `get_opendata_record_id`"
 
         record_id_second = 54321
-        opendata.update_opendata_record_id(scope=mock_scope, name=name, record_id=record_id_second, session=db_write_session)
+        opendata.update_opendata_record_id(scope=mock_scope, name=name, record_id=record_id_second,
+                                           session=db_write_session)
 
         db_write_session.commit()
 
@@ -330,7 +339,8 @@ class TestOpenDataCore:
 
         with pytest.raises(OpenDataDuplicateRecordID):
             # using a record id that is in use by another open data did will throw
-            opendata.update_opendata_did(scope=mock_scope, name=name_first, record_id=record_id, session=db_write_session)
+            opendata.update_opendata_did(scope=mock_scope, name=name_first, record_id=record_id,
+                                         session=db_write_session)
 
     def test_opendata_dids_list(self, mock_scope, root_account, db_write_session):
         dids = [
@@ -447,6 +457,7 @@ class TestOpenDataCore:
         finally:
             config_set('opendata', 'rule_enable', 'False')
 
+
 @pytest.mark.noparallel(reason="Changes in configuration values and race conditions")
 class TestOpenDataClient:
     def test_opendata_dids_list_client(self, mock_scope, rucio_client):
@@ -537,15 +548,18 @@ class TestOpenDataClient:
         meta = opendata_did["meta"]
         assert meta == {}, "'meta' should be empty"
 
+
 @pytest.mark.noparallel(reason="Changes in configuration values and race conditions")
 class TestOpenDataAPI:
     api_endpoint = '/opendata/dids'
     api_endpoint_public = '/opendata/public/dids'
 
     def test_opendata_api_list(self, rest_client, auth_token, root_account):
+        request_headers = headers(auth(auth_token))
+
         response = rest_client.get(
             self.api_endpoint,
-            headers=headers(auth(auth_token)),
+            headers=request_headers,
         )
         assert response.status_code == 200, f"Expected 200 OK, got {response.status_code}"
 
@@ -582,7 +596,7 @@ class TestOpenDataAPI:
             endpoint,
             headers=request_headers,
         )
-        assert response.status_code == 201, f"Expected 200 OK, got {response.status_code}"
+        assert response.status_code == 201, f"Expected 201 OK, got {response.status_code}"
 
         # Add it again, should fail because it already exists
         response = rest_client.post(
@@ -605,7 +619,63 @@ class TestOpenDataAPI:
         )
         assert response.status_code == 404, f"Expected 404 Not Found, got {response.status_code}"
 
-@pytest.mark.noparallel(reason="Changes in configuration values and race conditions")
+    @skip_unsupported_dialect("postgresql")
+    def test_is_opendata(self, rest_client, auth_token, root_account, mock_scope):
+        # More details why this is skipped: https://github.com/rucio/rucio/pull/7903#issuecomment-3144608087
+
+        name = did_name_generator(did_type="dataset")
+        opendata_endpoint = f"{self.api_endpoint}/{mock_scope}/{name}"
+        meta_endpoint = f"/dids/{mock_scope}/{name}/meta"
+        request_headers = headers(auth(auth_token))
+
+        # Add it as a DID
+        add_did(scope=mock_scope, name=name, account=root_account, did_type=DIDType.DATASET)
+
+        # Check `is_opendata` returns False for a regular DID
+        response = rest_client.get(
+            meta_endpoint,
+            headers=request_headers,
+        )
+        assert response.status_code == 200, f"Expected 200 OK, got {response.status_code}"
+        response_data = json.loads(response.get_data(as_text=True))
+        is_opendata: bool = response_data["is_opendata"]
+        assert not is_opendata, "Expected is_opendata to be False for a regular DID"
+
+        # Register as Opendata
+        response = rest_client.post(
+            opendata_endpoint,
+            headers=request_headers,
+        )
+        assert response.status_code == 201, f"Expected 201 OK, got {response.status_code}"
+
+        # Check `is_opendata` returns True for an Opendata DID
+        response = rest_client.get(
+            meta_endpoint,
+            headers=request_headers,
+        )
+        assert response.status_code == 200, f"Expected 200 OK, got {response.status_code}"
+        response_data = json.loads(response.get_data(as_text=True))
+        is_opendata: bool = response_data["is_opendata"]
+        assert is_opendata, "Expected is_opendata to be True for an Opendata DID"
+
+        # Remove it from Opendata
+        response = rest_client.delete(
+            opendata_endpoint,
+            headers=request_headers,
+        )
+        assert response.status_code == 204, f"Expected 204 OK, got {response.status_code}"
+
+        # Check `is_opendata` returns False again after removal
+        response = rest_client.get(
+            meta_endpoint,
+            headers=request_headers,
+        )
+        assert response.status_code == 200, f"Expected 200 OK, got {response.status_code}"
+        response_data = json.loads(response.get_data(as_text=True))
+        is_opendata: bool = response_data["is_opendata"]
+        assert not is_opendata, "Expected is_opendata to be False after removal from Opendata"
+
+
 class TestOpenDataCLI:
     @staticmethod
     def extract_subcommands(stdout: str):
@@ -755,7 +825,7 @@ class TestOpenDataCLI:
         assert exitcode == 0, f"Failed to add Open Data DID: {stderr.strip()}"
 
         # Update the Record ID (using a hash of the name to avoid collisions)
-        record_id = abs(hash(name)) % 10**8
+        record_id = abs(hash(name)) % 10 ** 8
         exitcode, _, stderr = execute(f"rucio opendata did update {mock_scope}:{name} --record-id {record_id}")
         assert exitcode == 0, f"Failed to update Open Data DID: {stderr.strip()}"
 
