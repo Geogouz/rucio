@@ -1,0 +1,437 @@
+name: Checks
+
+on:
+  pull_request:
+  push:
+  schedule:
+    - cron: '0 3 * * *'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    if: github.repository_owner == 'rucio' || github.event_name != 'schedule'
+    steps:
+      - uses: actions/checkout@v5.0.1
+        with:
+          fetch-depth: 0  # Needed for license header check
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install pre-commit dependency
+        run: pip install pre-commit
+
+      - name: Run quality checks
+        run: make check
+
+  # Keep existing type annotation checks (uses custom ancestor comparison logic)
+  python_annotations:
+    if: |
+      !startsWith(github.ref_name, 'release')
+      && !startsWith(github.base_ref, 'release')
+      && github.event_name != 'schedule'
+      && github.ref_type != 'tag'
+    name: Check Python Type Annotations
+    runs-on: ubuntu-latest
+    env:
+      UPDATED_PYTHON_TYPE_ANNOTATIONS_REPORT_FILE: ../updated_type_annotation_report.txt
+      INITIAL_PYTHON_TYPE_ANNOTATIONS_REPORT_FILE: ../initial_type_annotation_report.txt
+    steps:
+      - uses: actions/checkout@v5.0.1
+      - name: Count current number of missing type annotations
+        id: count_updated
+        shell: bash
+        run: |
+          pip install ruff
+          source tools/count_missing_type_annotations_utils.sh
+          create_missing_python_type_annotations_report ${{ env.UPDATED_PYTHON_TYPE_ANNOTATIONS_REPORT_FILE }}
+          echo "The current number of missing python type annotations: $(wc -l < ${{ env.UPDATED_PYTHON_TYPE_ANNOTATIONS_REPORT_FILE }})"
+      - name: Checkout ancestor commit with rucio/master
+        uses: ./.github/actions/checkout_ancestor_commit
+        with:
+          paths_to_copy: |
+            tools/count_missing_type_annotations.sh
+            tools/count_missing_type_annotations_utils.sh
+      - name: Count initial number of missing type annotations
+        id: count_initial
+        shell: bash
+        run: |
+          source tools/count_missing_type_annotations_utils.sh
+          create_missing_python_type_annotations_report ${{ env.INITIAL_PYTHON_TYPE_ANNOTATIONS_REPORT_FILE }}
+          echo "The initial number of missing python type annotations: $(wc -l < ${{ env.INITIAL_PYTHON_TYPE_ANNOTATIONS_REPORT_FILE }})"
+      - name: Diff of missing annotations
+        shell: bash
+        run: |
+          diff ${{ env.INITIAL_PYTHON_TYPE_ANNOTATIONS_REPORT_FILE }} ${{ env.UPDATED_PYTHON_TYPE_ANNOTATIONS_REPORT_FILE }} || true
+      - name: Compare numbers of missing type annotations
+        shell: bash
+        run: |
+          INITIAL_NUMBER_OF_MISSING_TYPE_ANNOTATIONS=$(wc -l < ${{ env.INITIAL_PYTHON_TYPE_ANNOTATIONS_REPORT_FILE }})
+          UPDATED_NUMBER_OF_MISSING_TYPE_ANNOTATIONS=$(wc -l < ${{ env.UPDATED_PYTHON_TYPE_ANNOTATIONS_REPORT_FILE }})
+          echo "The initial number of missing type annotations is: $INITIAL_NUMBER_OF_MISSING_TYPE_ANNOTATIONS"
+          echo "The updated number of missing type annotations is: $UPDATED_NUMBER_OF_MISSING_TYPE_ANNOTATIONS"
+          if [ $UPDATED_NUMBER_OF_MISSING_TYPE_ANNOTATIONS -gt $INITIAL_NUMBER_OF_MISSING_TYPE_ANNOTATIONS ]; then
+            echo "The number of missing python type annotations should never increase!"
+            exit 1
+          fi
+
+  # Keep existing Pyright check (uses custom ancestor comparison logic)
+  python_pyright:
+    if: |
+      !startsWith(github.ref_name, 'release')
+      && !startsWith(github.base_ref, 'release')
+      && github.event_name != 'schedule'
+      && github.ref_type != 'tag'
+    name: Python type check (Pyright)
+    runs-on: ubuntu-latest
+    env:
+      PYRIGHT_CURRENT_REPORT: ../pyright_current_report.json
+      PYRIGHT_ANCESTOR_REPORT: ../pyright_ancestor_report.json
+    steps:
+      - uses: actions/checkout@v5.0.1
+      - name: Install dependencies
+        run: |
+          sudo apt-get update 
+          sudo apt-get install -y npm libkrb5-dev libxmlsec1-dev git libmagic1
+          npm install --global pyright
+          python -m pip --no-cache-dir install --upgrade pip
+          python -m pip --no-cache-dir install --upgrade -r requirements/requirements.server.txt -r requirements/requirements.dev.txt
+      - name: Make pyright report of current commit
+        run: |
+          tools/run_pyright.sh generate ${{ env.PYRIGHT_CURRENT_REPORT }}
+      - name: Show the current Pyright report
+        run: cat ${{ env.PYRIGHT_CURRENT_REPORT }}
+      - name: Checkout ancestor commit with rucio/master
+        uses: ./.github/actions/checkout_ancestor_commit
+        with:
+          paths_to_copy: |
+            pyrightconfig.json
+            tools/run_pyright.sh
+            tools/run_pyright/
+      - name: Make pyright report of ancestor commit
+        run: |
+          tools/run_pyright.sh generate ${{ env.PYRIGHT_ANCESTOR_REPORT }}
+      - name: Show the ancestor Pyright report
+        run: cat ${{ env.PYRIGHT_ANCESTOR_REPORT }}
+      - name: Compare reports
+        run: |
+          tools/run_pyright.sh compare --Werror \
+            ${{ env.PYRIGHT_ANCESTOR_REPORT }} \
+            ${{ env.PYRIGHT_CURRENT_REPORT }}
+
+  unit-tests:
+    name: Unit Tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v5.0.1
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libkrb5-dev gcc libxmlsec1 libxmlsec1-dev libmagic1
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel xmlsec==1.3.13
+          pip install -r requirements/requirements.dev.txt
+
+      - name: Run unit tests
+        run: make test
+
+  runtime_images:
+    if: github.event_name != 'schedule'
+    name: Build Runtime Images
+    uses: ./.github/workflows/runtime_images.yml
+    permissions:
+      packages: write
+
+  setup:
+    if: github.repository_owner == 'rucio' || github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5.0.1
+      - name: Update pip
+        run: python3 -m pip install -U pip setuptools
+      - name: Install python requirements for matrix_parser.py
+        run: python3 -m pip install -U PyYAML
+      - name: Identify branch
+        id: branch
+        run: python3 tools/github/workflow/set_branch_output_env.py
+      - name: Identify Matrix
+        id: matrix
+        run: |
+          EVENT="${{ github.event_name }}"
+          if [ $EVENT != 'schedule' ]; then
+            echo "matrix=$(./tools/test/matrix_parser.py < ./etc/docker/test/matrix.yml)" >> $GITHUB_OUTPUT
+          else
+            echo "matrix=$(./tools/test/matrix_parser.py < ./etc/docker/test/matrix_nightly.yml)" >> $GITHUB_OUTPUT
+          fi
+    outputs:
+      branch: ${{ steps.branch.outputs.branch }}
+      matrix: ${{ steps.matrix.outputs.matrix }}
+
+  test:
+    needs: [runtime_images, setup]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        cfg: ${{ fromJson(needs.setup.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v5.0.1
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+      - name: Set repository variable
+        id: repo
+        run: echo "repo=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+      - name: Build Python 3.9 image locally
+        if: needs.runtime_images.outputs.build_locally == 'true' && matrix.cfg.PYTHON == '3.9'
+        uses: docker/build-push-action@v6.18.0
+        with:
+          context: .
+          file: etc/docker/test/runtime.Dockerfile
+          target: final
+          build-args: |
+            PYTHON=3.9
+          push: false
+          tags: ${{ needs.runtime_images.outputs.py39_image }}
+          outputs: type=docker
+          cache-from: type=registry,ref=ghcr.io/${{ steps.repo.outputs.repo }}/rucio-dev-runtime:py39-buildcache
+        continue-on-error: false
+      - name: Build Python 3.10 image locally
+        if: needs.runtime_images.outputs.build_locally == 'true' && matrix.cfg.PYTHON == '3.10'
+        uses: docker/build-push-action@v6.18.0
+        with:
+          context: .
+          file: etc/docker/test/runtime.Dockerfile
+          target: final
+          build-args: |
+            PYTHON=3.10
+          push: false
+          tags: ${{ needs.runtime_images.outputs.py310_image }}
+          outputs: type=docker
+          cache-from: type=registry,ref=ghcr.io/${{ steps.repo.outputs.repo }}/rucio-dev-runtime:py310-buildcache
+        continue-on-error: false
+      - name: Run test with cfg
+        env:
+          PY39_RUNTIME_IMAGE: ${{ needs.runtime_images.outputs.py39_image }}
+          PY310_RUNTIME_IMAGE: ${{ needs.runtime_images.outputs.py310_image }}
+          BUILD_LOCALLY: ${{ needs.runtime_images.outputs.build_locally }}
+        run: |
+          echo '{"matrix": ${{ toJson(matrix.cfg) }}, "runtime_images": {"3.9": "${{ needs.runtime_images.outputs.py39_image }}", "3.10": "${{ needs.runtime_images.outputs.py310_image }}"}, "build_locally": "${{ needs.runtime_images.outputs.build_locally }}" }' | ./tools/test/run_tests.py
+
+  # ==========================================================================
+  # END-TO-END INTEGRATION TESTS (from integration_tests.yml)
+  # ==========================================================================
+
+  e2e_runtime_images:
+    name: Build E2E Runtime Images
+    if: github.event_name != 'schedule'
+    uses: ./.github/workflows/runtime_images.yml
+    permissions:
+      packages: write
+
+  e2e_setup:
+    runs-on: ubuntu-latest
+    if: github.repository_owner == 'rucio' || github.event_name != 'schedule'
+    steps:
+      - uses: actions/checkout@v5.0.1
+      - name: Update pip
+        run: python3 -m pip install -U pip setuptools
+      - name: Install python requirements for matrix_parser.py
+        run: python3 -m pip install -U PyYAML
+      - name: Identify branch
+        id: branch
+        run: python3 tools/github/workflow/set_branch_output_env.py
+      - name: Identify Matrix
+        id: matrix
+        run: echo "matrix=$(./tools/test/matrix_parser.py < ./etc/docker/test/matrix_integration_tests.yml)" >> $GITHUB_OUTPUT
+    outputs:
+      branch: ${{ steps.branch.outputs.branch }}
+      matrix: ${{ steps.matrix.outputs.matrix }}
+
+  integration-tests:
+    needs: [e2e_runtime_images, e2e_setup]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        cfg: ${{ fromJson(needs.e2e_setup.outputs.matrix) }}
+    steps:
+      - name: Checkout rucio containers repository
+        uses: actions/checkout@v5.0.1
+        with:
+          repository: rucio/containers
+          fetch-depth: 0
+      - uses: actions/checkout@v5.0.1
+        name: Checkout rucio source
+        with:
+          path: dev/rucio
+          fetch-depth: 0
+      - name: Select tag for rucio containers
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/dev/rucio
+          BRANCH=$(git rev-parse --abbrev-ref HEAD)
+          OWNER="${{ github.repository_owner }}"
+
+          if [ $OWNER != 'rucio' ]; then
+            echo "Fetching branches and tags from rucio/rucio"
+            git remote add rucio https://github.com/rucio/rucio
+            git fetch rucio --tags -f
+          fi
+
+          echo "On branch ${BRANCH}"
+          if [ $BRANCH == 'master' ]; then
+              GIT_REF="master"
+          else
+              GIT_REF=$(git describe --tags --abbrev=0)
+              IFS=. read major minor micro build <<<"${GIT_REF}"
+              RELEASE_FAMILY=$major
+              LATEST_RELEASE_IN_RELEASE_FAMILY=$(git for-each-ref --format '%(refname)' refs/tags/$RELEASE_FAMILY.* | sort -k 1.11V | tail -1 | awk -F'/' '{print $3}')
+              LATEST_RUCIO_RELEASE_FAMILY=$(git for-each-ref --format '%(refname)' refs/tags | sort -k 1.11V | tail -1 | awk -F'/' '{print $3}' | awk -F'.' '{print $1}')
+
+              if [ $LATEST_RUCIO_RELEASE_FAMILY = $RELEASE_FAMILY ]; then
+                  GIT_REF='master'
+              else
+                  GIT_REF=$LATEST_RELEASE_IN_RELEASE_FAMILY
+              fi
+          fi
+
+          cd $GITHUB_WORKSPACE
+          if [ $(git tag -l "$GIT_REF") ]; then
+              git checkout tags/$GIT_REF
+          else
+              echo "Tag $GIT_REF not found, using master"
+              git checkout master
+          fi
+
+      - name: Set up Docker Buildx
+        if: needs.e2e_runtime_images.outputs.build_locally == 'true'
+        uses: docker/setup-buildx-action@v3.12.0
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+      - name: Build Python 3.9 image locally
+        if: needs.e2e_runtime_images.outputs.build_locally == 'true'
+        uses: docker/build-push-action@v6.18.0
+        with:
+          context: dev/rucio
+          file: dev/rucio/etc/docker/test/runtime.Dockerfile
+          target: final
+          build-args: |
+            PYTHON=3.9
+          push: false
+          tags: ${{ needs.e2e_runtime_images.outputs.py39_image }}
+          outputs: type=docker
+        continue-on-error: false
+      - name: Pull all required images
+        id: images
+        shell: bash
+        run: |
+          docker compose -f $GITHUB_WORKSPACE/dev/rucio/etc/docker/dev/docker-compose.yml --profile storage --profile externalmetadata --profile iam pull
+      - name: Set Runtime Image in Docker Compose
+        shell: bash
+        run: |
+          docker image ls
+          sed -i 's;image: .*rucio-dev.*;image: ${{ needs.e2e_runtime_images.outputs.py39_image }};' \
+              $GITHUB_WORKSPACE/dev/rucio/etc/docker/dev/docker-compose.yml
+      - name: Start containers
+        run: |
+          export DEV_PROFILES=storage,externalmetadata,iam
+          docker compose -f $GITHUB_WORKSPACE/dev/rucio/etc/docker/dev/docker-compose.yml --profile storage --profile externalmetadata --profile iam up -d
+      - name: Initialize tests
+        shell: bash
+        run: |
+          docker exec -t dev-rucio-1 bash -c "
+            set -e
+            cd /rucio_source
+            cp etc/rse-accounts.cfg.template /opt/rucio/etc/rse-accounts.cfg
+            cp etc/rse-accounts.cfg.template /opt/rucio/etc/rse-accounts.cfg.template
+            cp etc/rse_repository.json /opt/rucio/etc/rse_repository.json
+            cp etc/rclone-init.cfg /opt/rucio/etc/rclone-init.cfg
+            ln -sf pyproject.server.toml pyproject.toml
+            ln -sf /root/.ssh/ruciouser_sshkey /root/.ssh/id_rsa 2>/dev/null || true
+            ln -sf /root/.ssh/ruciouser_sshkey.pub /root/.ssh/id_rsa.pub 2>/dev/null || true
+            pip install --no-cache-dir -e /rucio_source
+            tools/run_tests.sh -ir
+          "
+      - name: File Upload/Download Test
+        run: docker exec -t dev-rucio-1 tools/pytest.sh -v --tb=short tests/test_rucio_server.py
+      - name: UploadClient Test
+        run: docker exec -t dev-rucio-1 tools/pytest.sh -v --tb=short tests/test_upload.py
+      - name: File Upload/Download Test using 'impl' parameter
+        run: docker exec -t dev-rucio-1 tools/pytest.sh -v --tb=short tests/test_impl_upload_download.py
+      - name: Test gfal2 implementation on xrootd protocol
+        run: docker exec -t dev-rucio-1 tools/pytest.sh -v --tb=short tests/test_rse_protocol_gfal2_impl.py
+      - name: Test Protocol XrootD
+        run: docker exec -t dev-rucio-1 tools/pytest.sh -v --tb=short tests/test_rse_protocol_xrootd.py
+      - name: Test Protocol SSH (scp)
+        run: docker exec -t dev-rucio-1 tools/pytest.sh -v --tb=short tests/test_rse_protocol_ssh.py
+      - name: Test Protocol Rsync
+        run: docker exec -t dev-rucio-1 tools/pytest.sh -v --tb=short tests/test_rse_protocol_rsync.py
+      - name: Test Protocol Rclone
+        run: docker exec -t dev-rucio-1 tools/pytest.sh -v --tb=short tests/test_rse_protocol_rclone.py
+      - name: Test Conveyor
+        run: docker exec -t dev-rucio-1 tools/pytest.sh -v --tb=short tests/test_conveyor.py
+      - name: Execute transfer and export FTS transfer details
+        id: tpc
+        shell: bash
+        run: |
+          docker exec -t dev-rucio-1 tools/pytest.sh -v --tb=short --export-artifacts-from="test_tpc" tests/test_tpc.py
+          FTS_LOG_FILE=$(docker exec -t dev-rucio-1 cat /tmp/test_tpc.artifact)
+          echo "fts3log=$FTS_LOG_FILE" >> $GITHUB_OUTPUT
+      - name: Verify TPC transfers from FTS logs
+        shell: bash
+        run: |
+          FTS_LOG_FILE=${{ steps.tpc.outputs.fts3log }}
+          if docker exec -t dev-fts-1 /bin/bash -c "grep -Fq \"3rd pull\" $FTS_LOG_FILE"
+          then
+            echo "TPC 3rd party pull verified"
+          else
+            echo "TPC failed"
+            exit 1
+          fi
+      - name: Test Token Deletion
+        run: docker exec -t dev-rucio-1 tools/pytest.sh -v --tb=short tests/test_reaper.py::test_deletion_with_tokens
+      - name: Print server error logs
+        if: ${{ success() || failure() }}
+        shell: bash
+        run: |
+          docker exec -t dev-rucio-1 cat /var/log/rucio/httpd_error_log
+      - name: Archive Upload/Download Test
+        run: docker exec -t dev-rucio-1 tools/pytest.sh -v --tb=short tests/test_download.py::test_download_from_archive_on_xrd
+      - name: Test external metadata plugin (mongo)
+        run: docker exec -t dev-rucio-1 tools/pytest.sh -v --tb=short tests/test_did_meta_plugins.py::TestDidMetaMongo
+      - name: Test external metadata plugin (postgres)
+        run: docker exec -t dev-rucio-1 tools/pytest.sh -v --tb=short tests/test_did_meta_plugins.py::TestDidMetaExternalPostgresJSON
+      - name: Test external metadata plugin (elasticsearch)
+        run: docker exec -t dev-rucio-1 tools/pytest.sh -v --tb=short tests/test_did_meta_plugins.py::TestDidMetaElastic
+      - name: Stop containers
+        if: always()
+        run: docker compose -f $GITHUB_WORKSPACE/dev/rucio/etc/docker/dev/docker-compose.yml --profile storage --profile externalmetadata --profile iam down

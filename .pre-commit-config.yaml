@@ -1,18 +1,124 @@
+# Rucio Pre-commit Configuration
+# Copyright European Organization for Nuclear Research (CERN) since 2012
+#
+# This configuration defines all code quality checks for both local development
+# and CI. The checks are organized into three stages:
+#
+# COMMIT STAGE (< 5s):  Fast checks that run automatically on git commit
+# MANUAL STAGE (30s+):  Very slow checks, run explicitly via make targets
+#
+# Installation:
+#   make install              # Installs hooks automatically
+#   pre-commit install        # Or install via pre-commit directly
+#
+# Usage:
+#   git commit                # Automatically runs commit-stage hooks
+#   git push                  # Automatically runs push-stage hooks
+#   make check                # Run commit-stage checks manually
+#   make check-push           # Run push-stage checks manually
+#   make check-all            # Run all checks including manual stage
+#   make type-check           # Run pyright explicitly (slow)
+#
+# In CI:
+#   make check check-push     # Runs in the "quality" job
+
+default_install_hook_types: [pre-commit]
+default_stages: [pre-commit]
+
 repos:
-- repo: https://github.com/pre-commit/pre-commit-hooks
-  rev: v5.0.0
-  hooks:
-  - id: end-of-file-fixer
-  - id: trailing-whitespace
-- repo: local
-  hooks:
-  - id: add-header
-    name: Run `add_header` script
-    description: Run the `add_header` script to verify the file headers
-    entry: tools/add_header
-    language: system
-- repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: v0.14.9
-  hooks:
-    - id: ruff
-      args: [ --fix ]
+  # ==========================================================================
+  # COMMIT STAGE - Fast checks (< 5 seconds)
+  # Runs automatically on: git commit
+  # Runs via make target: make check
+  # ==========================================================================
+
+  # Basic file hygiene
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: end-of-file-fixer
+        exclude: '^(\.github/|etc/docker/)'
+        stages: [pre-commit]
+      - id: trailing-whitespace
+        exclude: '^(\.github/|etc/docker/)'
+        args: [--markdown-linebreak-ext=md]
+        stages: [pre-commit]
+      - id: check-merge-conflict
+        stages: [pre-commit]
+      # - id: check-added-large-files
+      #   args: ['--maxkb=1000']
+      #   stages: [pre-commit]
+      # - id: mixed-line-ending
+      #   args: ['--fix=lf']
+      #   stages: [pre-commit]
+      # - id: check-yaml
+      #   args: [--safe]
+      #   exclude: '^(\.github/workflows/)'  # GitHub Actions have special syntax
+      #   stages: [pre-commit]
+      # - id: check-json
+      #   stages: [pre-commit]
+      # - id: check-toml
+      #   stages: [pre-commit]
+
+  # Python linting and formatting (matches CI: python_ruff job)
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.13
+    hooks:
+      # - id: ruff
+      #   args: [ --fix ]
+      - id: ruff
+        name: ruff lint
+        args: [--fix, --exit-non-zero-on-fix]
+        types_or: [python, pyi]
+        stages: [pre-commit]
+      # - id: ruff-format
+      #   name: ruff format
+      #   types_or: [python, pyi]
+      #   stages: [pre-commit]
+  # License header check
+  - repo: local
+    hooks:
+      - id: add-header
+        name: Check Apache 2.0 license headers
+        entry: tools/add_header
+        args: [--dry-run, --disable-progress-bar]
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
+
+  # ==========================================================================
+  # MANUAL STAGE - Very slow or setup-dependent checks (30+ seconds)
+  # Runs explicitly via: make type-check, make security, make check-all
+  # ==========================================================================
+
+  # Pyright type checking
+  # NOTE: This is slow (~30-60s) so it's manual by default
+  # CI runs this separately with ancestor comparison logic
+  - repo: local
+    hooks:
+      - id: pyright
+        name: Pyright type checking
+        entry: bash -c 'npm install --global pyright >/dev/null 2>&1 && pyright'
+        language: system
+        pass_filenames: false
+        stages: [manual]
+
+  # # Security scanning (not currently in CI, but useful for local dev)
+  # - repo: https://github.com/PyCQA/bandit
+  #   rev: 1.8.0
+  #   hooks:
+  #     - id: bandit
+  #       args: [-c, pyproject.toml, -ll]  # Only report medium+ severity
+  #       additional_dependencies: ["bandit[toml]"]
+  #       stages: [manual]
+  #       exclude: '^tests/'
+
+# CI configuration for pre-commit.ci service (not currently used)
+ci:
+  autofix_commit_msg: '[pre-commit.ci] auto fixes'
+  autofix_prs: true
+  autoupdate_branch: ''
+  autoupdate_commit_msg: '[pre-commit.ci] pre-commit autoupdate'
+  autoupdate_schedule: weekly
+  skip: [add-header, pyright]  # Skip local hooks in pre-commit.ci
+  submodules: false
