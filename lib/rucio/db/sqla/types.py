@@ -86,9 +86,6 @@ class BooleanString(TypeDecorator):
 
     cache_ok = True
 
-    def load_dialect_imp(self, dialect):
-        return dialect.type_descriptor(String(255))
-
     def process_bind_param(self, value, dialect):
         if value is None:
             return value
@@ -149,9 +146,6 @@ class InternalAccountString(TypeDecorator):
 
     cache_ok = True
 
-    def load_dialect_imp(self, dialect):
-        return dialect.type_descriptor(String(255))
-
     def process_bind_param(self, value, dialect):
         if value is None:
             return value
@@ -181,9 +175,6 @@ class InternalScopeString(TypeDecorator):
     impl = String
 
     cache_ok = True
-
-    def load_dialect_imp(self, dialect):
-        return dialect.type_descriptor(String(255))
 
     def process_bind_param(self, value, dialect):
         if value is None:

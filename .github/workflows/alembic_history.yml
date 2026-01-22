@@ -2,6 +2,9 @@ name: Alembic history validation
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - '**'
   schedule:
     - cron: '0 4 * * 0'
 

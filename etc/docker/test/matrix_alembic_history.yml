@@ -3,8 +3,13 @@ dists:
     allow:
       python:
         - "3.9"
+        - "3.10"
 python:
   - id: "3.9"
+    allow:
+      suites:
+        - alembic_history
+  - id: "3.10"
     allow:
       suites:
         - alembic_history
