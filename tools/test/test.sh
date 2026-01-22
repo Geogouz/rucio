@@ -20,9 +20,8 @@ echo "* Using $(command -v python) $(python --version 2>&1) and $(command -v pip
 
 SOURCE_PATH=${RUCIO_SOURCE_DIR:-/usr/local/src/rucio}
 CFG_PATH=${RUCIO_SOURCE_DIR:-/usr/local/src/rucio}/etc/docker/test/extra/
-ORIGINAL_RUCIO_HOME=${RUCIO_HOME:-/opt/rucio}
 if [ -z "$RUCIO_HOME" ]; then
-    RUCIO_HOME="$ORIGINAL_RUCIO_HOME"
+    RUCIO_HOME=/opt/rucio
 fi
 
 function srchome() {
@@ -92,13 +91,9 @@ elif [ "$SUITE" == "multi_vo" ]; then
 
 elif [ "$SUITE" == "alembic_history" ]; then
     wait_for_database
-    (
-        cd "$SOURCE_PATH"
-        PYTHONPATH=lib \
-            RUCIO_HOME="$ORIGINAL_RUCIO_HOME" \
-            ALEMBIC_CONFIG="$ORIGINAL_RUCIO_HOME/etc/alembic.ini" \
-            python3 tools/check_alembic_history.py
-    )
+    srchome
+    tools/reset_database.py
+    PYTHONPATH=lib python3 tools/check_alembic_history.py
 
 elif [ "$SUITE" == "remote_dbs" ] || [ "$SUITE" == "sqlite" ]; then
     wait_for_database

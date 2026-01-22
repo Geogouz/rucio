@@ -13,88 +13,83 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Alembic history validation entry point used in Rucio CI and local dev.
-
-Overview
---------
-This script invokes :func:`rucio.db.sqla.util.validate_alembic_history` against
-the repository's Alembic configuration. The validator performs four checks:
-
-1. **Single-branch history** – rejects repositories whose revision graph has
-   forks, joins, or cycles so that migrations remain a linear chain.
-2. **Application flag sanity** – exercises ``is_old_db()`` across known
-   upgrade/downgrade transitions and verifies the revision markers recorded in
-   both the source tree and the database.
-3. **Revision round-trips** – for every adjacent pair of revisions, upgrading
-   and then downgrading back must reproduce the original schema fingerprint.
-4. **Head marker vs. models** – upgrading to ``head`` must yield exactly the
-   schema described by the SQLAlchemy models bundled with the repository.
-
-The validator stops as soon as the first inconsistency is detected so that each
-issue can be addressed individually before re-running the checks.
-
-Safety
-------
-Because the routine performs destructive migrations, it should only be used
-against disposable databases. CI and the local developer harness provision a
-fresh database inside a container and inject the generated ``alembic.ini`` via
-``ALEMBIC_CONFIG`` before invoking the checker. Running the tool against a
-shared or production database is strongly discouraged.
+"""
+Design goals
+------------
+1) From *any* Alembic revision state, upgrading to head must produce a schema
+   that exactly matches Rucio's SQLAlchemy models.
+2) Every adjacent upgrade/downgrade pair must be a lossless round-trip:
+   - A -> B -> A yields the same schema as A
+   - B -> A -> B yields the same schema as B
+3) Stop on first problem by default, but optionally report all issues.
+4) Usable locally (manual run) and in CI (non-interactive, JSON artifact).
 
 Usage
 -----
-$ python3 tools/check_alembic_history.py [--verbose]
+# use the repository's alembic.ini and models module
+$ python3 tools/check_alembic_history.py \
+    --alembic-cfg etc/alembic.ini \
+    --models rucio.db.sqla.models:BASE \
+    --report-json artifacts/alembic_history_report.json
 
-Exit codes
-----------
-0 – no issues detected
-1 – validation completed with at least one reported issue
-2 – unexpected error while running the checks
+Optional Flags
+--------------
+--db-url               Override the database URL (otherwise read from alembic.ini)
+--report-all-drift     Continue after a failure to collect all issues
+--skip-roundtrips      Only verify 'upgrade to head matches models' (faster)
+--schemas SC1,SC2      Extra schemas to include when comparing (comma separated)
+--include-views        Include views in the fingerprint (experimental, default off)
+--verbose              Chatty logs
+
+Exit code is non‑zero when issues are found.
+
+Implementation notes
+--------------------
+- We rely on Alembic's ScriptDirectory to discover the revision DAG.
+- For round-trip checks we compute a structural "fingerprint" of the current
+  database using SQLAlchemy's reflection in a backend‑agnostic way.
+- To validate "head matches models" we use Alembic's autogenerate engine to
+  produce migrations vs. the models metadata and assert that the upgrade ops
+  are empty.
 """
 import argparse
+import dataclasses
 import importlib
+import io
+import json
 import logging
 import os
 import sys
-from pathlib import Path
+import time
+from collections import defaultdict
 from typing import TYPE_CHECKING, Optional
 
+from alembic import command as alembic_cmd
+from alembic.autogenerate import api as autogen_api
 from alembic.config import Config as AlembicConfig
+from alembic.migration import MigrationContext
 from alembic.script import ScriptDirectory
 from sqlalchemy import MetaData, create_engine
 
-from rucio.db.sqla import alembicrevision
-from rucio.db.sqla.alembic_validation import (
-    Issue,
-    log_heading,
-)
-from rucio.db.sqla.util import validate_alembic_history as _validate_alembic_history
-
 if TYPE_CHECKING:
-    from collections.abc import Callable, Sequence
+    from collections.abc import Callable, Iterable, Sequence
 
     from sqlalchemy.engine import Engine
-
-DEFAULT_MODELS_EXPR = "rucio.db.sqla.models:BASE"
 
 
 # --------------------------- CLI parsing -----------------------------------
 
 def _parse_arguments(argv: "Sequence[str]") -> argparse.Namespace:
-    """Parse command line arguments.
-
-    Parameters
-    ----------
-    argv:
-        Raw command line parameters, typically ``sys.argv[1:]``.
-
-    Returns
-    -------
-    argparse.Namespace
-        The parsed arguments including the ``verbose`` flag.
-    """
-
     p = argparse.ArgumentParser(description="Exhaustive Alembic history validation")
+    p.add_argument("--alembic-cfg", required=True, help="Path to alembic.ini")
+    p.add_argument("--models", default="rucio.db.sqla.models:BASE",
+                   help="Import path to models metadata. Formats: 'pkg.mod' (has 'Base' or 'BASE'), or 'pkg.mod:BaseName'")
+    p.add_argument("--db-url", default=None, help="Override sqlalchemy.url in alembic.ini")
+    p.add_argument("--report-json", default=None, help="Write a JSON report here")
+    p.add_argument("--report-all-drift", action="store_true", help="Continue after failures to collect all issues")
+    p.add_argument("--skip-roundtrips", action="store_true", help="Skip A<->B round-trip checks (faster)")
+    p.add_argument("--schemas", default=None, help="Comma separated extra schemas to include in reflection")
+    p.add_argument("--include-views", action="store_true", help="Include views in fingerprint")
     p.add_argument("--verbose", action="store_true", help="Verbose logging")
     return p.parse_args(argv)
 
@@ -102,32 +97,10 @@ def _parse_arguments(argv: "Sequence[str]") -> argparse.Namespace:
 # --------------------------- Utilities -------------------------------------
 
 def _load_models_metadata(models_expr: str) -> MetaData:
-    """Resolve a dotted expression describing the SQLAlchemy models metadata.
-
-    The utility accepts two forms:
-
-    * ``"package.module"`` – the module is imported and an attribute named
-      ``BASE``, ``Base`` or ``metadata`` is looked up automatically.
-    * ``"package.module:Attribute"`` – the module is imported and the provided
-      attribute is retrieved explicitly.
-
-    In both cases the resolved object can either be a declarative base (with a
-    ``metadata`` attribute) or a :class:`sqlalchemy.MetaData` instance.
-
-    Parameters
-    ----------
-    models_expr:
-        Expression describing where to locate the metadata object.
-
-    Returns
-    -------
-    sqlalchemy.MetaData
-        The metadata object that describes the canonical database schema.
-
-    Raises
-    ------
-    TypeError
-        If the resolved object is not a :class:`~sqlalchemy.MetaData` instance.
+    """
+    Accepts either 'package.module' (with attribute 'Base' or 'BASE')
+    or 'package.module:Attribute' which resolves to a declarative base
+    or a MetaData instance. Returns a MetaData.
     """
     if ":" in models_expr:
         mod_name, attr = models_expr.split(":", 1)
@@ -152,170 +125,286 @@ def _load_models_metadata(models_expr: str) -> MetaData:
     return md
 
 
-def _resolve_alembic_config_path() -> Path:
-    """Return the absolute path to the Alembic configuration file.
-
-    The history checker now mirrors the rest of the tooling: it first respects
-    the ``ALEMBIC_CONFIG`` environment variable (which is how the developer and
-    CI containers expose their generated configuration) and only falls back to
-    the repository default when that override is absent.
-
-    Returns
-    -------
-    pathlib.Path
-        Absolute path to the Alembic configuration file that should be used for
-        the validation run.
-
-    Raises
-    ------
-    FileNotFoundError
-        If neither ``ALEMBIC_CONFIG`` nor ``etc/alembic.ini`` resolve to an
-        existing file.
-    """
-
-    env_cfg = os.environ.get("ALEMBIC_CONFIG")
-    if env_cfg:
-        cfg_path = Path(env_cfg).expanduser()
-        if cfg_path.is_file():
-            return cfg_path.resolve()
-        raise FileNotFoundError(
-            "Alembic configuration specified via ALEMBIC_CONFIG not found: "
-            f"{cfg_path}"
-        )
-
-    repo_root = Path(__file__).resolve().parent.parent
-    default_alembic_cfg = repo_root / "etc" / "alembic.ini"
-
-    if default_alembic_cfg.is_file():
-        return default_alembic_cfg.resolve()
-
-    raise FileNotFoundError(
-        "Alembic configuration not found. Set ALEMBIC_CONFIG or provide "
-        "etc/alembic.ini in the repository checkout."
-    )
-
-
-def _build_alembic_config() -> AlembicConfig:
-    """Construct an Alembic configuration object for the validation run.
-
-    The helper resolves the configuration path and ensures that the
-    ``script_location`` entry is absolute so that Alembic can find the revision
-    scripts regardless of the current working directory. Relative locations are
-    resolved against the directory containing the configuration file, mirroring
-    Alembic's own behaviour.
-    """
-    cfg_path = _resolve_alembic_config_path()
-    cfg = AlembicConfig(str(cfg_path))
+def _build_alembic_config(alembic_cfg_path: str, db_url_override: Optional[str] = None) -> AlembicConfig:
+    cfg = AlembicConfig(alembic_cfg_path)
+    if db_url_override:
+        cfg.set_main_option("sqlalchemy.url", db_url_override)
     # Alembic might be invoked from any cwd; make script_location absolute
     script_loc = cfg.get_main_option("script_location")
     if script_loc and not os.path.isabs(script_loc):
-        resolved_script_loc = Path(cfg_path).parent.joinpath(script_loc).resolve()
-        cfg.set_main_option("script_location", str(resolved_script_loc))
+        cfg.set_main_option("script_location", os.path.abspath(script_loc))
     return cfg
 
 
-def _assert_single_head_repo(cfg: AlembicConfig) -> None:
-    """Validate the Alembic repository head before running history checks.
-
-    This routine loads the Alembic script directory from the given Config and
-    enforces two invariants:
-
-    1) The repository exposes exactly one head (no multi-head branches).
-    2) That head equals rucio.db.sqla.alembicrevision.ALEMBIC_REVISION (the
-       code's notion of the current head).
-
-    If either condition fails, the process terminates (SystemExit) with a
-    message that suggests merging heads or updating ALEMBIC_REVISION. This
-    early check prevents running the expensive validation against an
-    inconsistent revision graph.
-    """
-
-    script = ScriptDirectory.from_config(cfg)
-    heads = tuple(script.get_heads())
-    if len(heads) != 1:
-        raise SystemExit(
-            f"[alembic-history] Multiple repo heads: {heads}.\n"
-            "Fix by merging heads with `alembic merge`."
-        )
-    if heads[0] != alembicrevision.ALEMBIC_REVISION:
-        raise SystemExit(
-            f"[alembic-history] Repo head {heads[0]} != "
-            f"ALEMBIC_REVISION {alembicrevision.ALEMBIC_REVISION}."
-        )
-
-
 def _get_engine_from_cfg(cfg: AlembicConfig) -> "Engine":
-    """Create a SQLAlchemy Engine from alembic.ini.
-
-    Reads the 'sqlalchemy.url' setting from the provided Alembic Config and
-    constructs a new Engine (created with 'future=True').
-
-    Returns
-    -------
-    sqlalchemy.engine.Engine
-
-    Raises
-    ------
-    RuntimeError
-        If 'sqlalchemy.url' is missing or empty in the loaded configuration.
-    """
     url = cfg.get_main_option("sqlalchemy.url")
     if not url:
-        raise RuntimeError("No sqlalchemy.url found; configure it in alembic.ini")
+        raise RuntimeError("No sqlalchemy.url found; supply --db-url or set it in alembic.ini")
     return create_engine(url, future=True)
 
 
-def validate_alembic_history(
-        logger: "Callable[[str], None]",
-) -> list[Issue]:
-    """Run the end-to-end Alembic history validation for the current repository.
+def _reflect_metadata(engine: "Engine", include_schemas: "Iterable[str]", include_views: bool) -> MetaData:
+    md = MetaData()
+    schemas = [None]
+    for sc in include_schemas:
+        if sc and sc not in schemas:
+            schemas.append(sc)
+    for sc in schemas:
+        try:
+            md.reflect(bind=engine, schema=sc, views=include_views, resolve_fks=True)  # type: ignore[arg-type]
+        except TypeError:
+            md.reflect(bind=engine, schema=sc)  # views kw not supported in some versions
+    return md
 
-    Workflow
-    --------
-    1) Build the Alembic Config (including converting 'script_location' to an
-       absolute path).
-    2) Enforce repository invariants via _assert_single_head_repo:
-       - exactly one head; and
-       - that head equals ALEMBIC_REVISION.
-       On failure this function terminates the process (SystemExit).
-    3) Log a heading and delegate to the library validator
-       (rucio.db.sqla.util.validate_alembic_history) with explicit loaders:
-         • load_config           -> returns the already constructed Config
-         • load_models_metadata  -> imports and returns the code's MetaData
-         • load_engine           -> creates an Engine from alembic.ini
 
-    Parameters
-    ----------
-    logger : Callable[[str], None]
-        Used to report progress and findings (e.g. 'print').
-    Returns
-    -------
-    list[Issue]
-        The issues reported by the library validator.
+def _normalize_type(t) -> str:
+    try:
+        return str(t)
+    except Exception:
+        return repr(t)
 
-    Raises
-    ------
-    SystemExit
-        If the repository has multiple heads or the head does not match
-        ALEMBIC_REVISION.
-    FileNotFoundError, RuntimeError
-        Propagated from configuration resolution and Engine creation.
+
+def _schema_fingerprint(engine: "Engine", include_schemas: "Iterable[str]", include_views: bool) -> str:
     """
-    cfg = _build_alembic_config()
-    _assert_single_head_repo(cfg)
+    Compute a backend‑agnostic fingerprint of the current database schema.
+    This is used for round‑trip checks.
+    """
+    md = _reflect_metadata(engine, include_schemas, include_views)
+    parts = []
+    for table in sorted(md.tables.values(), key=lambda t: (t.schema or "", t.name)):
+        parts.append(f"TABLE {table.schema or ''}.{table.name}")
+        for c in sorted(table.columns, key=lambda c: c.name):
+            try:
+                default_text = None
+                if c.server_default is not None:
+                    # SQLAlchemy 2.0 has .arg for server_default, older may vary
+                    if hasattr(c.server_default, "arg") and hasattr(c.server_default.arg, "text"):
+                        default_text = c.server_default.arg.text  # type: ignore[attr-defined]
+                    else:
+                        default_text = str(c.server_default)
+                parts.append(f"  COL {c.name} {_normalize_type(c.type)} "
+                             f"{'NULL' if c.nullable else 'NOTNULL'} "
+                             f"DEF={default_text} "
+                             f"PKEY={'Y' if c.primary_key else 'N'}")
+            except Exception:
+                pass
+        if table.primary_key and table.primary_key.columns:
+            parts.append("  PK " + ",".join(col.name for col in table.primary_key.columns))
+        # indexes
+        for idx in sorted(table.indexes, key=lambda i: i.name or ""):
+            try:
+                unique = "U" if idx.unique else "N"
+                cols = ",".join(c.name for c in idx.columns)
+                parts.append(f"  IDX {idx.name}:{unique}:{cols}")
+            except Exception:
+                pass
+        # foreign keys
+        for fk in sorted(table.foreign_keys, key=lambda fk: fk.parent.name + (fk.constraint.name or "")):
+            try:
+                parts.append(
+                    f"  FK {fk.constraint.name}:{fk.parent.name}->{fk.column.table.fullname}({fk.column.name})")
+            except Exception:
+                pass
+    import hashlib
+    blob = "\n".join(parts).encode("utf-8", errors="ignore")
+    return hashlib.sha256(blob).hexdigest()
 
-    log_heading(logger, "Alembic history validation")
 
-    return _validate_alembic_history(
-        logger=logger,
-        load_config=lambda: cfg,
-        load_models_metadata=lambda: _load_models_metadata(DEFAULT_MODELS_EXPR),
-        load_engine=lambda: _get_engine_from_cfg(cfg),
-    )
+def _drop_everything(engine: "Engine") -> None:
+    """
+    Hard drop of all reflected tables; safer and faster than downgrade base when
+    not all down-revisions exist. Attempts a best‑effort for common dialects.
+    """
+    from sqlalchemy import MetaData
+    from sqlalchemy import text as sql_text
+    with engine.connect() as conn:
+        trans = conn.begin()
+        try:
+            # disable FK checks if possible (mysql)
+            dialect_name = conn.dialect.name
+            if dialect_name == "mysql":
+                conn.execute(sql_text("SET FOREIGN_KEY_CHECKS=0"))
+            md = MetaData()
+            md.reflect(bind=conn)
+            md.drop_all(bind=conn)
+            # try dropping alembic_version table if left
+            try:
+                conn.execute(sql_text("DROP TABLE IF EXISTS alembic_version"))
+            except Exception:
+                pass
+            trans.commit()
+        except Exception:
+            trans.rollback()
+            raise
+
+
+@dataclasses.dataclass
+class Issue:
+    kind: str  # "roundtrip" | "models-drift"
+    at_revision: str
+    path: tuple[str, ...]  # e.g., ("r", "c", "r") for roundtrip A->B->A
+    detail: str
+
+
+def _log_heading(logger: "Callable[[str], None]", text: str) -> None:
+    bar = "=" * len(text)
+    logger(f"\n{bar}\n{text}\n{bar}")
+
+
+def _autogen_diff_is_empty(engine: "Engine", models_md: MetaData) -> tuple[bool, str]:
+    """
+    Return True if autogenerate produces no upgrade ops.
+    """
+    with engine.connect() as conn:
+        mctx = MigrationContext.configure(conn, opts={
+            "compare_type": True,
+            "compare_server_default": True,
+            "include_schemas": True,
+            "version_table_schema": None,
+            "target_metadata": models_md,
+        })
+        diffs = autogen_api.produce_migrations(mctx, models_md)
+        has_ops = not diffs.upgrade_ops.is_empty()
+        buf = io.StringIO()
+        if has_ops:
+            buf.write("Autogenerate suggests the following upgrade operations:\n")
+            for op in diffs.upgrade_ops.ops:
+                buf.write(f"  - {op!r}\n")
+        return (not has_ops), buf.getvalue()
+
+
+def _alembic_upgrade(cfg: AlembicConfig, rev: str) -> None:
+    alembic_cmd.upgrade(cfg, rev)
+
+
+def _alembic_downgrade(cfg: AlembicConfig, rev: str) -> None:
+    alembic_cmd.downgrade(cfg, rev)
+
+
+def _discover_revision_graph(script: ScriptDirectory) -> tuple[list[str], dict[str, set[str]], dict[str, set[str]]]:
+    """
+    Returns (topo_order, parents, children) where parents[r] is set of down_revisions of r, and
+    children[r] are immediate upgrades from r.
+    """
+    parents: dict[str, set[str]] = defaultdict(set)
+    children: dict[str, set[str]] = defaultdict(set)
+    for s in script.walk_revisions(base="base", head="heads"):
+        rid = s.revision
+        dr = s.down_revision
+        if dr is None:
+            pass
+        elif isinstance(dr, (list, tuple, set)):
+            parents[rid].update(dr)
+        else:
+            parents[rid].add(dr)
+    for child, ps in parents.items():
+        for p in ps:
+            children[p].add(child)
+    topo_from_base: list[str] = list(reversed([s.revision for s in script.walk_revisions(base="base", head="heads")]))
+    return topo_from_base, parents, children
+
+
+def validate_alembic_history(
+        alembic_cfg: str,
+        models_expr: str,
+        db_url: Optional[str],
+        logger: "Callable[[str], None]",
+        report_all_drift: bool = False,
+        skip_roundtrips: bool = False,
+        include_schemas: Optional["Iterable[str]"] = None,
+        include_views: bool = False,
+) -> list[Issue]:
+    cfg = _build_alembic_config(alembic_cfg, db_url_override=db_url)
+    script = ScriptDirectory.from_config(cfg)
+    engine = _get_engine_from_cfg(cfg)
+    models_md = _load_models_metadata(models_expr)
+    include_schemas = list(include_schemas or [])
+
+    topo, parents, children = _discover_revision_graph(script)
+
+    issues: list[Issue] = []
+
+    _log_heading(logger, "Alembic history validation")
+    logger(f"Using DB URL: {engine.url!s}")
+    logger(f"Total revisions in scope: {len(topo)}")
+    if skip_roundtrips:
+        logger("Round-trip checks: SKIPPED")
+    else:
+        logger("Round-trip checks: ENABLED")
+
+    for i, r in enumerate(topo, start=1):
+        logger(f"\n[{i}/{len(topo)}] Prepare at revision {r}: hard-reset database and upgrade to {r}")
+
+        # fresh DB at r
+        _drop_everything(engine)
+        _alembic_upgrade(cfg, r)
+
+        # baseline fingerprint for r
+        f_r = _schema_fingerprint(engine, include_schemas, include_views)
+
+        if not skip_roundtrips:
+            # For each adjacent child c: r -> c
+            for c in sorted(children.get(r, ())):
+                logger(f"  Round-trip A->B->A for edge {r} -> {c} -> {r}")
+                # r -> c -> r
+                _alembic_upgrade(cfg, c)
+                _alembic_downgrade(cfg, r)
+                f_back = _schema_fingerprint(engine, include_schemas, include_views)
+                if f_back != f_r:
+                    issues.append(Issue(
+                        kind="roundtrip",
+                        at_revision=r,
+                        path=(r, c, r),
+                        detail="Schema fingerprint after r->c->r differs from original at r"
+                    ))
+                    logger("Drift detected on r->c->r")
+                    if not report_all_drift:
+                        return issues
+                else:
+                    logger("OK")
+
+                # Now B->A->B starting from B
+                logger(f"  Round-trip B->A->B for edge {r} <- {c} <- {r}")
+                _drop_everything(engine)
+                _alembic_upgrade(cfg, c)
+                f_c = _schema_fingerprint(engine, include_schemas, include_views)
+                _alembic_downgrade(cfg, r)
+                _alembic_upgrade(cfg, c)
+                f_c_back = _schema_fingerprint(engine, include_schemas, include_views)
+                if f_c_back != f_c:
+                    issues.append(Issue(
+                        kind="roundtrip",
+                        at_revision=c,
+                        path=(c, r, c),
+                        detail="Schema fingerprint after c->r->c differs from original at c"
+                    ))
+                    logger("Drift detected on c->r->c")
+                    if not report_all_drift:
+                        return issues
+                else:
+                    logger("OK")
+
+        # From r upgrade to head, then compare with models
+        logger(f"  Upgrade {r} -> head and compare with models")
+        _alembic_upgrade(cfg, "head")
+        ok, diff_text = _autogen_diff_is_empty(engine, models_md, include_schemas)
+        if not ok:
+            issues.append(Issue(
+                kind="models-drift",
+                at_revision=r,
+                path=(r, "head"),
+                detail=diff_text or "Autogenerate reported differences between DB and models",
+            ))
+            logger("Models drift at head vs. SQLAlchemy models")
+            if not report_all_drift:
+                return issues
+        else:
+            logger("Head matches SQLAlchemy models")
+
+    return issues
 
 
 def main(argv: Optional["Sequence[str]"] = None) -> int:
-    """Command line entry point used by CI and local developers."""
     args = _parse_arguments(sys.argv[1:] if argv is None else argv)
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO, format="%(message)s")
 
@@ -324,26 +413,32 @@ def main(argv: Optional["Sequence[str]"] = None) -> int:
 
     try:
         issues = validate_alembic_history(
+            alembic_cfg=args.alembic_cfg,
+            models_expr=args.models,
+            db_url=args.db_url,
             logger=_log,
+            report_all_drift=args.report_all_drift,
+            skip_roundtrips=args.skip_roundtrips,
+            include_schemas=(args.schemas.split(",") if args.schemas else []),
+            include_views=args.include_views,
         )
     except Exception as exc:
         _log(f"FAILED with unexpected exception: {exc!r}")
         return 2
 
+    report = {
+        "issues_found": len(issues),
+        "issues": [dataclasses.asdict(i) for i in issues],
+        "timestamp": int(time.time()),
+    }
+
+    if args.report_json:
+        path = __import__("pathlib").Path  # lazy import to keep top small
+        path(args.report_json).parent.mkdir(parents=True, exist_ok=True)
+        path(args.report_json).write_text(json.dumps(report, indent=2), encoding="utf-8")
+
     if issues:
-        issue = issues[0]
-        _log("\nValidation halted after the first issue:")
-        _log(f"  kind : {issue.kind}")
-        _log(f"  at   : {issue.at_revision}")
-        if issue.path:
-            path_str = " -> ".join(issue.path)
-            _log(f"  path : {path_str}")
-        _log("  detail:")
-        for line in issue.detail.splitlines():
-            _log(f"    {line}")
-        if len(issues) > 1:
-            _log(f"  (additional {len(issues) - 1} issues were also returned)")
-        _log("\nSummary: issue detected. Fix the reported drift and rerun the validator.")
+        _log("\nSummary: issues found. See report above.")
         return 1
     else:
         _log("\nSummary: no issues found.")

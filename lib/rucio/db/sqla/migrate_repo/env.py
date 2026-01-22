@@ -12,10 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+from logging import LogRecord
 from logging.config import fileConfig
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
+
+if TYPE_CHECKING:
+    from collections.abc import Collection, Mapping
+
+    from alembic.runtime.migration import MigrationContext, MigrationInfo
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -25,10 +34,51 @@ config = context.config
 # This line sets up loggers basically.
 fileConfig(config.config_file_name)
 
+log = logging.getLogger("alembic.runtime.migration")
+
+
+class _SuppressRunningLogFilter(logging.Filter):
+    """Filter out Alembic's default "Running ..." log entries."""
+
+    def filter(self, record: LogRecord) -> bool:
+        message = record.getMessage()
+        return not (message.startswith("Running upgrade ") or message.startswith("Running downgrade "))
+
+
+log.addFilter(_SuppressRunningLogFilter())
+
+
+def _log_version_details(
+        ctx: 'MigrationContext',
+        step: 'MigrationInfo',
+        heads: 'Collection[Any]',
+        run_args: 'Mapping[str, Any]',
+) -> None:
+    """Emit a precise log entry for each executed migration step."""
+
+    revision = step.up_revision
+    if revision is None:
+        return
+
+    operation = "upgrade" if step.is_upgrade else "downgrade"
+    source = ",".join(step.source_revision_ids) or "base"
+    destination = ",".join(step.destination_revision_ids) or "base"
+
+    script_path = Path(revision.path).resolve()
+    repo_root = Path(__file__).resolve().parent
+    try:
+        relative_path = script_path.relative_to(repo_root)
+    except ValueError:
+        relative_path = script_path
+
+    log.info(f"Executing {operation} {source} -> {destination} using {relative_path}::{operation}")
+
 # add your model's MetaData object here
 # for 'autogenerate' support
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
+
+
 target_metadata = None
 
 # other values from the config, defined by the needs of env.py,
@@ -37,21 +87,17 @@ target_metadata = None
 # ... etc.
 
 
-def run_migrations_offline():
-    """Run migrations in *offline* mode using only configuration values.
+def run_migrations_offline() -> None:
+    """
+    Run migrations in 'offline' mode.
 
-    The context is configured from ``alembic.ini`` without creating an Engine.
-    This allows Alembic to emit SQL without a live DBAPI connection.
+    This configures the context with just a URL/dialect
+    and not an Engine, though an Engine is acceptable
+    here as well.  By skipping the Engine creation
+    we don't even need a DBAPI to be available.
 
-    Recognized options (from ``alembic.ini``):
-      - ``sqlalchemy.url``: database URL (may be omitted when using ``dialect``).
-      - ``dialect``: force a dialect name when no URL is supplied.
-      - ``version_table_schema``: schema that owns Alembic's version table.
-      - ``starting_rev``: optional starting revision to limit the run.
-
-    The environment enables ``include_schemas=True`` so objects outside the
-    default schema are included, and uses ``literal_binds=True`` to produce
-    fully rendered SQL.
+    Calls to context.execute() here emit the given string to the
+    script output.
     """
 
     # try getting url & version_table_schema
@@ -71,24 +117,20 @@ def run_migrations_offline():
         starting_rev=starting_rev,
         target_metadata=target_metadata,
         literal_binds=True,
-        include_schemas=True)
+        include_schemas=True,
+        on_version_apply=_log_version_details,
+    )
 
     with context.begin_transaction():
         context.run_migrations()
 
 
-def run_migrations_online():
-    """Run migrations in *online* mode against a live database connection.
+def run_migrations_online() -> None:
+    """
+    Run migrations in 'online' mode.
 
-    An Engine is constructed from the ``alembic.ini`` section. For databases
-    that support named schemas (e.g., PostgreSQL), we set a
-    ``schema_translate_map`` so that ``None`` maps to ``version_table_schema``
-    (if provided). The Alembic context is configured with:
-      - the active connection,
-      - the resolved ``version_table_schema``, and
-      - ``include_schemas=True`` so all schemas are migrated.
-
-    Migrations are then executed inside a transaction.
+    In this scenario we need to create an Engine
+    and associate a connection with the context.
     """
 
     params = config.get_section(config.config_ini_section)
@@ -108,7 +150,8 @@ def run_migrations_online():
             connection=conn,
             target_metadata=target_metadata,
             version_table_schema=params.get('version_table_schema', None),
-            include_schemas=True)
+            include_schemas=True,
+            on_version_apply=_log_version_details)
 
         with context.begin_transaction():
             context.run_migrations()
