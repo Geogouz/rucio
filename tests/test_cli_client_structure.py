@@ -19,6 +19,7 @@ import re
 import tempfile
 from typing import TYPE_CHECKING
 
+import click
 import pytest
 from click.testing import CliRunner
 
@@ -37,6 +38,17 @@ def _restore_rucio_config(value):
     else:
         os.environ["RUCIO_CONFIG"] = value
     clean_cached_config()
+
+
+def _help_paths(command: click.Command, prefix: tuple[str, ...] = ()) -> list[tuple[str, ...]]:
+    paths = [prefix]
+    if isinstance(command, click.Group):
+        with click.Context(command) as ctx:
+            for name in command.list_commands(ctx):
+                subcommand = command.get_command(ctx, name)
+                if subcommand:
+                    paths.extend(_help_paths(subcommand, (*prefix, name)))
+    return paths
 
 
 @pytest.mark.noparallel(reason='Modifies the configuration file')
@@ -87,38 +99,25 @@ def test_main_args(monkeypatch, tmp_path):
     assert "Cannot get AUTH_TYPE" in err
 
 
+@pytest.mark.filterwarnings("ignore:'BaseCommand' is deprecated.*:DeprecationWarning")
 def test_help_menus():
-    """Verify help menus"""
-    exitcode, out, err = execute("rucio --help")
-    assert exitcode == 0
-    assert "ERROR" not in err
-    out = out.split("\n")
-    commands = [cmd.split(" ") for cmd in out[out.index("Commands:") + 1:] if len(cmd) > 3]  # command has two spaces in front of it
-    commands = [cmd[2] for cmd in commands]
+    import rucio.cli.command as command_module
 
-    for command in commands:
-        exitcode, out, err = execute(f"rucio {command} --help")
-        assert exitcode == 0, f"Command {command} --help failed"  # Included for debugging purposes
+    for command in ("rucio --help", "rucio account add --help"):
+        exitcode, out, err = execute(command)
+        assert exitcode == 0, f"Command {command} failed"
+        assert "Usage:" in out
+        assert "ERROR" not in err
 
-        exitcode, out, err = execute(f"rucio {command} -h")
-        assert exitcode == 0, f"Command {command} -h failed"
-
-        # test the subcommands/operations as well
-        out = out.split("\n")
-        try:
-            subcommands = [cmd.split(" ") for cmd in out[out.index("Commands:") + 1:] if len(cmd) > 3]
-            subcommands = [cmd[2] for cmd in subcommands]
-            for subcommand in subcommands:
-                menu = f"rucio {command} {subcommand} --help"
-                exitcode, out, err = execute(menu)
-                assert exitcode == 0, f"Command {menu} failed"  # Included for debugging purposes
-
-                menu = f"rucio {command} {subcommand} -h"
-                exitcode, out, err = execute(menu)
-                assert exitcode == 0, f"Command {menu} -h failed"
-
-        except ValueError:  # "Commands:" not in list
-            continue
+    runner = CliRunner()
+    for path in _help_paths(command_module.main):
+        for option in ("--help", "-h"):
+            args = (*path, option)
+            result = runner.invoke(command_module.main, args, prog_name="rucio")
+            command = "rucio " + " ".join(args)
+            assert result.exit_code == 0, f"Command {command} failed: {result.output}"
+            assert "Usage:" in result.output
+            assert "ERROR" not in result.output
 
 
 def test_nested_help_menus_do_not_need_client_config(monkeypatch, tmp_path):
