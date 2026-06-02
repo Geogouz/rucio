@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import importlib
+import os
 import signal
 import sys
 import time
@@ -27,7 +28,17 @@ from rucio import version
 from rucio.cli.bin_legacy.rucio import ping, test_server, whoami_account
 from rucio.cli.utils import Arguments, exception_handler, get_client, setup_gfal2_logger, signal_handler
 from rucio.client.richclient import MAX_TRACEBACK_WIDTH, MIN_CONSOLE_WIDTH, CLITheme, get_cli_config, get_pager, setup_rich_logger
+from rucio.common.config import clean_cached_config, get_config
 from rucio.common.utils import setup_logger
+
+
+def _has_help_option(args: list[str], help_options: list[str]) -> bool:
+    for arg in args:
+        if arg == "--":
+            return False
+        if arg in help_options:
+            return True
+    return False
 
 
 # Taken directly from https://click.palletsprojects.com/en/stable/complex/#defining-the-lazy-group
@@ -62,6 +73,10 @@ class LazyGroup(click.Group):
         if not isinstance(cmd_object, click.BaseCommand):
             raise ValueError(f"Lazy loading of {import_path} failed by returning " "a non-command object")
         return cmd_object
+
+    def parse_args(self, ctx: click.Context, args: list[str]) -> list[str]:
+        ctx.meta["rucio_help_requested"] = _has_help_option(args, ctx.help_option_names)
+        return super().parse_args(ctx, args)
 
     @exception_handler
     def _invoke_with_handler(self, ctx: click.Context):
@@ -235,8 +250,11 @@ def main(
             "ca_certificate": ca_certificate,
         }
     )  # TODO Future improvement - change `get_client` to take these args directly
-    client = get_client(args, logger)  # TODO Future improvement - use envvar functionality in click to remove conditionals checking env vars
-
+    if config is not None:
+        os.environ["RUCIO_CONFIG"] = config
+        clean_cached_config()
+        get_config()
+    client = None if bool(ctx.meta.get("rucio_help_requested", False)) else get_client(args, logger)
     setup_gfal2_logger()
     signal.signal(signal.SIGINT, lambda sig, frame: signal_handler(sig, frame, logger))
 
