@@ -12,10 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import importlib
+import os
 import signal
 import sys
 import time
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 import click
 from rich.console import Console
@@ -27,7 +28,25 @@ from rucio import version
 from rucio.cli.bin_legacy.rucio import ping, test_server, whoami_account
 from rucio.cli.utils import Arguments, exception_handler, get_client, setup_gfal2_logger, signal_handler
 from rucio.client.richclient import MAX_TRACEBACK_WIDTH, MIN_CONSOLE_WIDTH, CLITheme, get_cli_config, get_pager, setup_rich_logger
+from rucio.common.config import clean_cached_config, get_config
 from rucio.common.utils import setup_logger
+
+if TYPE_CHECKING:
+    from logging import Logger
+
+    from rucio.client.client import Client
+
+
+class _LazyClient:
+    def __init__(self, args: Arguments, logger: "Logger") -> None:
+        self._args = args
+        self._logger = logger
+        self._client: Optional["Client"] = None
+
+    def __getattr__(self, name: str) -> object:
+        if self._client is None:
+            self._client = get_client(self._args, self._logger)
+        return getattr(self._client, name)
 
 
 # Taken directly from https://click.palletsprojects.com/en/stable/complex/#defining-the-lazy-group
@@ -235,12 +254,14 @@ def main(
             "ca_certificate": ca_certificate,
         }
     )  # TODO Future improvement - change `get_client` to take these args directly
-    client = get_client(args, logger)  # TODO Future improvement - use envvar functionality in click to remove conditionals checking env vars
-
+    if config is not None:
+        os.environ["RUCIO_CONFIG"] = config
+        clean_cached_config()
+        get_config()
     setup_gfal2_logger()
     signal.signal(signal.SIGINT, lambda sig, frame: signal_handler(sig, frame, logger))
 
-    ctx.obj.client = client
+    ctx.obj.client = _LazyClient(args, logger)
     ctx.obj.logger = logger
 
     ctx.call_on_close(_teardown)

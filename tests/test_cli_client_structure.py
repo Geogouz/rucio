@@ -20,6 +20,7 @@ import tempfile
 from typing import TYPE_CHECKING
 
 import pytest
+from click.testing import CliRunner
 
 from rucio.common.config import clean_cached_config
 from rucio.common.exception import RucioException
@@ -118,6 +119,58 @@ def test_help_menus():
 
         except ValueError:  # "Commands:" not in list
             continue
+
+
+def test_nested_help_menus_do_not_need_client_config(monkeypatch, tmp_path):
+    config = tmp_path / "rucio.cfg"
+    config.write_text(f"[common]\n[database]\ndefault = sqlite:///{tmp_path}/rucio.db\n")
+    rucio_config = os.environ.get("RUCIO_CONFIG")
+    try:
+        with monkeypatch.context() as m:
+            m.setenv("RUCIO_CONFIG", str(config))
+            clean_cached_config()
+            for command in ("rucio account --help", "rucio account add --help"):
+                exitcode, out, err = execute(command)
+                assert exitcode == 0
+                assert "Usage:" in out
+
+            exitcode, _, err = execute("rucio account list")
+    finally:
+        _restore_rucio_config(rucio_config)
+    assert exitcode != 0
+    assert "Cannot get AUTH_TYPE" in err
+
+
+def test_config_option_is_visible_before_client_creation(monkeypatch, tmp_path):
+    import rucio.cli.command as command_module
+    import rucio.cli.did as did_module
+
+    config = tmp_path / "rucio.cfg"
+    config.write_text(f"[common]\n[database]\ndefault = sqlite:///{tmp_path}/rucio.db\n")
+    seen_configs = []
+
+    class Client:
+        def get_metadata(self, **kwargs):
+            return {}
+
+    def config_get(section, option, *args, **kwargs):
+        seen_configs.append(os.environ.get("RUCIO_CONFIG"))
+        return "DID_COLUMN"
+
+    rucio_config = os.environ.get("RUCIO_CONFIG")
+    try:
+        with monkeypatch.context() as m:
+            m.delenv("RUCIO_CONFIG", raising=False)
+            m.setattr(command_module.signal, "signal", lambda *args: None)
+            m.setattr(command_module, "get_client", lambda args, logger: Client())
+            m.setattr(did_module, "config_get", config_get)
+
+            result = CliRunner().invoke(command_module.main, ["--config", str(config), "did", "metadata", "list", "mock:did"])
+    finally:
+        _restore_rucio_config(rucio_config)
+
+    assert result.exit_code == 0
+    assert seen_configs == [str(config)]
 
 
 def test_account(rucio_client):
