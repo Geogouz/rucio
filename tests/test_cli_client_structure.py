@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import configparser
 import json
 import os
 import re
@@ -20,6 +21,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from rucio.common.config import clean_cached_config
 from rucio.common.exception import RucioException
 from rucio.common.utils import generate_uuid
 from rucio.tests.common import account_name_generator, execute, file_generator, rse_name_generator, scope_name_generator
@@ -28,8 +30,16 @@ if TYPE_CHECKING:
     from rucio.common.types import FileToUploadDict
 
 
+def _restore_rucio_config(value):
+    if value is None:
+        os.environ.pop("RUCIO_CONFIG", None)
+    else:
+        os.environ["RUCIO_CONFIG"] = value
+    clean_cached_config()
+
+
 @pytest.mark.noparallel(reason='Modifies the configuration file')
-def test_main_args():
+def test_main_args(monkeypatch, tmp_path):
     specify_account = "rucio --account root --auth-strategy userpass whoami"
     exitcode, out, err = execute(specify_account)
     assert exitcode == 0
@@ -52,25 +62,28 @@ def test_main_args():
     _, _, err = execute(non_existent_cmd)
     assert "This method is being deprecated" not in err
 
-    import configparser
     cfg = configparser.ConfigParser()
     cfg['database'] = {"default": "postgresql+psycopg://rucio:secret@ruciodb/rucio", "schema": ""}
-    cfg["client"] = {"rucio_host": "", "auth_host": "", "auth_type": "", "username": "", "password": ""}
+    cfg["client"] = {
+        "rucio_host": "https://localhost",
+        "auth_host": "https://localhost",
+    }
 
-    # Set to a non-existent config path
-    current_config = os.environ.get('RUCIO_CONFIG')
-    fake_config = "/NoConfigHere.cfg"
-    with open(fake_config, "w") as f:
+    fake_config = tmp_path / "rucio.cfg"
+    with fake_config.open("w") as f:
         cfg.write(f)
-    os.environ['RUCIO_CONFIG'] = fake_config
-    exitcode, _, err = execute("rucio whoami")
-    if current_config is not None:
-        os.environ['RUCIO_CONFIG'] = current_config
-    else:
-        os.environ.pop("RUCIO_CONFIG")
+    rucio_config = os.environ.get("RUCIO_CONFIG")
+    try:
+        with monkeypatch.context() as m:
+            m.setenv("RUCIO_CONFIG", str(fake_config))
+            clean_cached_config()
+            exitcode, _, err = execute("rucio whoami")
+    finally:
+        _restore_rucio_config(rucio_config)
 
     assert exitcode != 0
     assert "ERROR" in err
+    assert "Cannot get AUTH_TYPE" in err
 
 
 def test_help_menus():
