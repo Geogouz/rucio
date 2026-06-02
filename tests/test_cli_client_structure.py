@@ -26,7 +26,8 @@ from click.testing import CliRunner
 from rucio.common.config import clean_cached_config
 from rucio.common.exception import RucioException
 from rucio.common.utils import generate_uuid
-from rucio.tests.common import account_name_generator, execute, file_generator, rse_name_generator, scope_name_generator
+from rucio.tests.common import account_name_generator, file_generator, rse_name_generator, scope_name_generator
+from rucio.tests.common import execute as _execute
 
 if TYPE_CHECKING:
     from rucio.common.types import FileToUploadDict
@@ -38,6 +39,18 @@ def _restore_rucio_config(value):
     else:
         os.environ["RUCIO_CONFIG"] = value
     clean_cached_config()
+
+
+def execute(cmd: str) -> tuple[int, str, str]:
+    rucio_client_mode = os.environ.get("RUCIO_CLIENT_MODE")
+    os.environ["RUCIO_CLIENT_MODE"] = "1"
+    try:
+        return _execute(cmd)
+    finally:
+        if rucio_client_mode is None:
+            os.environ.pop("RUCIO_CLIENT_MODE", None)
+        else:
+            os.environ["RUCIO_CLIENT_MODE"] = rucio_client_mode
 
 
 def _help_paths(command: click.Command, prefix: tuple[str, ...] = ()) -> list[tuple[str, ...]]:
