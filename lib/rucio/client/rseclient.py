@@ -1364,8 +1364,7 @@ class RSEClient(BaseClient):
             rse_client = Client()
             rse_name="MyRSE"
             rse_client.get_rse_limits(rse_name)
-            > {"MaxSpaceAvailable": 1000000000000, "AnotherLimit": 500000000000}
-
+            ```
 
         See Also
         --------
