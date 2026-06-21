@@ -1105,10 +1105,20 @@ class RSEClient(BaseClient):
         """
         List all QoS policies of an RSE.
 
-        :param rse_id: The id of the RSE.
-        :param session: The database session in use.
+        Parameters
+        ----------
+        rse
+            The name of the RSE.
 
-        :returns: List containing all QoS policies.
+        Returns
+        -------
+        list[str]
+            QoS policy names configured on the RSE.
+
+        Raises
+        ------
+        RSENotFound
+            If the RSE doesn't exist.
         """
 
         path = [self.RSE_BASEURL, rse, 'qos_policy']
