@@ -1289,9 +1289,7 @@ class RSEClient(BaseClient):
         Set the limit for the amount of data that can be stored on the RSE.
         If an RSE limit with the same name already exists, it will be overwritten.
 
-        The name "MaxSpaceAvailable" will be used to when selecting RSEs create replicas
-        if multiple RSEs match rule requirements and have the avaiable quotas.
-
+        ``MaxSpaceAvailable`` is used when choosing among matching RSEs for new replicas.
 
         Parameters
         ----------
@@ -1306,6 +1304,12 @@ class RSEClient(BaseClient):
         -------
         True if successful.
 
+        Raises
+        ------
+        AccessDenied
+            If the issuer cannot update RSE limits.
+        RSENotFound
+            If the RSE doesn't exist.
 
         Examples
         --------
