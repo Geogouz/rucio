@@ -341,7 +341,15 @@ class RSEClient(BaseClient):
 
         Returns
         -------
-        All RSE names matching the RSE expression, if given, otherwise all RSEs.
+        Iterator[dict[str, Any]]
+            Without an expression, full RSE dictionaries including availability fields. With an expression, each item contains the matching RSE name as ``{"rse": ...}``.
+
+        Raises
+        ------
+        InvalidRSEExpression
+            If ``rse_expression`` cannot be parsed.
+        InvalidObject
+            If the expression contains an invalid RSE property.
 
         Examples
         --------
