@@ -1601,10 +1601,12 @@ class RSEClient(BaseClient):
 
         Returns
         -------
-            True if successful.
+            True if successful. Missing distance rows are ignored.
 
         Raises
         ------
+        AccessDenied
+            If the issuer cannot delete RSE distances.
         RSENotFound
             If either of the RSEs doesn't exist.
         """
