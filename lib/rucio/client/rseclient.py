@@ -44,8 +44,10 @@ class RSEClient(BaseClient):
 
         Returns
         --------
-        Dictionary of settings and attributes.
-        Additional attributes can be added beyond the ones listed below by using "RSEClient.add_rse_attribute"
+        Dictionary of settings and protocol information.
+            **`availability`**:
+                int: Deprecated availability bitmask.
+
             **`availability_delete`**:
                 bool: Can the replicas on the RSE be deleted?
 
@@ -62,7 +64,7 @@ class RSEClient(BaseClient):
                 bool: Are the PFNs on the RSE set deteriminstically?
 
             **`domain`**:
-              dict|list: Domains (lan/wan) the RSE can act on (and premissions, if dictionary)
+                list[str]: Supported protocol domains, such as "lan" and "wan".
 
             **`id`**:
                 str: ID of the RSE
@@ -81,6 +83,18 @@ class RSEClient(BaseClient):
 
             **`rse_type`**:
                 str: Storage type of RSE, typically "DISK" or "TAPE"
+
+            **`sign_url`**:
+                Optional[str]: Signing service configuration, if configured.
+
+            **`staging_area`**:
+                bool: Whether the RSE is a staging area.
+
+            **`verify_checksum`**:
+                bool: Whether checksums are verified.
+
+            **`volatile`**:
+                bool: Whether the RSE is volatile.
 
         Raises
         -------
