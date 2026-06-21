@@ -1027,7 +1027,8 @@ class RSEClient(BaseClient):
 
         Returns
         -------
-            True if successful.
+        bool
+            ``True`` if both protocol priorities were swapped, ``False`` if either scheme is absent from the protocol list.
 
         Raises
         ------
@@ -1035,8 +1036,16 @@ class RSEClient(BaseClient):
             If no matching protocol entry could be found.
         RSENotFound
             If the RSE doesn't exist.
-        KeyNotFound
-            If invalid data was provided for update.
+        InvalidObject
+            If invalid values were provided for update.
+        RSEProtocolDomainNotSupported
+            If the domain is not supported.
+        RSEOperationNotSupported
+            If the operation is not supported.
+        RSEProtocolPriorityError
+            If a protocol priority is invalid.
+        Duplicate
+            If one update conflicts with an existing protocol entry.
         AccessDenied
             If not authorized.
         """
