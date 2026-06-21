@@ -817,7 +817,7 @@ class RSEClient(BaseClient):
         """
         Deletes matching protocols from RSE. Protocols using the same identifier can be
         distinguished by hostname and port.
-        If not hostname and port and not provided, all protocols with the same scheme will be deleted.
+        If hostname and port are omitted, all protocols with the same scheme are deleted. If hostname is provided without port, all protocols matching the scheme and hostname are deleted.
 
         Parameters
         ----------
