@@ -528,9 +528,6 @@ class RSEClient(BaseClient):
             attributes = rse_client.list_rse_attributes(rse_name)
             for key, value in attributes.items():
                 print(f"{key}: {value}")
-
-            > TIER: 3
-            > TEST: True
             ```
 
         See Also
