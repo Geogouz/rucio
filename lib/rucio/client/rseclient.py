@@ -771,17 +771,15 @@ class RSEClient(BaseClient):
         Examples
         --------
         ??? Example
-        ```python
 
+            Translate LFNs to PFNs:
+
+            ```python
             from rucio.client.client import Client
-            rse_client = Client()
-            rse_name="MyRSE"
-            lfns = ["scope1:name1", "scope2:name2"] # Exact format depends on ScopeExtraction implimentation for your rucio instance
-            pfns = rse_client.lfns2pfns(rse_name, lfns)  # Get PFNs for the LFNs on MyRSE
-            > {"scope1:name1": "protocol://host:port/prefix/scope1/name1",
-            >  "scope2:name2": "protocol://host:port/prefix/scope2/name2"}
 
-        ```
+            rse_client = Client()
+            pfns = rse_client.lfns2pfns("MY_RSE", ["scope1:name1", "scope2:name2"])
+            ```
         """
         path = '/'.join([self.RSE_BASEURL, rse, 'lfns2pfns'])
         params = []
