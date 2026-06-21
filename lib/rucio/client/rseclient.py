@@ -112,9 +112,9 @@ class RSEClient(BaseClient):
 
             rse_client = Client()
             rse_expression="rse_type=DISK"
-            possible_rses = [rse['rse'] for rse in c.list_rses(rse_expression)]
+            possible_rses = [rse['rse'] for rse in rse_client.list_rses(rse_expression)]
             for rse in possible_rses:
-                print(c.get_rse(rse))
+                print(rse_client.get_rse(rse))
             ```
 
         See Also
