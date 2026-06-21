@@ -910,10 +910,9 @@ class RSEClient(BaseClient):
         """
         Updates matching protocols from RSE.
         Protocols are uniquely defined by a combination of identifier, hostname, and port.
-        If hostname and port are not provided, there must be a scheme without hostname and port.
+        If hostname and port are not provided, only a protocol entry stored without hostname and port can match.
 
-        ** Note ** - You cannot change the hostname and port of a protocol.
-        To change this, the protocol must be deleted and re-made with the new hostname and port.
+        The path scheme, hostname, and port select the protocol row to update. Changing these identifiers requires deleting and recreating the protocol.
 
         Parameters
         ----------
@@ -922,16 +921,13 @@ class RSEClient(BaseClient):
         scheme:
             The identifier of the protocol.
         data:
-            A dict providing the new values of the protocol attributes. Keys must match column names in database.
-            ** domains **: Dict with domain (lan/wan) as keys and permissions for operations as values. Example: {"lan": {"read": 1, "write": 1, "delete": 1}, "wan": {"read": 1, "write": 1, "delete": 1}}
-            ** prefix **: String used as a prefix for this protocol when generating the PFN.
-            ** impl **: Qualified name of the implementation class for this protocol.
-            ** extended_attributes **: Dict with protocol specific information
+            New protocol attributes. Supported keys include ``domains``, ``prefix``, ``impl``, and ``extended_attributes``. Nested ``domains`` values update operation priorities.
 
         hostname:
             The hostname of the protocol.
         port:
             The port of the protocol.
+
         Returns
         -------
         True if success.
@@ -942,8 +938,16 @@ class RSEClient(BaseClient):
             If no matching protocol entry could be found.
         RSENotFound
             If the RSE doesn't exist.
-        KeyNotFound
-            If invalid data was provided for update.
+        InvalidObject
+            If invalid values were provided for update.
+        RSEProtocolDomainNotSupported
+            If a domain in ``data["domains"]`` is not supported.
+        RSEOperationNotSupported
+            If an operation in ``data["domains"]`` is not supported.
+        RSEProtocolPriorityError
+            If a protocol priority is invalid.
+        Duplicate
+            If the update conflicts with an existing protocol entry.
         AccessDenied
             If not authorized.
 
