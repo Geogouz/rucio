@@ -1232,28 +1232,25 @@ class RSEClient(BaseClient):
             filters: Optional[dict[str, Any]] = None
     ) -> "Iterator[dict[str, Any]]":
         """
-        Get RSE usage information as set by `RSEClient.set_rse_usage`. Will only show the most recent usage of a source.
+        Get current RSE usage information, one record per source.
 
         Parameters
         ----------
         rse:
             The RSE name.
         filters:
-            Optional filters to apply.
-                ** source ** [str]: Source of usage
-                ** used ** [int]: Used space in bytes
-                ** free ** [int]: Free space in bytes
-                ** files ** [int|None]: Number of files
+            Optional query parameters. Supported keys are ``source`` and ``per_account``.
 
         Returns
         -------
-        List of dictionaries, containing the following:
-            ** rse_id ** [str]: The RSE id
-            ** source ** [str]: Source of usage
-            ** used ** [int]: Used space in bytes
-            ** free ** [int]: Free space in bytes
-            ** files ** [int|None]: Number of files
-            ** updated_at ** [datetime.datetime]: Timestamp of the usage information
+        Iterator[dict[str, Any]]
+            Usage records including RSE ID, RSE name, source, used bytes, free bytes, total bytes,
+            file count, update timestamp, and ``account_usages`` for ``rucio`` source records when ``per_account`` is true.
+
+        Raises
+        ------
+        RSENotFound
+            If the RSE doesn't exist.
 
         See Also
         --------
