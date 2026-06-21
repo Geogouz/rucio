@@ -460,6 +460,10 @@ class RSEClient(BaseClient):
 
         Raises
         -------
+        AccessDenied
+            If the issuer cannot delete RSE attributes.
+        RSENotFound
+            If the RSE does not exist.
         RSEAttributeNotFound
             If the attribute to delete was not found for the given RSE.
 
