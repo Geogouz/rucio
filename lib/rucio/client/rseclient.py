@@ -292,7 +292,7 @@ class RSEClient(BaseClient):
 
     def delete_rse(self, rse: str) -> Literal[True]:
         """
-        Sends the request to delete a rse.
+        Disable an empty RSE.
 
         Parameters
         ----------
@@ -305,10 +305,14 @@ class RSEClient(BaseClient):
 
         Raises
         ------
+        AccessDenied
+            If the issuer cannot delete the RSE.
         RSENotFound
             If the RSE was not found.
         RSEOperationNotSupported
             If the RSE is not empty.
+        CounterNotFound
+            If the RSE counter cannot be found while deleting.
 
         See Also
         --------
