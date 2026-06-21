@@ -666,35 +666,31 @@ class RSEClient(BaseClient):
         rse :
             The RSE name.
         protocol_domain :
-            The scope of the protocol.
+            Protocol domain sent to the protocol-list endpoint.
         operation :
-            The name of the requested operation. If None, all operations are queried.
+            Operation sent to the protocol-list endpoint.
         default :
-            Only return the default protocol
+            Whether to ask the protocol-list endpoint for its default protocol.
         scheme :
-            The identifier of the requested protocol.
+            The protocol identifier. When set, the scheme endpoint is used; the current server response is the RSE protocol-settings dictionary and is not restricted to this scheme.
 
         Returns
         -------
-            A list of dicts with details about each matching protocol.
-            Each protocol contains the following keys:
-            - scheme [str]: identifier
-            - hostname [str]: hostname
-            - port [int]: port
-            - prefix [str]: string used as a prefix for this protocol when generating the PFN
-            - impl [str]: qualified name of the implementation class for this protocol
-            - domains [dict]: dictionary with domain (lan/wan) as keys and permissions for operations as values
-            - extended_attributes [Optional[dict]]: miscellaneous protocol specific information
+        Any
+            Without ``scheme``, a list of protocol entries. Each entry contains ``scheme`` (str), ``hostname`` (str),
+            ``port`` (int), ``prefix`` (str), ``impl`` (str), ``domains`` (dict[str, dict[str, int]]),
+            and ``extended_attributes`` (dict[str, Any] | str | None).
 
-            If only on protocol matches the query, a single dict is returned instead of a list.
+            With ``scheme``, the RSE protocol-settings dictionary is returned. It contains RSE metadata such as ``id`` (str),
+            ``rse`` (str), availability flags (bool), ``domain`` (list[str]), ``lfn2pfn_algorithm`` (str),
+            ``verify_checksum`` (bool), and a ``protocols`` list with the same protocol-entry shape.
+
         Raises
         ------
         RSENotFound
             If the RSE doesn't exist.
         RSEProtocolNotSupported
             If no matching protocol entry could be found.
-        RSEOperationNotSupported
-            If no matching protocol entry for the requested operation could be found.
 
         Examples
         --------
