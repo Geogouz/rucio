@@ -1520,7 +1520,7 @@ class RSEClient(BaseClient):
             parameters: dict[str, int]
     ) -> Literal[True]:
         """
-        Update distances between RSEs.
+        Update the directional distance between two RSEs.
 
         If the distance does not exist, it will not be created.
 
@@ -1531,11 +1531,18 @@ class RSEClient(BaseClient):
         destination :
             The destination RSE.
         parameters :
-            Updated distance in the form {"distance": int}.
+            Updated distance in the form ``{"distance": int}``. Deprecated ``{"ranking": int}`` is accepted as an alias.
 
         Returns
         -------
         True if successful.
+
+        Raises
+        ------
+        AccessDenied
+            If the issuer cannot update RSE distances.
+        RSENotFound
+            If either RSE doesn't exist.
 
         Examples
         --------
