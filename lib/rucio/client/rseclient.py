@@ -1111,8 +1111,6 @@ class RSEClient(BaseClient):
             The name of the RSE.
         qos_policy
             The QoS policy to delete.
-        session:
-            The database session in use.
 
         Returns
         -------
@@ -1120,10 +1118,10 @@ class RSEClient(BaseClient):
 
         Raises
         ------
+        AccessDenied
+            If the issuer cannot delete QoS policies.
         RSENotFound
             If the RSE doesn't exist.
-        QoSPolicyNotFound
-            If the QoS policy doesn't exist.
         """
 
         path = [self.RSE_BASEURL, rse, 'qos_policy', qos_policy]
