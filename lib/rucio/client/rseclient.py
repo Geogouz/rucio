@@ -1083,6 +1083,10 @@ class RSEClient(BaseClient):
 
         Raises
         ------
+        AccessDenied
+            If the issuer cannot add QoS policies.
+        RSENotFound
+            If the RSE doesn't exist.
         Duplicate
             If the QoS policy already exists.
         """
