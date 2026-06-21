@@ -1280,22 +1280,18 @@ class RSEClient(BaseClient):
         rse:
             The RSE name.
         filters:
-            Optional filters to apply.
-                ** source ** [str]: Source of usage
-                ** used ** [int]: Used space in bytes
-                ** free ** [int]: Free space in bytes
-                ** files ** [int|None]: Number of files
+            Optional query parameters. The server supports ``source``.
 
         Returns
         -------
-        List of dictionaries, containing the following:
-            ** rse_id ** [str]: The RSE id
-            ** source ** [str]: Source of usage
-            ** used ** [int]: Used space in bytes
-            ** free ** [int]: Free space in bytes
-            ** files ** [int|None]: Number of files
-            ** updated_at ** [datetime.datetime]: Timestamp of the usage information
-        Will show all historical usage information for the RSE, including the current usage information as set by `RSEClient.set_rse_usage`
+        Iterator[dict[str, Any]]
+            Historical usage records including RSE ID, RSE name, source,
+            used bytes, free bytes, total bytes, and update timestamp.
+
+        Raises
+        ------
+        RSENotFound
+            If the RSE doesn't exist.
 
         See Also
         --------
