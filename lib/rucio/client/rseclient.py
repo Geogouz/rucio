@@ -1432,10 +1432,12 @@ class RSEClient(BaseClient):
 
         Returns
         -------
-        True if successful, will not fail if the limit did not exist.
+        True if successful. Deleting a missing limit is a no-op.
 
         Raises
         ------
+        AccessDenied
+            If the issuer cannot delete RSE limits.
         RSENotFound
             If the RSE doesn't exist.
 
