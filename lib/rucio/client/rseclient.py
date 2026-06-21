@@ -956,22 +956,6 @@ class RSEClient(BaseClient):
             rse_client.update_protocols(rse_name, scheme='srm', hostname='host1', port=8443, data={'prefix': '/new/prefix'})
             ```
 
-            [INCORRECT USAGE] Try to update without providing hostname and port where all scheme are defined with those attributes
-            ```python
-            from rucio.client.client import Client
-            rse_client = Client()
-            rse_name="MyRSE"
-
-            c.get_protocols(rse_name, scheme='srm')
-            > [{'scheme': 'srm', 'hostname': 'host1', 'port': 8443, 'prefix': '/old/prefix', ...},
-            >  {'scheme': 'srm', 'hostname': 'host2', 'port': 8443, 'prefix': '/old/prefix', ...}]
-
-            c.update_protocols(rse_name, scheme='srm', data={'prefix': '/new/prefix'})
-            > rucio.common.exception.RSEProtocolNotSupported: RSE does not support requested protocol.
-            > Details: RSE 'MyRse' does not support protocol 'srm' for hostname 'None' on port 'None'
-
-            ```
-
         See Also
         --------
         rucio.client.rseclient.RSEClient.get_protocols
