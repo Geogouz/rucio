@@ -145,9 +145,9 @@ class RSEClient(BaseClient):
         rse
             The name of the RSE.
         deterministic
-            Boolean to know if the pfn is generated deterministically.
+            Whether PFNs are generated deterministically. Defaults to ``True``.
         volatile
-            Boolean for RSE cache.
+            Whether the RSE is used as volatile cache. Defaults to ``False``.
         city
             City for the RSE.
         region_code
@@ -171,7 +171,13 @@ class RSEClient(BaseClient):
         ASN
             Access service network.
         availability
-            Availability.
+            Deprecated integer availability bitmask. Cannot be used together with ``availability_read``, ``availability_write``, or ``availability_delete``.
+        availability_read
+            Whether replicas on the RSE can be read.
+        availability_write
+            Whether replicas can be written to the RSE.
+        availability_delete
+            Whether replicas on the RSE can be deleted.
 
         Returns
         -------
@@ -179,6 +185,12 @@ class RSEClient(BaseClient):
 
         Raises
         ------
+        InvalidObject
+            If one of the supplied values is invalid.
+        InputValidationError
+            If deprecated ``availability`` is mixed with per-operation availability flags.
+        AccessDenied
+            If the issuer cannot create the RSE.
         Duplicate
             If RSE already exists.
 
