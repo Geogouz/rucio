@@ -1434,7 +1434,7 @@ class RSEClient(BaseClient):
             parameters: dict[str, int]
     ) -> Literal[True]:
         """
-        Add a distance between two RSEs.
+        Add a directional distance between two RSEs.
         Distances are used to deterimine paths between RSEs during transfers, a lower distance will be preferred over a higher one.
 
         RSEs must have distances between them for them to be used in multi-hop transfers.
@@ -1446,7 +1446,7 @@ class RSEClient(BaseClient):
         destination :
             The destination RSE name.
         parameters :
-            Dicionary in the format {"distance": int}.
+            Dictionary in the format ``{"distance": int}``. Deprecated ``{"ranking": int}`` is accepted as an alias.
 
         Returns
         -------
@@ -1454,6 +1454,8 @@ class RSEClient(BaseClient):
 
         Raises
         ------
+        AccessDenied
+            If the issuer cannot add RSE distances.
         Duplicate
             If a distance between the RSEs already exists.
         RSENotFound
