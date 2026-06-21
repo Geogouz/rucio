@@ -1193,6 +1193,13 @@ class RSEClient(BaseClient):
         -------
         True if successful
 
+        Raises
+        ------
+        AccessDenied
+            If the issuer cannot update usage for the RSE.
+        RSENotFound
+            If the RSE doesn't exist.
+
         Examples
         --------
         ??? Example
