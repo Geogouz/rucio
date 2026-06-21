@@ -575,14 +575,12 @@ class RSEClient(BaseClient):
         params :
             Attributes of the protocol. Supported are:
 
-            - scheme: identifier of this protocol
+            - scheme: identifier of this protocol (mandatory)
             - hostname: hostname for this protocol (default = localhost)
             - port: port for this protocol (default = 0)
             - prefix: string used as a prefix for this protocol when generating the PFN (default = None)
             - impl: qualified name of the implementation class for this protocol (mandatory)
-            - read: integer representing the priority of this protocol for read operations (default = -1)
-            - write: integer representing the priority of this protocol for write operations (default = -1)
-            - delete: integer representing the priority of this protocol for delete operations (default = -1)
+            - domains: per-domain operation priorities
             - extended_attributes: miscellaneous protocol specific information e.g. spacetoken for SRM (default = None)
 
             Extended attributes required for each protocol can be seen listed in the documentation for each protocol implementation
@@ -602,6 +600,12 @@ class RSEClient(BaseClient):
             If params is missing mandatory attributes to create the protocol.
         AccessDenied
             If not authorized.
+        RSEProtocolDomainNotSupported
+            If a domain in ``params["domains"]`` is not supported.
+        RSEOperationNotSupported
+            If an operation in ``params["domains"]`` is not supported.
+        RSEProtocolPriorityError
+            If a protocol priority is invalid.
 
         Examples
         --------
