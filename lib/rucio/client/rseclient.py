@@ -262,17 +262,13 @@ class RSEClient(BaseClient):
         --------
         ??? Example
 
-            Create a new disk RSE and add a few attributes
+            Rename an RSE:
 
             ```python
             from rucio.client.client import Client
 
             rse_client = Client()
-            rse_name="MyNewRSE"
-            rse_client.add_rse(rse_name, rse_type="DISK")
-
-            rse_client.add_rse_attribute(rse_name, key="TIER", value="3")  # Custom organizational attribute
-
+            rse_client.update_rse("OLD_RSE", {"name": "NEW_RSE"})
             ```
 
         See Also
