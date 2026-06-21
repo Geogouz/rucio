@@ -404,6 +404,10 @@ class RSEClient(BaseClient):
 
         Raises
         -------
+        AccessDenied
+            If the issuer cannot add RSE attributes.
+        RSENotFound
+            If the RSE does not exist.
         Duplicate
             If RSE attribute already exists.
 
