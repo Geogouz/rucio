@@ -1577,9 +1577,9 @@ class RSEClient(BaseClient):
             destination: str
     ) -> list[dict[str, Union[str, int]]]:
         """
-        Get distances between rses.
+        Get the directional distance between two RSEs.
 
-        Param
+        Parameters
         ----------
         source :
             The source RSE.
@@ -1598,6 +1598,11 @@ class RSEClient(BaseClient):
             ** dest_rse ** [str]: Name of destination RSE.
             ** distance ** [int]: Value of distance between RSEs.
             ** ranking ** [int]: Legacy name for distance, same value as distance.
+
+        Raises
+        ------
+        RSENotFound
+            If either RSE doesn't exist.
 
         """
         path = [self.RSE_BASEURL, source, 'distances', destination]
