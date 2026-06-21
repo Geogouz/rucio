@@ -695,7 +695,7 @@ class RSEClient(BaseClient):
             rse_client.get_protocols(rse_name, default=True) # Get default protocol
             # Get protocols that can be used for read operations on wan domain
             rse_client.get_protocols(rse_name, protocol_domain='wan', operation='read')
-            rse_client.get_protocols(rse_name, scheme='file') # Get protocol with file scheme
+            rse_client.get_protocols(rse_name, scheme='file') # Query the scheme endpoint
             ```
 
         See Also
