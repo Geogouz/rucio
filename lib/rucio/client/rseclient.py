@@ -756,14 +756,11 @@ class RSEClient(BaseClient):
             The RSE name.
         lfns :
             A list of LFN strings to translate to PFNs.
-            LFNs are typically written as "scope:name", though the exact format can vary depending on
-            the Rucio instance's implementation of ScopeExtraction.
-            Contact your Rucio administrator if you are unsure about the expected format of LFNs for your instance.
+            LFNs are written as ``"scope:name"``.
         protocol_domain :
-            The scope of the protocol. (e.g., 'wan' or 'lan').
+            The protocol domain. If left as ``'ALL'``, no domain parameter is sent and the server defaults to ``wan``.
         operation :
-            The name of the requested operation (read, write, or delete).
-            If None, all operations are queried, by default None.
+            The operation. If ``None``, no operation parameter is sent and the server defaults to ``write``.
         scheme :
             The identifier of the requested protocol (gsiftp, https, davs, etc), by default None.
 
@@ -779,6 +776,12 @@ class RSEClient(BaseClient):
             If no matching protocol entry could be found.
         RSEOperationNotSupported
             If no matching protocol entry for the requested operation could be found.
+        RSEProtocolDomainNotSupported
+            If the requested protocol domain is not supported.
+        InvalidPath
+            If any LFN is not written as ``"scope:name"``.
+        ReplicaNotFound
+            If the server cannot produce PFNs for the request.
 
         Examples
         --------
