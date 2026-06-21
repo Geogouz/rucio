@@ -1372,7 +1372,7 @@ class RSEClient(BaseClient):
     def get_rse_limits(
             self,
             rse: str
-    ) -> "Iterator[dict[str, Union[str, int]]]":
+    ) -> dict[str, int]:
         """
         Get RSE limits.
 
@@ -1383,7 +1383,13 @@ class RSEClient(BaseClient):
 
         Returns
         -------
-        Dictionaries with the name and value of each limit for the RSE.
+        dict[str, int]
+            Limit names mapped to their values.
+
+        Raises
+        ------
+        RSENotFound
+            If the RSE doesn't exist.
 
         Examples
         --------
