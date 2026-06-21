@@ -236,9 +236,27 @@ class RSEClient(BaseClient):
         rse:
             The name of the RSE.
         parameters:
-            Dictionary of properties (attributes or settings) to update. Format as
-            {"name": "updated_value"}.
+            Mutable properties to update. Valid keys are ``name``, ``availability_read``, ``availability_write``,
+            ``availability_delete``, ``availability`` (deprecated bitmask), ``deterministic``, ``volatile``, ``city``,
+            ``region_code``, ``country_name``, ``continent``, ``time_zone``, ``rse_type``, ``latitude``, ``longitude``,
+            ``staging_area``, and ``qos_class``.
 
+        Returns
+        -------
+        True if RSE was updated successfully.
+
+        Raises
+        ------
+        InvalidObject
+            If one of the supplied values is invalid.
+        InputValidationError
+            If ``parameters`` contains an unsupported key.
+        Duplicate
+            If the requested name conflicts with an existing RSE.
+        AccessDenied
+            If the issuer cannot update the RSE.
+        RSENotFound
+            If the RSE does not exist.
 
         Examples
         --------
