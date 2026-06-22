@@ -412,7 +412,7 @@ class RSE(ErrorHandlingMethodView):
         }
         try:
             update_rse(rse, **kwargs)
-        except (InvalidObject, InputValidationError) as error:
+        except InputValidationError as error:
             return generate_http_error_flask(400, error)
         except AccessDenied as error:
             return generate_http_error_flask(401, error)
@@ -643,8 +643,6 @@ class Attributes(ErrorHandlingMethodView):
         """
         try:
             rse_attr = list_rse_attributes(rse, vo=request.environ['vo'])
-        except AccessDenied as error:
-            return generate_http_error_flask(401, error)
         except RSENotFound as error:
             return generate_http_error_flask(404, error)
 
@@ -2113,11 +2111,17 @@ class QoSPolicy(ErrorHandlingMethodView):
             description: "Rse not found"
           406:
             description: "Not acceptable"
+          409:
+            description: "QoS policy already exists"
         """
         try:
             add_qos_policy(rse=rse, qos_policy=policy, issuer=request.environ['issuer'], vo=request.environ['vo'])
+        except AccessDenied as error:
+            return generate_http_error_flask(401, error)
         except RSENotFound as error:
             return generate_http_error_flask(404, error)
+        except Duplicate as error:
+            return generate_http_error_flask(409, error)
 
         return 'Created', 201
 
@@ -2154,6 +2158,8 @@ class QoSPolicy(ErrorHandlingMethodView):
         """
         try:
             delete_qos_policy(rse=rse, qos_policy=policy, issuer=request.environ['issuer'], vo=request.environ['vo'])
+        except AccessDenied as error:
+            return generate_http_error_flask(401, error)
         except RSENotFound as error:
             return generate_http_error_flask(404, error)
 

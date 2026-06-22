@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from rucio.core.rse import get_rse, update_rse
+from rucio.tests.common import auth, hdrdict, headers
 
 
 class TestQoS:
@@ -68,3 +69,16 @@ class TestQoS:
         rse_client.delete_qos_policy(rse_name, 'FOO')
         policies = rse_client.list_qos_policies(rse_name)
         assert policies == []
+
+    def test_qos_policy_duplicate_rest(self, rest_client, auth_token, rse_factory):
+        """QoS (REST): adding an existing QoS policy returns Duplicate."""
+        rse_name, _ = rse_factory.make_mock_rse()
+        headers_dict = {'X-Rucio-Type': 'user', 'X-Rucio-Account': 'root'}
+        request_headers = headers(auth(auth_token), hdrdict(headers_dict))
+
+        response = rest_client.post(f'/rses/{rse_name}/qos_policy/FOO', headers=request_headers)
+        assert response.status_code == 201
+
+        response = rest_client.post(f'/rses/{rse_name}/qos_policy/FOO', headers=request_headers)
+        assert response.status_code == 409
+        assert response.headers.get('ExceptionClass') == 'Duplicate'
