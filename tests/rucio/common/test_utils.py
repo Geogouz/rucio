@@ -12,9 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import base64
+from io import StringIO
+
 import pytest
 
-from rucio.common.utils import ScopeExtractionAlgorithms, _encode_params_as_url_query_string, build_url, invert_dict
+from rucio.common.utils import ScopeExtractionAlgorithms, _encode_params_as_url_query_string, build_url, invert_dict, ssh_sign
 
 
 class TestUtils:
@@ -50,6 +53,20 @@ class TestUtils:
     )
     def test_encode_params_as_url_query_string(self, params, doseq, expected_query_string):
         assert _encode_params_as_url_query_string(params, doseq) == expected_query_string
+
+    def test_ssh_sign_uses_rsa_sha2_algorithm(self, monkeypatch):
+        paramiko = pytest.importorskip("paramiko")
+        key = paramiko.RSAKey.generate(2048)
+        private_key = StringIO()
+        key.write_private_key(private_key)
+        monkeypatch.setattr(paramiko.RSAKey, "HASHES", {name: hash_algorithm for name, hash_algorithm in paramiko.RSAKey.HASHES.items() if name != 'ssh-rsa'})
+
+        signature = ssh_sign(private_key.getvalue(), 'challenge-token')
+
+        signature_message = paramiko.Message(base64.b64decode(signature))
+        assert signature_message.get_text() == 'rsa-sha2-256'
+        signature_message.rewind()
+        assert key.verify_ssh_sig(b'challenge-token', signature_message)
 
     @pytest.mark.parametrize(
         'did, scope, name',
