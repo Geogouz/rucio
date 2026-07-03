@@ -71,7 +71,7 @@ server_requirements_table = {
         'argcomplete<=3.6.3',
         'boto',  # no upper limit is set in .in or .txt req files
         'python-magic<=0.4.27',
-        'paramiko<=4.0.0',
+        'paramiko<=5.0.0',
         'boto3<=1.40.64',
         'sqlalchemy<=2.0.44',
         'alembic<=1.16.5',
