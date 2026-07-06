@@ -589,7 +589,7 @@ class RuleClient(BaseClient):
             'updated_at'
                 Last modified date of rule.
             'state'
-                State of the rule. R [Replicating], O [Ok], S [Stuck], U [Suspended], W [Waiting Approval], I [Injecting]
+                State of the rule (REPLICATING, OK, STUCK, SUSPENDED, WAITING_APPROVAL, INJECT)
             'locks_ok_cnt'
                 Number of locks in OK state
             'locks_replicating_cnt'
@@ -597,6 +597,7 @@ class RuleClient(BaseClient):
             'locks_stuck_cnt'
                 Number of locks in STUCK state
 
+            If no history exists for the DID, the iterator is empty.
 
         Raises
         -------
