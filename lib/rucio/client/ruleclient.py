@@ -343,7 +343,7 @@ class RuleClient(BaseClient):
 
         Returns
         -------
-        True if the rule was sucessfully updated.
+        True if the rule was successfully updated.
 
         Examples
         --------
