@@ -537,9 +537,9 @@ class RuleClient(BaseClient):
         Raises
         -------
         RuleNotFound
-            Rule ID does not exist
-        AccessedDenied
-            User does not have premission to deny/approve rules.
+            Rule ID does not exist.
+        AccessDenied
+            The issuing account cannot approve or deny rules.
 
         Returns
         -------
