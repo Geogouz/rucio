@@ -330,8 +330,16 @@ class RuleClient(BaseClient):
         -------
         RuleNotFound
             Rule ID was not found.
+        AccessDenied
+            The issuing account cannot update the rule.
+        AccountNotFound
+            The requested new owner account does not exist.
         InputValidationError
             An invalid key was passed in "options".
+        ScratchDiskLifetimeConflict
+            The requested lifetime conflicts with scratch disk policy.
+        UnsupportedOperation
+            The requested update is not supported.
 
         Returns
         -------
