@@ -653,13 +653,15 @@ class RuleClient(BaseClient):
 
         Returns
         -------
-        Iterator of dictionaries of replica information with the keys:
+        Iterator of dictionaries of replica-lock information with the keys:
             'scope': DID Scope
             'name': DID Name
             'rse_id': RSE ID
             'rse': RSE Name
-            'state': State of replica
+            'state': State of the lock (OK, REPLICATING, STUCK)
             'rule_id': Passed rule ID
+
+            If the rule has no locks, the iterator is empty.
 
         Raises
         -------
