@@ -694,80 +694,70 @@ class RuleClient(BaseClient):
             Iterator of rule dictionaries with the keys:
             'id'
                 ID of the rule
+            'subscription_id'
+                ID of the subscription that created this rule
+            'account'
+                Owner of the rule
             'scope'
                 DID scope
             'name'
                 DID name
             'did_type'
                 Type of the DID (FILE, DATASET, CONTAINER)
-            'account'
-                Owner of the rule
+            'state'
+                State of the replication rule (OK, REPLICATING, STUCK, SUSPENDED, WAITING_APPROVAL, INJECT)
+            'error'
+                Any error raised when creating replicas for the rule
             'rse_expression'
                 RSE Expression
             'copies'
                 Number of replica copies
-            'grouping'
-                How replicas are grouped (ALL, DATASET, NONE)
-            'lifetime'
-                The lifetime of the replication rules (in seconds)
-            'locked'
-                If the rule is locked, it cannot be deleted
-            'source_replica_expression'
-                RSE Expression for RSEs to be considered for source replicas
-            'activity'
-                Transfer Activity to be passed to FTS
-            'notify'
-                Notification setting for the rule (Y, N, C, P)
-            'purge_replicas'
-                When the rule gets deleted purge the associated replicas immediately
-            'ignore_availability'
-                Option to ignore the availability of RSEs
-            'comment'
-                Comment about the rule
-            'ask_approval'
-                Ask for approval of this replication rule
-            'asynchronous'
-                Create rule asynchronously by judge-injector
-            'delay_injection'
-                Delay the rule injection
-            'priority'
-                Priority of the transfers
-            'weight'
-                Weighting scheme to be used
-            'meta'
-                Metadata as dictionary
-            'state'
-                State of the replication rule (OK, REPLICATING, STUCK, SUSPENDED, WAITING_APPROVAL, INJECT)
-            'error'
-                Any error raised when creating replicas for the rule.
-            'created_at'
-                Rule creation date.
-            'updated_at'
-                Last modified date of rule.
             'expires_at'
                 Expiration date of the rule
-            'eol_at'
-                End of life date for the replicas
-            'deleted_at'
-                Date when the rule was deleted
-            'stuck_at'
-                Date when the rule entered STUCK state
-            'child_rule_id'
-                ID of the child rule (if this rule was replaced)
-            'subscription_id'
-                ID of the subscription that created this rule
-            'split_container'
-                Whether the rule was split from a container rule
-            'ignore_account_limit'
-                Whether account limits were ignored when creating the rule
-            'notification'
-                Notification setting for the rule (YES, NO, CLOSE, PROGRESS)
+            'weight'
+                Weighting scheme to be used
+            'locked'
+                If the rule is locked, it cannot be deleted
             'locks_ok_cnt'
                 Number of locks in OK state
             'locks_replicating_cnt'
                 Number of locks in REPLICATING state
             'locks_stuck_cnt'
                 Number of locks in STUCK state
+            'source_replica_expression'
+                RSE Expression for RSEs to be considered for source replicas
+            'activity'
+                Transfer Activity to be passed to FTS
+            'grouping'
+                How replicas are grouped (ALL, DATASET, NONE)
+            'notification'
+                Notification setting for the rule (YES, NO, CLOSE, PROGRESS)
+            'stuck_at'
+                Date when the rule entered STUCK state
+            'purge_replicas'
+                When the rule gets deleted purge the associated replicas immediately
+            'ignore_availability'
+                Option to ignore the availability of RSEs
+            'ignore_account_limit'
+                Whether account limits were ignored when creating the rule
+            'priority'
+                Priority of the transfers
+            'comments'
+                Comment about the rule
+            'child_rule_id'
+                ID of the child rule, if this rule was replaced
+            'eol_at'
+                End of life date for the replicas
+            'split_container'
+                Whether the rule was split from a container rule
+            'meta'
+                Serialized metadata
+            'deleted_at'
+                Date when the rule was deleted
+            'created_at'
+                Rule creation date
+            'updated_at'
+                Last modified date of rule
             'bytes'
                 Total bytes of the DID
 
