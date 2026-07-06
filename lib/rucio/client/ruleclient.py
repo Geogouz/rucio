@@ -663,10 +663,6 @@ class RuleClient(BaseClient):
 
             If the rule has no locks, the iterator is empty.
 
-        Raises
-        -------
-        RuleNotFound
-
         See Also
         ---------
             rucio.client.ruleclient.RuleClient.examine_replication_rule
