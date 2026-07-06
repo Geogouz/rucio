@@ -381,8 +381,8 @@ class RuleClient(BaseClient):
         exclude_expression: Optional[str] = None
     ) -> Any:
         """
-        Downgrade the number of replica copies a rule creates.
-        Creates a new rule and deletes the old one.
+        Replace an OK replication rule with a new rule that has fewer copies.
+        The old rule is deleted after the replacement rule is created.
 
         Parameters
         ----------
