@@ -623,10 +623,12 @@ class RuleClient(BaseClient):
             The rule to examine
 
         Returns
-        --------
+        -------
         Dictionary with the following keys:
             'rule_error': Error message from transfer error
-            'transfers': List of ongoing transfer IDs
+            'transfers': List of diagnostic dictionaries for stuck transfers.
+                Each dictionary can contain 'scope', 'name', 'rse_id', 'rse',
+                'attempts', 'last_error', 'last_source', 'sources', and 'last_time'.
 
         Raises
         -------
