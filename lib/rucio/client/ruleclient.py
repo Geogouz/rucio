@@ -396,13 +396,13 @@ class RuleClient(BaseClient):
         Raises
         -------
         RuleNotFound
-            Rule ID does not exist
+            Rule ID does not exist.
         RuleReplaceFailed
-            The target rule is either not in an OK state, or requested copies is larger than current copies.
+            The source rule is not in OK state, requested copies is not lower than the current copies, or replacement failed.
         AccessDenied
-            User does not have sufficent premissions.
+            The issuing account cannot reduce the rule.
         InvalidRSEExpression
-            The Expression (<rule ID rse expression>)\\(<exclude_expression>) does not resolve to RSEs.
+            The source RSE expression, or the source expression minus exclude_expression, cannot be resolved.
 
         Returns
         -------
