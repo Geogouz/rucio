@@ -522,11 +522,10 @@ class RuleClient(BaseClient):
 
     def deny_replication_rule(self, rule_id: str, reason: Optional[str] = None) -> Literal[True]:
         """
-        Admin tool used to deny and delete pending rules.
-        Rules with the "ask_approval" attribute can be denied this way.
+        Deny a pending replication rule.
+        Rules in WAITING_APPROVAL state are deleted after denial.
 
-        When a rule is denied, a message is sent to the user who created
-        the rule via the email listed on their account.
+        Email notifications are queued when the rule owner's account has an email address and mail templates are configured.
 
         Parameters
         ----------
