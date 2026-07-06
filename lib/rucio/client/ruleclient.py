@@ -192,7 +192,7 @@ class RuleClient(BaseClient):
         rule_id :
             The id of the rule to be deleted.
         purge_replicas :
-            Immediate delete the replicas
+            Override the rule purge setting to delete associated replicas immediately.
 
         Raises
         -------
