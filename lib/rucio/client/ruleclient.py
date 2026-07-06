@@ -440,6 +440,11 @@ class RuleClient(BaseClient):
             RSE expression of the new rule.
         override :
             Configurations to update for the new rule.
+            Valid keys are 'account', 'copies', 'rse_expression', 'grouping',
+            'weight', 'lifetime', 'locked', 'subscription_id',
+            'source_replica_expression', 'activity', 'notify', 'purge_replicas',
+            'ignore_availability', and 'comment'. The 'dids' and 'session'
+            keys cannot be overridden.
 
         Raises
         -------
