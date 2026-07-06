@@ -154,8 +154,8 @@ class RuleClient(BaseClient):
             ```python
             from rucio.client.client import Client
             client = Client()
-            rule_id = client.add_replication_rule([{"scope": "myscope", "name": "mydid"}], copies=1, rse_expression="LocalRSE)
-            print(rule_id)
+            rule_ids = client.add_replication_rule([{"scope": "myscope", "name": "mydid"}], copies=1, rse_expression="LocalRSE")
+            print(rule_ids[0])
             ```
 
         See Also
