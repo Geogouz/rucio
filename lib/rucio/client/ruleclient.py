@@ -599,11 +599,6 @@ class RuleClient(BaseClient):
 
             If no history exists for the DID, the iterator is empty.
 
-        Raises
-        -------
-        RuleNotFound
-            DID not found or no rules exist for the given scope and name.
-
         See Also
         --------
             rucio.client.ruleclient.RuleClient.list_replication_rules
