@@ -429,8 +429,8 @@ class RuleClient(BaseClient):
         override: "Mapping[str, Any]"
     ) -> Any:
         """
-        Move a replication rule to another RSE and, once done, sets the lifetime of the original rule to 0.
-        Creates the new rule as a child rule of the supplied rule.
+        Move a replication rule to another RSE by creating a replacement child rule.
+        The original rule is linked to the replacement rule and expires with lifetime 0.
 
         Parameters
         ----------
