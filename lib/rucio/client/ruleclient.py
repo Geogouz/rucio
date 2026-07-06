@@ -319,9 +319,12 @@ class RuleClient(BaseClient):
         Parameters
         ----------
         rule_id :
-            The id of the rule to be retrieved.
+            The id of the rule to be updated.
         options :
-            Options dictionary. Options dictionary can contain any of the keys used to add a rule.
+            Options dictionary. Valid keys are 'comment', 'locked', 'lifetime',
+            'account', 'state', 'activity', 'source_replica_expression',
+            'cancel_requests', 'priority', 'child_rule_id', 'eol_at', 'meta',
+            'purge_replicas', and 'boost_rule'.
 
         Raises
         -------
