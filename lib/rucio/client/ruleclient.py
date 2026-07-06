@@ -355,7 +355,7 @@ class RuleClient(BaseClient):
             from rucio.client.client import Client
             client = Client()
             rule_id = "Existing Rule ID"
-            client.update_replication_rule(rule_id, options={"lifetime":0})
+            client.update_replication_rule(rule_id, options={"lifetime": 0})
             ```
 
         See Also
