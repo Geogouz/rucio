@@ -205,7 +205,7 @@ class RuleClient(BaseClient):
 
         Returns
         -------
-            True if rule is successfully deleted
+            True if the deletion request was accepted.
         """
 
         path = self.RULE_BASEURL + '/' + rule_id
