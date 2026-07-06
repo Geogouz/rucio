@@ -452,6 +452,10 @@ class RuleClient(BaseClient):
             Rule ID does not exist.
         RuleReplaceFailed
             Rule already has a child rule.
+        AccessDenied
+            The issuing account cannot move the rule.
+        InvalidRSEExpression
+            The replacement RSE expression cannot be resolved.
         UnsupportedOperation
             Key in override is invalid.
 
