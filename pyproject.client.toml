@@ -57,7 +57,7 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-ssh = ['paramiko']
+ssh = ['paramiko>=5.0.0']
 kerberos = [
             'kerberos',
             'pykerberos',
@@ -65,7 +65,7 @@ kerberos = [
         ]
 swift = ['python-swiftclient']
 argcomplete = ['argcomplete']
-sftp = ['paramiko']
+sftp = ['paramiko>=5.0.0']
 dumper = ['python-magic']
 
 [project.urls]
