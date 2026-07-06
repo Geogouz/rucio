@@ -199,9 +199,9 @@ class RuleClient(BaseClient):
         RuleNotFound
             Rule ID does not exist.
         AccessDenied
-            Rule does not belong, to the user associated with the client, or user has insufficent permissions.
+            The issuing account cannot delete the rule.
         UnsupportedOperation
-            Rule is either locked, or is a parent of child rules with "delete_parent=False" set.
+            Rule is locked or has a child rule and cannot be deleted through this client call.
 
         Returns
         -------
