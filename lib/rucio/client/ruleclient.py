@@ -485,10 +485,10 @@ class RuleClient(BaseClient):
 
     def approve_replication_rule(self, rule_id: str) -> Literal[True]:
         """
-        Admin tool used to approve pending rules.
-        Rules with the "ask_approval" attribute can be approved this way.
+        Approve a pending replication rule.
+        Rules in WAITING_APPROVAL state move to INJECT state after approval.
 
-        An email will be sent to the user who created the rule when the rule is approved.
+        Email notifications are queued when the rule owner's account has an email address and mail templates are configured.
 
         Parameters
         ----------
