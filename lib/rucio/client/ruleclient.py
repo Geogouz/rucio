@@ -461,7 +461,7 @@ class RuleClient(BaseClient):
 
         Returns
         -------
-        New rule ID.
+        ID of the replacement rule.
 
         See Also
         ---------
