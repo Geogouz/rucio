@@ -314,6 +314,8 @@ class RuleClient(BaseClient):
 
     def update_replication_rule(self, rule_id: str, options: dict[str, Any]) -> Literal[True]:
         """
+        Update a replication rule.
+
         Parameters
         ----------
         rule_id :
