@@ -105,8 +105,8 @@ class RuleClient(BaseClient):
             If the weighting option of the replication rule is used, the choice of RSEs takes their weight into account.
 
         Returns
-        ----------
-        Rule ID. Can be used to check the status of the rule.
+        -------
+        List of created rule IDs. Each ID can be used to check the status of a rule.
 
         Raises
         ----------
