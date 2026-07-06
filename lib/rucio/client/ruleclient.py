@@ -109,19 +109,41 @@ class RuleClient(BaseClient):
         List of created rule IDs. Each ID can be used to check the status of a rule.
 
         Raises
-        ----------
+        ------
+        AccessDenied
+            The issuing account is not allowed to add the rule.
         InvalidRSEExpression
-            The rse expression provided doesn't match any RSEs.
+            The RSE expression cannot be resolved.
+        InvalidSourceReplicaExpression
+            The source replica expression cannot be resolved.
         DataIdentifierNotFound
             Requested DID does not exist or is otherwise specified incorrectly.
-        InsufficentAccountLimit
-            The account used to create the rule does not have sufficent quota on the target RSE.
+        InsufficientAccountLimit
+            The account used to create the rule does not have sufficient quota on the target RSE.
         DuplicateRule
             Rule already exists with the same DID, RSE, and number of copies.
-        InsufficentTargetRSEs
-            There are not enough RSEs that match the RSE expression to fulfil the 'copies' requirement
+        InsufficientTargetRSEs
+            There are not enough RSEs that match the RSE expression to fulfil the 'copies' requirement.
+        InvalidReplicationRule
+            The rule parameters are invalid.
+        InvalidRuleWeight
+            The requested weight is not valid for RSE selection.
+        InvalidObject
+            The rule payload does not match the rule schema.
         InvalidValueForKey
-            Requested '0' or negative copies of a replica.
+            Requested 0 or negative copies.
+        ManualRuleApprovalBlocked
+            Manual approval is blocked for a target RSE.
+        ReplicationRuleCreationTemporaryFailed
+            Rule creation failed due to a temporary backend conflict.
+        RSEOverQuota
+            The target RSE is over quota.
+        RSEWriteBlocked
+            The target RSE is not writable.
+        ScratchDiskLifetimeConflict
+            The requested lifetime conflicts with scratch disk policy.
+        StagingAreaRuleRequiresLifetime
+            A staging-area rule was requested without a lifetime.
 
         Examples
         --------
