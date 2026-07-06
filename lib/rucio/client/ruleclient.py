@@ -185,7 +185,7 @@ class RuleClient(BaseClient):
         self, rule_id: str, purge_replicas: Optional[bool] = None
     ) -> Literal[True]:
         """
-        Deletes a replication rule and all associated replica locks.
+        Mark a replication rule for deletion and remove its associated locks when the rule expires.
 
         Parameters
         ----------
