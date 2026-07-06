@@ -764,7 +764,7 @@ class RuleClient(BaseClient):
         Raises
         -------
         RucioException
-            An invalid key is passed as a filter.
+            A filter value is badly formatted.
 
         See Also
         --------
