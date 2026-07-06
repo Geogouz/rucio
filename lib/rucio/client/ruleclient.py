@@ -678,7 +678,8 @@ class RuleClient(BaseClient):
 
     def list_replication_rules(self, filters: Optional[dict[str, Any]] = None) -> "Iterator[dict[str, Any]]":
         """
-        List all replication rules which match a filter
+        List all replication rules which match a filter.
+
         Parameters
         ----------
         filters:
