@@ -503,7 +503,7 @@ class RuleClient(BaseClient):
             The issuing account cannot approve or deny rules.
 
         Returns
-        --------
+        -------
         True if rule was successfully approved.
 
         See Also
