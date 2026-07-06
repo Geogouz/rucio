@@ -543,7 +543,7 @@ class RuleClient(BaseClient):
 
         Returns
         -------
-        True if the rule is sucessfully denied.
+        True if the rule is successfully denied.
 
         See Also
         ---------
