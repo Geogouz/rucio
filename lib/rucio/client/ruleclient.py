@@ -683,8 +683,11 @@ class RuleClient(BaseClient):
         Parameters
         ----------
         filters:
-            dictionary of attributes by which the rules should be filtered.
-            Filters can be any of the attributes in the return dictionary.
+            Dictionary of rule attributes by which the rules should be filtered.
+            Filters can use replication rule columns such as 'id', 'scope',
+            'name', 'account', 'state', 'did_type', and 'grouping'. Date range
+            filters 'created_before', 'created_after', 'updated_before', and
+            'updated_after' are also supported.
 
         Returns
         -------
