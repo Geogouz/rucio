@@ -427,6 +427,7 @@ def test_postgres_uses_ci_worker_count(tmp_path: "Path", monkeypatch) -> None:
     )
 
     assert "--numprocesses=3" in _Manager.commands[0]
+    assert "/rucio_source/pyproject.toml" in _Manager.commands[0]
 
 
 def test_user_xdist_setting_is_preserved(tmp_path: "Path", monkeypatch) -> None:
@@ -563,6 +564,7 @@ def test_unit_case_builds_and_runs_requested_python(tmp_path: "Path", monkeypatc
     assert "--target" not in commands[0]
     assert "PYTHON=3.12" in commands[0]
     assert commands[1][:3] == ["docker", "run", "--rm"]
+    assert "/rucio_source/pyproject.toml" in commands[1]
     assert commands[0][commands[0].index("--tag") + 1] in commands[1]
     assert f"{tmp_path.resolve()}:/rucio_source:z" in commands[1]
     assert "PYTHONPATH=/rucio_source/lib" in commands[1]
