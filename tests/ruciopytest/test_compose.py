@@ -18,6 +18,7 @@ import yaml
 
 COMPOSE_DIR = Path(__file__).resolve().parents[2] / "etc/docker/dev"
 RUNTIME_DOCKERFILE = COMPOSE_DIR.parent / "test/runtime.Dockerfile"
+UNIT_DOCKERFILE = COMPOSE_DIR.parent / "test/unit.Dockerfile"
 
 
 def test_compose_services_do_not_use_global_container_names() -> None:
@@ -63,10 +64,10 @@ def test_test_overlay_consumes_prebuilt_image() -> None:
     assert rucio["environment"]["RUCIO_HOME"] == "${RUCIO_HOME:-/opt/rucio}"
 
 
-def test_runtime_dockerfile_has_parameterized_unit_target() -> None:
-    dockerfile = RUNTIME_DOCKERFILE.read_text()
+def test_unit_dockerfile_has_parameterized_runtime() -> None:
+    dockerfile = UNIT_DOCKERFILE.read_text()
 
-    assert "FROM python:${PYTHON}-slim-bookworm AS unit" in dockerfile
+    assert "FROM python:${PYTHON}-slim-bookworm" in dockerfile
     assert 'ENTRYPOINT ["python", "-bb", "-m", "pytest"]' in dockerfile
 
 
