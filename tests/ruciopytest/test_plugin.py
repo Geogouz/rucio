@@ -65,6 +65,11 @@ class _Config:
         return self.ini_options.get(name, [])
 
 
+@pytest.fixture(autouse=True)
+def outer_runner_environment(monkeypatch) -> None:
+    monkeypatch.delenv("RUCIO_PYTEST_INNER", raising=False)
+
+
 def test_list_cases_is_machine_readable(capsys) -> None:
     config = _Config(list_cases=True)
 
