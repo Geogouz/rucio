@@ -164,6 +164,7 @@ def run_unit_case(
     inner_environment = dict(case.env_vars)
     inner_environment.update(container_environment or {})
     inner_environment.update({
+        "PYTHONPATH": "/rucio_source/lib",
         "RUCIO_PYTEST_INNER": "1",
         "RUCIO_SKIP_TEST_SETUP": "1",
         "RUCIO_TEST_CASE": case.id,
