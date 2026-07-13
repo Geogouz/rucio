@@ -1,0 +1,227 @@
+# Copyright European Organization for Nuclear Research (CERN) since 2012
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from typing import Optional
+
+
+_XDIST_RDBMS = frozenset({"postgres14"})
+
+
+@dataclass(frozen=True)
+class SuiteDefinition:
+    name: str
+    group: str
+    python_versions: tuple[str, ...]
+    rdbms: tuple[str, ...] = ()
+    test_paths: tuple[str, ...] = ("tests/",)
+    exclude_paths: tuple[str, ...] = ("tests/ruciopytest/*",)
+    compose_profiles: tuple[str, ...] = ()
+    policies: tuple[str, ...] = ()
+    env_vars: dict[str, str] = field(default_factory=dict)
+    xdist_enabled: bool = True
+
+
+@dataclass(frozen=True)
+class TestCase:
+    suite: str
+    group: str
+    python: str
+    rdbms: str = ""
+    policy: str = ""
+    test_paths: tuple[str, ...] = ("tests/",)
+    exclude_paths: tuple[str, ...] = ()
+    compose_profiles: tuple[str, ...] = ()
+    env_vars: dict[str, str] = field(default_factory=dict)
+    xdist_enabled: bool = False
+
+    @property
+    def id(self) -> str:
+        parts = [self.suite.replace("_", "-"), f"py{self.python.replace('.', '')}"]
+        if self.rdbms:
+            parts.append(self.rdbms)
+        if self.policy:
+            parts.append(self.policy)
+        return "-".join(parts)
+
+
+@dataclass(frozen=True)
+class SuiteProfile:
+    name: str
+    rdbms: str
+    compose_profiles: tuple[str, ...] = ()
+    xdist_enabled: bool = True
+    run_in_container: bool = True
+    default_workers_ci: int = 3
+    default_workers_local: str = "auto"
+    test_paths: tuple[str, ...] = ("tests/",)
+    markers: tuple[str, ...] = ()
+    exclude_paths: tuple[str, ...] = ()
+    env_vars: dict[str, str] = field(default_factory=dict)
+    policy: "Optional[str]" = None
+
+
+SUITE_DEFINITIONS: dict[str, SuiteDefinition] = {
+    "unit": SuiteDefinition(
+        name="unit",
+        group="unit",
+        python_versions=("3.9", "3.10", "3.11", "3.12"),
+        test_paths=("tests/rucio", "tests/ruciopytest"),
+        exclude_paths=(),
+    ),
+    "client": SuiteDefinition(
+        name="client",
+        group="autotest",
+        python_versions=("3.9", "3.10"),
+        rdbms=("postgres14",),
+        test_paths=(
+            "tests/test_clients.py",
+            "tests/test_bin_rucio.py",
+            "tests/test_module_import.py",
+        ),
+        exclude_paths=(),
+    ),
+    "remote_dbs": SuiteDefinition(
+        name="remote_dbs",
+        group="autotest",
+        python_versions=("3.9", "3.10"),
+        rdbms=("oracle", "mysql8", "postgres14"),
+    ),
+    "sqlite": SuiteDefinition(
+        name="sqlite",
+        group="autotest",
+        python_versions=("3.9", "3.10"),
+        rdbms=("sqlite",),
+    ),
+    "multi_vo": SuiteDefinition(
+        name="multi_vo",
+        group="autotest",
+        python_versions=("3.9", "3.10"),
+        rdbms=("postgres14",),
+        env_vars={"RUCIO_HOME": "/opt/rucio/etc/multi_vo/tst"},
+    ),
+    "votest": SuiteDefinition(
+        name="votest",
+        group="votest",
+        python_versions=("3.9",),
+        rdbms=("postgres14",),
+        policies=("atlas", "belleii"),
+    ),
+    "integration": SuiteDefinition(
+        name="integration",
+        group="integration",
+        python_versions=("3.9",),
+        rdbms=("postgres14",),
+        compose_profiles=("storage", "externalmetadata", "iam"),
+        test_paths=(
+            "tests/test_rucio_server.py",
+            "tests/test_upload.py",
+            "tests/test_impl_upload_download.py",
+            "tests/test_rse_protocol_gfal2_impl.py",
+            "tests/test_rse_protocol_xrootd.py",
+            "tests/test_rse_protocol_ssh.py",
+            "tests/test_rse_protocol_rsync.py",
+            "tests/test_rse_protocol_rclone.py",
+            "tests/test_conveyor.py",
+            "tests/test_tpc.py",
+            "tests/test_reaper.py::test_deletion_with_tokens",
+            "tests/test_download.py::test_download_from_archive_on_xrd",
+            "tests/test_did_meta_plugins.py::TestDidMetaMongo",
+            "tests/test_did_meta_plugins.py::TestDidMetaExternalPostgresJSON",
+            "tests/test_did_meta_plugins.py::TestDidMetaElastic",
+        ),
+        exclude_paths=(),
+        xdist_enabled=False,
+    ),
+}
+
+
+def iter_cases(group: "Optional[str]" = None) -> "Iterator[TestCase]":
+    for definition in SUITE_DEFINITIONS.values():
+        if group is not None and definition.group != group:
+            continue
+        databases = definition.rdbms or ("",)
+        policies = definition.policies or ("",)
+        for python in definition.python_versions:
+            for rdbms in databases:
+                for policy in policies:
+                    profiles = definition.compose_profiles
+                    if rdbms and rdbms != "sqlite":
+                        profiles = (rdbms, *profiles)
+                    env_vars = dict(definition.env_vars)
+                    if rdbms:
+                        env_vars["RDBMS"] = rdbms
+                    if policy:
+                        env_vars["POLICY"] = policy
+                    yield TestCase(
+                        suite=definition.name,
+                        group=definition.group,
+                        python=python,
+                        rdbms=rdbms,
+                        policy=policy,
+                        test_paths=definition.test_paths,
+                        exclude_paths=definition.exclude_paths,
+                        compose_profiles=profiles,
+                        env_vars=env_vars,
+                        xdist_enabled=(
+                            definition.xdist_enabled
+                            and rdbms in _XDIST_RDBMS
+                        ),
+                    )
+
+
+def get_case(case_id: str) -> TestCase:
+    for case in iter_cases():
+        if case.id == case_id:
+            return case
+    raise ValueError(f"Unknown test case {case_id!r}")
+
+
+def resolve_profile(
+    suite_name: str,
+    rdbms_override: "Optional[str]" = None,
+) -> SuiteProfile:
+    if suite_name not in SUITE_DEFINITIONS:
+        raise ValueError(
+            f"Unknown suite: {suite_name!r}. Available: {sorted(SUITE_DEFINITIONS)}"
+        )
+
+    definition = SUITE_DEFINITIONS[suite_name]
+    rdbms = rdbms_override or (definition.rdbms[0] if definition.rdbms else "")
+    profiles = definition.compose_profiles
+    if rdbms and rdbms != "sqlite":
+        profiles = (rdbms, *profiles)
+    xdist_enabled = definition.xdist_enabled and rdbms in _XDIST_RDBMS
+    return SuiteProfile(
+        name=definition.name,
+        rdbms=rdbms,
+        compose_profiles=profiles,
+        xdist_enabled=xdist_enabled,
+        run_in_container=definition.name != "unit",
+        default_workers_ci=3 if xdist_enabled else 0,
+        default_workers_local="auto" if xdist_enabled else "0",
+        test_paths=definition.test_paths,
+        exclude_paths=definition.exclude_paths,
+        env_vars=definition.env_vars,
+    )
+
+
+SUITE_PROFILES = {
+    name: resolve_profile(name)
+    for name in SUITE_DEFINITIONS
+}
