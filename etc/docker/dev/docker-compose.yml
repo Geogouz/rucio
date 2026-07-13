@@ -23,11 +23,11 @@ services:
       - ../../certs/ssh/ruciouser_sshkey.pub:/root/.ssh/ruciouser_sshkey.pub:z
       - ../../certs/ssh/ruciouser_sshkey:/root/.ssh/ruciouser_sshkey:z
       - ./rucio/idpsecrets.json:/opt/rucio/etc/idpsecrets.json:ro
-      - ../../../tools:/opt/rucio/tools:Z
-      - ../../../bin:/opt/rucio/bin:Z
-      - ../../../lib:/opt/rucio/lib:Z
-      - ../../../tests:/opt/rucio/tests:Z
-      - ../../../:/rucio_source:Z
+      - ../../../tools:/opt/rucio/tools:z
+      - ../../../bin:/opt/rucio/bin:z
+      - ../../../lib:/opt/rucio/lib:z
+      - ../../../tests:/opt/rucio/tests:z
+      - ../../../:/rucio_source:z
     environment:
       - REQUESTS_CA_BUNDLE=/etc/pki/tls/certs/ca-bundle.crt
       - RUCIO_SOURCE_DIR=/rucio_source
@@ -50,10 +50,10 @@ services:
       - ../../certs/ssh/ruciouser_sshkey.pub:/root/.ssh/ruciouser_sshkey.pub:z
       - ../../certs/ssh/ruciouser_sshkey:/root/.ssh/ruciouser_sshkey:z
       - ./rucio/idpsecrets.json:/opt/rucio/etc/idpsecrets.json:ro
-      - ../../../tools:/opt/rucio/tools:Z
-      - ../../../bin:/opt/rucio/bin:Z
-      - ../../../lib:/opt/rucio/lib:Z
-      - ../../../tests:/opt/rucio/tests:Z
+      - ../../../tools:/opt/rucio/tools:z
+      - ../../../bin:/opt/rucio/bin:z
+      - ../../../lib:/opt/rucio/lib:z
+      - ../../../tests:/opt/rucio/tests:z
       - ../../../:/rucio_source
     environment:
       - REQUESTS_CA_BUNDLE=/etc/pki/tls/certs/ca-bundle.crt
@@ -177,8 +177,8 @@ services:
       - ./fts/entrypoint.sh:/docker-entrypoint.sh:ro
       - ../../certs/rucio_ca.pem:/etc/pki/ca-trust/source/anchors/rucio_ca.pem:ro
       - ../../certs/rucio_ca.pem:/etc/grid-security/certificates/5fca1cb1.0:z
-      - ../../certs/hostcert_fts.pem:/etc/grid-security/hostcert.pem:Z
-      - ../../certs/hostcert_fts.key.pem:/etc/grid-security/hostkey.pem:Z
+      - ../../certs/hostcert_fts.pem:/etc/grid-security/hostcert.pem:z
+      - ../../certs/hostcert_fts.key.pem:/etc/grid-security/hostkey.pem:z
       - ./fts/fts3restconfig:/etc/fts3/fts3restconfig:ro
     environment:
       - REQUESTS_CA_BUNDLE=/etc/pki/tls/certs/ca-bundle.crt
@@ -210,8 +210,8 @@ services:
       - XRDPORT=1094
     volumes:
       - ../../certs/rucio_ca.pem:/etc/grid-security/certificates/5fca1cb1.0:z
-      - ../../certs/hostcert_xrd1.pem:/tmp/xrdcert.pem:Z
-      - ../../certs/hostcert_xrd1.key.pem:/tmp/xrdkey.pem:Z
+      - ../../certs/hostcert_xrd1.pem:/tmp/xrdcert.pem:z
+      - ../../certs/hostcert_xrd1.key.pem:/tmp/xrdkey.pem:z
     ulimits:
       nofile:
         soft: 10240
@@ -227,8 +227,8 @@ services:
       - XRDPORT=1095
     volumes:
       - ../../certs/rucio_ca.pem:/etc/grid-security/certificates/5fca1cb1.0:z
-      - ../../certs/hostcert_xrd2.pem:/tmp/xrdcert.pem:Z
-      - ../../certs/hostcert_xrd2.key.pem:/tmp/xrdkey.pem:Z
+      - ../../certs/hostcert_xrd2.pem:/tmp/xrdcert.pem:z
+      - ../../certs/hostcert_xrd2.key.pem:/tmp/xrdkey.pem:z
     ulimits:
       nofile:
         soft: 10240
@@ -244,8 +244,8 @@ services:
       - XRDPORT=1096
     volumes:
       - ../../certs/rucio_ca.pem:/etc/grid-security/certificates/5fca1cb1.0:z
-      - ../../certs/hostcert_xrd3.pem:/tmp/xrdcert.pem:Z
-      - ../../certs/hostcert_xrd3.key.pem:/tmp/xrdkey.pem:Z
+      - ../../certs/hostcert_xrd3.pem:/tmp/xrdcert.pem:z
+      - ../../certs/hostcert_xrd3.key.pem:/tmp/xrdkey.pem:z
     ulimits:
       nofile:
         soft: 10240
@@ -261,8 +261,8 @@ services:
       - XRDPORT=1097
     volumes:
       - ../../certs/rucio_ca.pem:/etc/grid-security/certificates/5fca1cb1.0:z
-      - ../../certs/hostcert_xrd4.pem:/tmp/xrdcert.pem:Z
-      - ../../certs/hostcert_xrd4.key.pem:/tmp/xrdkey.pem:Z
+      - ../../certs/hostcert_xrd4.pem:/tmp/xrdcert.pem:z
+      - ../../certs/hostcert_xrd4.key.pem:/tmp/xrdkey.pem:z
     ulimits:
       nofile:
         soft: 10240
@@ -285,8 +285,8 @@ services:
       - ./xrd:/configs:ro
       - ./configure_qbittorrent.py:/configure_qbittorrent.py:ro
       - ../../certs/rucio_ca.pem:/etc/grid-security/certificates/5fca1cb1.0:z
-      - ../../certs/hostcert_xrd5.pem:/tmp/xrdcert.pem:Z
-      - ../../certs/hostcert_xrd5.key.pem:/tmp/xrdkey.pem:Z
+      - ../../certs/hostcert_xrd5.pem:/tmp/xrdcert.pem:z
+      - ../../certs/hostcert_xrd5.key.pem:/tmp/xrdkey.pem:z
     ulimits:
       nofile:
         soft: 10240
@@ -305,7 +305,7 @@ services:
       - ./configure_qbittorrent.py:/configure_qbittorrent.py:ro
       - ../../certs/rucio_ca.pem:/etc/grid-security/certificates/5fca1cb1.0:ro
       - ../../certs/hostcert_web1.key.pem:/etc/grid-security/hostkey.pem:ro
-      - ../../certs/hostcert_web1.pem:/etc/grid-security/hostcert.pem:Z
+      - ../../certs/hostcert_web1.pem:/etc/grid-security/hostcert.pem:z
       - ./web1/default-ssl.conf:/etc/apache2/sites-available/default-ssl.conf
 
   # ------------------------------------------------------------------
@@ -320,8 +320,8 @@ services:
       - MINIO_ROOT_PASSWORD=password
     volumes:
       - vol-minio-data:/data
-      - ../../certs/hostcert_minio.pem:/root/.minio/certs/public.crt:Z
-      - ../../certs/hostcert_minio.key.pem:/root/.minio/certs/private.key:Z
+      - ../../certs/hostcert_minio.pem:/root/.minio/certs/public.crt:z
+      - ../../certs/hostcert_minio.key.pem:/root/.minio/certs/private.key:z
     command: ["server", "/data"]
 
   ssh1:
@@ -330,7 +330,7 @@ services:
     profiles:
       - storage
     volumes:
-      - ../../certs/ssh/ruciouser_sshkey.pub:/tmp/sshkey.pub:Z
+      - ../../certs/ssh/ruciouser_sshkey.pub:/tmp/sshkey.pub:z
 
   # ------------------------------------------------------------------
   # External metadata services
