@@ -203,6 +203,7 @@ services:
       - ORACLE_PASSWORD=rucio
     volumes:
       - ./oracle/01_tune_oracle_limits.sql:/container-entrypoint-initdb.d/01_tune_oracle_limits.sql:ro
+      - vol-oracle-data:/opt/oracle/oradata
     healthcheck:
       test: [ "CMD-SHELL", "/opt/oracle/healthcheck.sh > /dev/null || exit 1" ]
       interval: 10s
@@ -562,6 +563,7 @@ volumes:
   vol-mongo-db:
   vol-iam-db-mysql:
   vol-mysql8-mysql:
+  vol-oracle-data:
   vol-postgres-data:
 
 networks:

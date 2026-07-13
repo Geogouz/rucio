@@ -38,6 +38,16 @@ def test_database_services_have_healthchecks() -> None:
     )
 
 
+def test_all_databases_use_persistent_storage() -> None:
+    compose = yaml.safe_load((COMPOSE_DIR / "docker-compose.yml").read_text())
+    overlay = yaml.safe_load((COMPOSE_DIR / "docker-compose.test.yml").read_text())
+
+    assert "vol-postgres14-data:/var/lib/postgresql/data" in compose["services"]["postgres14"]["volumes"]
+    assert "vol-mysql8-mysql:/var/lib/mysql" in compose["services"]["mysql8"]["volumes"]
+    assert "vol-oracle-data:/opt/oracle/oradata" in compose["services"]["oracle"]["volumes"]
+    assert "vol-test-tmp:/tmp" in overlay["services"]["rucio"]["volumes"]
+
+
 def test_test_overlay_consumes_prebuilt_image() -> None:
     compose = yaml.safe_load(
         (COMPOSE_DIR / "docker-compose.test.yml").read_text()
