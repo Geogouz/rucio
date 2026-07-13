@@ -211,15 +211,26 @@ class ContainerManager:
 
     def capture_logs(self) -> None:
         try:
-            result = self._run(
+            compose = self._run(
                 self.compose_command("logs", "--no-color", "--timestamps"),
                 check=False,
                 capture_output=True,
                 timeout=60,
             )
-            if result.stdout:
+            httpd = self.exec(
+                "rucio",
+                "cat",
+                "/var/log/rucio/httpd_error_log",
+                check=False,
+                capture_output=True,
+                timeout=30,
+            )
+            if compose.stdout or httpd.stdout:
                 self.log_dir.mkdir(parents=True, exist_ok=True)
-                (self.log_dir / "compose.log").write_text(result.stdout)
+            if compose.stdout:
+                (self.log_dir / "compose.log").write_text(compose.stdout)
+            if httpd.stdout:
+                (self.log_dir / "httpd_error.log").write_text(httpd.stdout)
         except (OSError, subprocess.SubprocessError):
             pass
 

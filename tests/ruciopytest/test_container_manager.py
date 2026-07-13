@@ -159,6 +159,25 @@ def test_stop_removes_only_owned_project(tmp_path: "Path", monkeypatch) -> None:
     assert all("compose ls" not in " ".join(command) for command in commands)
 
 
+def test_capture_logs_includes_httpd_errors(tmp_path: "Path", monkeypatch) -> None:
+    manager = _manager(tmp_path)
+
+    def run(command, **kwargs):
+        stdout = (
+            "httpd error"
+            if any(argument.endswith("httpd_error_log") for argument in command)
+            else "compose log"
+        )
+        return subprocess.CompletedProcess(command, 0, stdout=stdout)
+
+    monkeypatch.setattr(manager, "_run", run)
+
+    manager.capture_logs()
+
+    assert (manager.log_dir / "compose.log").read_text() == "compose log"
+    assert (manager.log_dir / "httpd_error.log").read_text() == "httpd error"
+
+
 def test_keep_db_preserves_compose_volumes(tmp_path: "Path", monkeypatch) -> None:
     manager = _manager(tmp_path, keep_db=True)
     commands = []
