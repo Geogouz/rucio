@@ -180,8 +180,11 @@ class InfraManager:
                 client.sendall(b"flush_all\r\n")
                 return
         except OSError:
+            memcached = shutil.which("memcached")
+            if memcached is None:
+                raise RuntimeError("memcached executable not found")
             subprocess.run(  # noqa: S603
-                ("memcached", "-u", "root", "-d"),
+                (memcached, "-u", "root", "-d"),
                 check=True,
             )
 
