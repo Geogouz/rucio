@@ -148,7 +148,7 @@ def run_unit_case(
     command.extend((
         "--rm",
         "--volume",
-        f"{root_dir.resolve()}:/rucio_source",
+        f"{root_dir.resolve()}:/rucio_source:z",
         "--workdir",
         "/rucio_source",
     ))

@@ -33,9 +33,16 @@ def test_compose_services_do_not_use_global_container_names() -> None:
 
 
 def test_compose_bind_mounts_allow_isolated_projects() -> None:
-    compose = (COMPOSE_DIR / "docker-compose.yml").read_text()
+    compose_text = (COMPOSE_DIR / "docker-compose.yml").read_text()
+    compose = yaml.safe_load(compose_text)
 
-    assert ":Z" not in compose
+    assert ":Z" not in compose_text
+    assert all(
+        "z" in volume.rsplit(":", 1)[-1].lower()
+        for service in compose["services"].values()
+        for volume in service.get("volumes", [])
+        if isinstance(volume, str) and volume.startswith(".")
+    )
 
 
 def test_database_services_have_healthchecks() -> None:
