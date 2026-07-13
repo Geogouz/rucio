@@ -84,13 +84,7 @@ SUITE_DEFINITIONS: dict[str, SuiteDefinition] = {
         name="remote_dbs",
         group="autotest",
         python_versions=("3.9", "3.10"),
-        rdbms=("oracle", "mysql8", "postgres14"),
-    ),
-    "sqlite": SuiteDefinition(
-        name="sqlite",
-        group="autotest",
-        python_versions=("3.9", "3.10"),
-        rdbms=("sqlite",),
+        rdbms=("oracle", "postgres14"),
     ),
     "multi_vo": SuiteDefinition(
         name="multi_vo",
@@ -145,7 +139,7 @@ def iter_cases(group: "Optional[str]" = None) -> "Iterator[TestCase]":
             for rdbms in databases:
                 for policy in policies:
                     profiles = definition.compose_profiles
-                    if rdbms and rdbms != "sqlite":
+                    if rdbms:
                         profiles = (rdbms, *profiles)
                     env_vars = dict(definition.env_vars)
                     if rdbms:

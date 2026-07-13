@@ -54,7 +54,7 @@ def test_list_cases_is_machine_readable(capsys) -> None:
     assert plugin.pytest_cmdline_main(config) == 0
 
     cases = json.loads(capsys.readouterr().out)
-    assert len(cases) == 19
+    assert len(cases) == 15
     assert {case["id"] for case in cases} >= {
         "unit-py39",
         "remote-dbs-py310-oracle",
@@ -154,7 +154,7 @@ def test_all_runs_every_case_and_reports_failures(monkeypatch, capsys) -> None:
 
     assert plugin.pytest_cmdline_main(config) == 1
     assert len(unit_cases) == 4
-    assert len(container_cases) == 15
+    assert len(container_cases) == 11
     assert "Failed cases: unit-py310" in capsys.readouterr().out
 
 
@@ -164,7 +164,7 @@ def test_all_dry_run_json_is_machine_readable(capsys) -> None:
     assert plugin.pytest_cmdline_main(config) == 0
 
     cases = json.loads(capsys.readouterr().out)
-    assert len(cases) == 19
+    assert len(cases) == 15
 
 
 def test_all_rejects_one_runtime_for_two_python_versions(monkeypatch) -> None:

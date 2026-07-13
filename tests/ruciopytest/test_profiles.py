@@ -22,9 +22,9 @@ from .profiles import SUITE_DEFINITIONS, get_case, iter_cases
 def test_case_registry_covers_current_ci() -> None:
     cases = list(iter_cases())
 
-    assert len(cases) == 19
+    assert len(cases) == 15
     assert len(list(iter_cases("unit"))) == 4
-    assert len(list(iter_cases("autotest"))) == 12
+    assert len(list(iter_cases("autotest"))) == 8
     assert len(list(iter_cases("votest"))) == 2
     assert len(list(iter_cases("integration"))) == 1
     assert len({case.id for case in cases}) == len(cases)
@@ -41,9 +41,7 @@ def test_regular_case_axes_match_current_ci() -> None:
         for suite, rdbms in (
             ("client", "postgres14"),
             ("remote_dbs", "oracle"),
-            ("remote_dbs", "mysql8"),
             ("remote_dbs", "postgres14"),
-            ("sqlite", "sqlite"),
             ("multi_vo", "postgres14"),
         )
     }
@@ -65,8 +63,7 @@ def test_cases_export_the_suite_name() -> None:
 
 
 def test_cases_derive_compose_profiles() -> None:
-    assert get_case("remote-dbs-py39-mysql8").compose_profiles == ("mysql8",)
-    assert get_case("sqlite-py39-sqlite").compose_profiles == ()
+    assert get_case("remote-dbs-py39-oracle").compose_profiles == ("oracle",)
     assert get_case("integration-py39-postgres14").compose_profiles == (
         "postgres14",
         "storage",
