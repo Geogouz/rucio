@@ -426,6 +426,10 @@ def _normalize_xdist_args(
     workers: "Optional[int]",
 ) -> list[str]:
     options = []
+    if config.getoption("distload", False):
+        options.append("-d")
+    if config.getoption("looponfail", False):
+        options.append("--looponfail")
     if workers is not None:
         options.extend(("-n", str(workers)))
     return runner.add_pytest_options(pytest_args, *options)
@@ -436,6 +440,8 @@ def _xdist_is_active(
     workers: "Optional[int]",
     pytest_args: "Sequence[str]",
 ) -> bool:
+    if config.getoption("looponfail", False):
+        return True
     if config.getoption("collectonly", False):
         return False
     if workers is None:

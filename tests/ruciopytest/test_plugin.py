@@ -307,6 +307,7 @@ def test_serial_case_rejects_xdist(monkeypatch) -> None:
     "options",
     (
         {"dist": "load", "tx": ["popen"]},
+        {"looponfail": True},
     ),
 )
 def test_serial_case_rejects_resolved_xdist(monkeypatch, options) -> None:
@@ -384,6 +385,31 @@ def test_custom_zero_workers_preserve_explicit_transaction(monkeypatch) -> None:
 
     with pytest.raises(pytest.UsageError, match="does not support xdist"):
         plugin.pytest_cmdline_main(config)
+
+
+@pytest.mark.parametrize("argument", ("-df", "-fd"))
+def test_clustered_looponfail_is_normalized(monkeypatch, argument) -> None:
+    config = _Config(
+        case="unit-py39",
+        dist="load",
+        distload=True,
+        looponfail=True,
+    )
+    config.invocation_params = SimpleNamespace(args=(
+        "--case=unit-py39",
+        argument,
+    ))
+    captured = {}
+
+    def run(case, root_path, pytest_args, **kwargs):
+        captured["args"] = pytest_args
+        return 0
+
+    monkeypatch.setattr(plugin.runner, "run_unit_case", run)
+
+    assert plugin.pytest_cmdline_main(config) == 0
+    assert "--looponfail" in captured["args"]
+    assert "-d" in captured["args"]
 
 
 def test_multi_vo_case_rejects_looponfail(monkeypatch) -> None:

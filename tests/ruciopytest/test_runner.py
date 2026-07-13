@@ -30,6 +30,7 @@ class _Manager:
     environments: list[dict[str, str]] = []
     stops: list[bool] = []
     artifact = "/fts/log/*__transfer-id"
+    interactives: list[bool] = []
 
     def __init__(self, case, root_dir, keep_db=False, log_output=False):
         self.case = case
@@ -60,6 +61,7 @@ class _Manager:
     ):
         self.commands.append((service, *arguments))
         self.environments.append(dict(environment or {}))
+        self.interactives.append(kwargs.get("interactive", False))
         if arguments[:2] == ("cat", "/tmp/test_tpc.artifact"):
             return subprocess.CompletedProcess(
                 arguments,
@@ -76,6 +78,7 @@ def _reset_manager(monkeypatch, results=()):
     _Manager.environments = []
     _Manager.stops = []
     _Manager.artifact = "/fts/log/*__transfer-id"
+    _Manager.interactives = []
     monkeypatch.setattr(runner, "ContainerManager", _Manager)
 
 
@@ -560,6 +563,7 @@ def test_user_xdist_setting_is_preserved(tmp_path: "Path", monkeypatch) -> None:
         ("--numprocesses=0",),
         ("--tx", "popen//python=python3"),
         ("--dist=no",),
+        ("-f",),
     ),
 )
 def test_xdist_options_override_default_workers(
@@ -644,6 +648,26 @@ def test_serial_case_loads_xdist_parser(tmp_path: "Path", monkeypatch) -> None:
     )
 
     assert _Manager.commands[0].count("xdist") == 1
+
+
+@pytest.mark.parametrize("argument", ("-f", "--looponfail"))
+def test_looponfail_loads_plugin_and_terminal(
+    tmp_path: "Path",
+    monkeypatch,
+    argument: str,
+) -> None:
+    _reset_manager(monkeypatch)
+    manager = _Manager(get_case("remote-dbs-py39-postgres14"), tmp_path)
+
+    runner._run_inner_pytest(
+        manager,
+        manager.case,
+        (argument,),
+        keep_db=False,
+    )
+
+    assert "xdist.looponfail" in _Manager.commands[0]
+    assert _Manager.interactives == [True]
 
 
 def test_inner_coverage_plugin_is_loaded(tmp_path: "Path", monkeypatch) -> None:
@@ -866,6 +890,22 @@ def test_unit_case_loads_requested_pytest_plugins(tmp_path: "Path", monkeypatch)
     assert commands[1].count("xdist") == 1
     assert commands[1].count("pytest_cov") == 1
     assert commands[1].count("rerunfailures") == 1
+
+
+def test_unit_case_loads_looponfail_plugin(tmp_path: "Path", monkeypatch) -> None:
+    commands = []
+
+    def run(command, **kwargs):
+        commands.append(list(command))
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(runner.subprocess, "run", run)
+
+    runner.run_unit_case(get_case("unit-py312"), tmp_path, ("-f",))
+
+    assert commands[1][:4] == ["docker", "run", "--interactive", "--tty"]
+    assert commands[1].count("xdist") == 1
+    assert commands[1].count("xdist.looponfail") == 1
 
 
 def test_unit_case_allocates_terminal_for_pdb(tmp_path: "Path", monkeypatch) -> None:

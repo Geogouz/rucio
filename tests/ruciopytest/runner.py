@@ -255,6 +255,8 @@ def run_unit_case(
         "-p",
         "xdist",
     ))
+    if has_looponfail(pytest_args):
+        command.extend(("-p", "xdist.looponfail"))
     if _has_coverage_option(pytest_args):
         command.extend(("-p", "pytest_cov"))
     command.extend(pytest_args)
@@ -459,6 +461,8 @@ def _run_inner_pytest(
         "-p",
         "xdist",
     ]
+    if has_looponfail(pytest_args):
+        command.extend(("-p", "xdist.looponfail"))
     if case.xdist_enabled:
         if not overrides_default_xdist_workers(pytest_args):
             workers = "3" if manager.environment.get("GITHUB_ACTIONS") == "true" else "auto"
@@ -639,7 +643,7 @@ def overrides_default_xdist_workers(arguments: "Sequence[str]") -> bool:
         if argument == "--":
             break
         if (
-            argument in ("-n", "--numprocesses", "--tx")
+            argument in ("-n", "--numprocesses", "--tx", "-f", "--looponfail")
             or (argument.startswith("-n") and argument != "-n")
             or argument.startswith("--numprocesses=")
             or argument.startswith("--tx=")
