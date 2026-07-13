@@ -271,9 +271,11 @@ def test_suite_runs_cases_concurrently(monkeypatch) -> None:
     config = _Config(suite="client", case_workers=2)
     barrier = threading.Barrier(2)
     cases = []
+    log_output = []
 
     def run(case, *args, **kwargs):
         cases.append(case.id)
+        log_output.append(kwargs["log_output"])
         barrier.wait(timeout=5)
         return 0
 
@@ -284,6 +286,7 @@ def test_suite_runs_cases_concurrently(monkeypatch) -> None:
         "client-py39-postgres14",
         "client-py310-postgres14",
     }
+    assert log_output == [True, True]
 
 
 def test_parallel_exitfirst_does_not_submit_pending_cases(monkeypatch) -> None:

@@ -81,9 +81,15 @@ def run_container_case(
     keep_db: bool = False,
     container_environment: "Optional[Mapping[str, str]]" = None,
     explicit_selectors: "Sequence[str]" = (),
+    log_output: bool = False,
 ) -> int:
     pytest_args = qualify_cache_dir(pytest_args, case.id)
-    manager = ContainerManager(case, root_dir, keep_db=keep_db)
+    manager = ContainerManager(
+        case,
+        root_dir,
+        keep_db=keep_db,
+        log_output=log_output,
+    )
     manager.start()
     try:
         if case.suite == "multi_vo":
@@ -128,6 +134,7 @@ def run_unit_case(
     *,
     container_environment: "Optional[Mapping[str, str]]" = None,
     explicit_selectors: "Sequence[str]" = (),
+    log_output: bool = False,
 ) -> int:
     pytest_args = qualify_cache_dir(pytest_args, case.id)
     environment = dict(os.environ)
@@ -145,11 +152,23 @@ def run_unit_case(
         image,
         str(root_dir),
     ))
-    subprocess.run(  # noqa: S603
+    output_log = None
+    if log_output:
+        project_name = ContainerManager.make_project_name(
+            case.id,
+            root_dir,
+            reusable=False,
+        )
+        output_log = root_dir / ".test-logs" / project_name / "case.log"
+        output_log.parent.mkdir(parents=True, exist_ok=True)
+        output_log.write_text("")
+        print(f"Case output: {output_log}", flush=True)
+    _run_unit_command(
         build,
         check=True,
-        cwd=root_dir,
-        env=environment,
+        root_dir=root_dir,
+        environment=environment,
+        output_log=output_log,
         timeout=1800,
     )
 
@@ -192,12 +211,42 @@ def run_unit_case(
     command.extend(pytest_args)
     if not explicit_selectors:
         command.extend(case.test_paths)
-    return subprocess.run(  # noqa: S603
+    return _run_unit_command(
         command,
         check=False,
+        root_dir=root_dir,
+        environment=environment,
+        output_log=output_log,
+    ).returncode
+
+
+def _run_unit_command(
+    command: "Sequence[str]",
+    *,
+    check: bool,
+    root_dir: Path,
+    environment: "Mapping[str, str]",
+    output_log: "Optional[Path]",
+    timeout: "Optional[int]" = None,
+) -> subprocess.CompletedProcess:
+    if output_log:
+        with output_log.open("a") as output:
+            return subprocess.run(  # noqa: S603
+                command,
+                check=check,
+                cwd=root_dir,
+                env=environment,
+                stdout=output,
+                stderr=subprocess.STDOUT,
+                timeout=timeout,
+            )
+    return subprocess.run(  # noqa: S603
+        command,
+        check=check,
         cwd=root_dir,
         env=environment,
-    ).returncode
+        timeout=timeout,
+    )
 
 
 def _run_multi_vo(

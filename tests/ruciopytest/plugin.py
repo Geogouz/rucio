@@ -235,6 +235,7 @@ def _run_cases(
                     case_args,
                     container_environment=container_environment,
                     explicit_selectors=explicit_selectors,
+                    log_output=worker_count > 1,
                 )
             else:
                 result = runner.run_container_case(
@@ -244,6 +245,7 @@ def _run_cases(
                     keep_db=config.getoption("keep_db"),
                     container_environment=container_environment,
                     explicit_selectors=explicit_selectors,
+                    log_output=worker_count > 1,
                 )
         except Exception as error:
             print(f"Case {case.id} failed: {error}", file=sys.stderr)

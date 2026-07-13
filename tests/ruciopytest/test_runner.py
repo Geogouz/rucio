@@ -31,10 +31,11 @@ class _Manager:
     stops: list[bool] = []
     artifact = "/fts/log/*__transfer-id"
 
-    def __init__(self, case, root_dir, keep_db=False):
+    def __init__(self, case, root_dir, keep_db=False, log_output=False):
         self.case = case
         self.root_dir = root_dir
         self.keep_db = keep_db
+        self.log_output = log_output
         self.environment = {}
 
     def __enter__(self):
@@ -556,6 +557,29 @@ def test_unit_case_ignores_inherited_default_platform(tmp_path: "Path", monkeypa
     runner.run_unit_case(get_case("unit-py312"), tmp_path, ())
 
     assert all("DOCKER_DEFAULT_PLATFORM" not in env for env in environments)
+
+
+def test_unit_case_captures_parallel_output(tmp_path: "Path", monkeypatch) -> None:
+    def run(command, **kwargs):
+        kwargs["stdout"].write("command output\n")
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(runner.subprocess, "run", run)
+    monkeypatch.setattr(
+        runner.ContainerManager,
+        "make_project_name",
+        lambda *args, **kwargs: "unit-project",
+    )
+
+    runner.run_unit_case(
+        get_case("unit-py312"),
+        tmp_path,
+        (),
+        log_output=True,
+    )
+
+    output = tmp_path / ".test-logs/unit-project/case.log"
+    assert output.read_text() == "command output\ncommand output\n"
 
 
 def test_unit_case_preserves_explicit_selector(tmp_path: "Path", monkeypatch) -> None:
