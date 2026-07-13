@@ -300,9 +300,11 @@ def test_no_cov_does_not_enable_coverage_aggregation() -> None:
 
 def test_unit_case_builds_and_runs_requested_python(tmp_path: "Path", monkeypatch) -> None:
     commands = []
+    timeouts = []
 
     def run(command, **kwargs):
         commands.append(list(command))
+        timeouts.append(kwargs.get("timeout"))
         return subprocess.CompletedProcess(command, 0)
 
     monkeypatch.setattr(runner.subprocess, "run", run)
@@ -316,6 +318,7 @@ def test_unit_case_builds_and_runs_requested_python(tmp_path: "Path", monkeypatc
 
     assert result == 0
     assert commands[0][:4] == ["docker", "buildx", "build", "--load"]
+    assert timeouts[0] == 1800
     assert str(tmp_path / "etc/docker/test/unit.Dockerfile") in commands[0]
     assert "--target" not in commands[0]
     assert "PYTHON=3.12" in commands[0]

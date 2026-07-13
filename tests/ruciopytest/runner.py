@@ -134,7 +134,13 @@ def run_unit_case(
         image,
         str(root_dir),
     ))
-    subprocess.run(build, check=True, cwd=root_dir, env=environment)  # noqa: S603
+    subprocess.run(  # noqa: S603
+        build,
+        check=True,
+        cwd=root_dir,
+        env=environment,
+        timeout=1800,
+    )
 
     command = ["docker", "run"]
     if _is_interactive(pytest_args):
