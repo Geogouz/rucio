@@ -81,27 +81,45 @@ Use an explicit release when source and published images must match. This guide
 does not infer a Git tag from the mutable registry ``latest`` image because that
 mapping is not reproducible.
 
-Using the standard environment
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Starting an interactive development environment
+------------------------------------------------
 
-Run the containers using Docker Compose (again might need `sudo`)::
+Stop the project before changing its profile set. ``docker compose up`` does
+not remove containers from profiles that are no longer selected.
 
-    docker compose --file etc/docker/dev/docker-compose.yml up -d
+Standard environment
+~~~~~~~~~~~~~~~~~~~~
 
-And verify that it is running properly::
+Start the base services and wait for them to become ready::
 
-    docker compose --file etc/docker/dev/docker-compose.yml ps
+    docker compose --project-name dev \
+        --file etc/docker/dev/docker-compose.yml \
+        up --detach --wait
 
-This should show you a few running containers: the Rucio server, the PostgreSQL database and the Graphite monitoring.
+``docker compose up`` pulls images that are missing under the normal Compose
+pull policy, so a separate ``docker compose pull`` is not required. To refresh
+all images first, or replace a cached image for the wrong architecture, use the
+same command with ``--pull always``::
 
-Finally, you can jump into the container with::
+    docker compose --project-name dev \
+        --file etc/docker/dev/docker-compose.yml \
+        up --detach --wait --pull always
 
-    docker compose --file etc/docker/dev/docker-compose.yml exec rucio /bin/bash
+Check the project and open a shell in the Rucio service::
 
-Initialize the catalogue in an existing development container with the same setup implementation used by the test runner::
+    docker compose --project-name dev \
+        --file etc/docker/dev/docker-compose.yml ps
+    docker compose --project-name dev \
+        --file etc/docker/dev/docker-compose.yml exec rucio /bin/bash
 
-    docker compose --file etc/docker/dev/docker-compose.yml exec rucio \
-        python -m tests.ruciopytest.infra_manager \
+The base environment contains the Rucio server, PostgreSQL, Graphite, InfluxDB,
+Elasticsearch, ActiveMQ, and the ``web1`` test endpoint.
+
+Initialize the catalogue in an existing development container::
+
+    docker compose --project-name dev \
+        --file etc/docker/dev/docker-compose.yml \
+        exec rucio python -m tests.ruciopytest.infra_manager \
         --case remote-dbs-py39-postgres14
 
 Running tests
