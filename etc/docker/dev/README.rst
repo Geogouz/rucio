@@ -275,43 +275,38 @@ URL, for example::
 
     ssh -L 5601:127.0.0.1:5601 <hostname>
 
-Development
------------
+Development workflow
+--------------------
 
-The idea for containerised development is that you use your host machine to edit the files, and test the changes within the container environment. Any change to files in your clone will be reflected into the containers by using volume mounts.
+Edit files on the host. The checkout is bind-mounted into the containers, so
+source changes appear without rebuilding the image. Restart only the affected
+process when required.
 
-To see your changes in action the recommended way is to jump twice into the container in parallel. One terminal to follow the output of the Rucio server with a shortcut to tail the logfiles (`logshow`), and one terminal to actually run interactive commands:
+For example, use one terminal to follow the server logs::
 
-From your host, get a separate Terminal 1 (the Rucio "server log show")::
+    docker compose --project-name dev \
+        --file etc/docker/dev/docker-compose.yml \
+        logs --follow rucio
 
-    docker compose --file etc/docker/dev/docker-compose.yml exec rucio /bin/bash
-    logshow
+Use another terminal for interactive commands::
 
-
-Terminal 1 can now be left open, and then from your host go into a new Terminal 2 (the "interactive" terminal)::
-
-    docker compose --file etc/docker/dev/docker-compose.yml exec rucio /bin/bash
+    docker compose --project-name dev \
+        --file etc/docker/dev/docker-compose.yml exec rucio /bin/bash
     rucio whoami
 
+Follow FTS logs in the same way::
 
-The command will output in Terminal 2, and at the same time the server debug output will be shown in Terminal 1.
-
-The same `logshow` is also available in the FTS container::
-
-    docker compose --file etc/docker/dev/docker-compose.yml --profile storage exec fts /bin/bash
-    logshow
-
-
-Development tricks
-------------------
+    docker compose --project-name dev \
+        --file etc/docker/dev/docker-compose.yml \
+        --profile storage logs --follow fts
 
 Server changes
 ~~~~~~~~~~~~~~
 
-If you edit server-side files, e.g. in `lib/rucio/web`, and your changes are not showing up then it is usually helpful to flush the memcache and force the webserver to restart without having to restart the container. Inside the container execute::
+If server-side changes are not visible, flush memcached and gracefully restart
+Apache inside the Rucio container::
 
     echo 'flush_all' | nc localhost 11211 && httpd -k graceful
-
 
 Database access
 ~~~~~~~~~~~~~~~
