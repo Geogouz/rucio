@@ -319,6 +319,7 @@ def _case_data(case: "TestCase") -> dict:
         "group": case.group,
         "suite": case.suite,
         "python": case.python,
+        "runtime": f"py{case.python.replace('.', '')}",
         "rdbms": case.rdbms,
         "policy": case.policy,
         "profiles": list(case.compose_profiles),
