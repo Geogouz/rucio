@@ -383,18 +383,8 @@ services:
   # ------------------------------------------------------------------
   # Monitoring stack
   # ------------------------------------------------------------------
-  logstash:
-    image: docker.elastic.co/logstash/logstash-oss:7.3.2
-    platform: linux/amd64
-    profiles:
-      - monitoring
-    command: bash -c "logstash-plugin install logstash-input-stomp ; /usr/local/bin/docker-entrypoint"
-    volumes:
-      - ./pipeline.conf:/usr/share/logstash/pipeline/pipeline.conf:Z
-
   kibana:
-    image: docker.io/kibana:7.4.0
-    platform: linux/amd64
+    image: docker.elastic.co/kibana/kibana:9.0.0
     profiles:
       - monitoring
 

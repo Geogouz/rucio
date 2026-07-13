@@ -64,9 +64,6 @@ services:
   postgres:
     ports:
       - "127.0.0.1:5433:5433"
-  logstash:
-    ports:
-      - "127.0.0.1:5044:5044"
   kibana:
     ports:
       - "127.0.0.1:5601:5601"
