@@ -171,20 +171,19 @@ and JUnit output are forwarded. ``--keep-db`` retains the database volume for
 each selected case. PostgreSQL and Oracle are the supported server test
 databases; MySQL and SQLite are not development test targets.
 
-Using the environment including storage
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Environment including storage
+-----------------------------
 
-Again run the containers using Docker Compose::
+Start the base environment with the ``storage`` profile::
 
-    docker compose --file etc/docker/dev/docker-compose.yml --profile storage up -d
+    DEV_PROFILES=storage docker compose --project-name dev \
+        --file etc/docker/dev/docker-compose.yml \
+        --profile storage \
+        up --detach --wait
 
-This should show you a few more running containers: the Rucio server, the PostgreSQL database, FTS and its associated MySQL database, the Graphite monitoring, and three XrootD storage servers.
-
-With this environment you can upload and download data and submit transfers. Initialize the catalogue and storage RSEs with::
-
-    docker compose --file etc/docker/dev/docker-compose.yml --profile storage exec rucio \
-        python -m tests.ruciopytest.infra_manager \
-        --case integration-py39-postgres14
+Storage adds FTS and its internal MySQL database, five XRootD servers, MinIO,
+and an SSH server. The FTS database is not a Rucio catalogue test target. This
+environment supports uploads, downloads, and transfer submission.
 
 Run the complete storage and external-metadata integration case in an isolated environment with::
 
