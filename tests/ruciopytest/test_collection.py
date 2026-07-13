@@ -70,3 +70,15 @@ def test_integration_suite_honours_node_selectors() -> None:
         case,
         ROOT,
     )
+
+
+def test_integration_suite_honours_class_selectors() -> None:
+    case = get_case("integration-py39-postgres14")
+    path = ROOT / "tests/test_did_meta_plugins.py"
+
+    assert item_matches_case(
+        path,
+        "tests/test_did_meta_plugins.py::TestDidMetaMongo::test_get_metadata",
+        case,
+        ROOT,
+    )

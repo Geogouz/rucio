@@ -60,7 +60,11 @@ def item_matches_case(
         normalized = selector_path.rstrip("/")
         if separator:
             expected = f"{normalized}::{selected_node}"
-            if nodeid == expected or nodeid.startswith(f"{expected}["):
+            if (
+                nodeid == expected
+                or nodeid.startswith(f"{expected}[")
+                or nodeid.startswith(f"{expected}::")
+            ):
                 return True
         elif relative == normalized or relative.startswith(f"{normalized}/"):
             return True
