@@ -189,12 +189,5 @@ FROM requirements AS final
     WORKDIR /opt/rucio
     RUN ldconfig
 
-    # Create a volume mount point for source code
-    VOLUME /opt/rucio/lib
-    VOLUME /opt/rucio/bin
-    VOLUME /opt/rucio/tools
-    VOLUME /opt/rucio/tests
-    VOLUME /opt/rucio/etc
-
     ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
     CMD ["httpd","-D","FOREGROUND"]
