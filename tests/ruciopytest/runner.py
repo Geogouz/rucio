@@ -41,6 +41,7 @@ _RUNNER_OPTIONS = {
     "--rootdir",
     "-c",
 }
+_UNIT_DOCKERFILE = "etc/docker/test/unit.Dockerfile"
 
 
 def forwarded_pytest_args(arguments: "Sequence[str]") -> list[str]:
@@ -120,9 +121,7 @@ def run_unit_case(
         build = ["podman", "build"]
     build.extend((
         "--file",
-        str(root_dir / ContainerManager.RUNTIME_DOCKERFILE),
-        "--target",
-        "unit",
+        str(root_dir / _UNIT_DOCKERFILE),
         "--build-arg",
         f"PYTHON={case.python}",
         "--tag",

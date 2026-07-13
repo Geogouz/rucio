@@ -228,7 +228,8 @@ def test_unit_case_builds_and_runs_requested_python(tmp_path: "Path", monkeypatc
 
     assert result == 0
     assert commands[0][:4] == ["docker", "buildx", "build", "--load"]
-    assert ["--target", "unit"] == commands[0][commands[0].index("--target"):commands[0].index("--target") + 2]
+    assert str(tmp_path / "etc/docker/test/unit.Dockerfile") in commands[0]
+    assert "--target" not in commands[0]
     assert "PYTHON=3.12" in commands[0]
     assert commands[1][:3] == ["docker", "run", "--rm"]
     assert commands[0][commands[0].index("--tag") + 1] in commands[1]
