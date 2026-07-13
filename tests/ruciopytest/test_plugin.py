@@ -169,6 +169,14 @@ def test_all_dry_run_json_is_machine_readable(capsys) -> None:
     assert len(cases) == 19
 
 
+def test_all_rejects_one_runtime_for_two_python_versions(monkeypatch) -> None:
+    config = _Config(suite="all")
+    monkeypatch.setenv("RUCIO_TEST_IMAGE", "runtime:one-version")
+
+    with pytest.raises(pytest.UsageError, match="RUCIO_TEST_IMAGE_PY39"):
+        plugin.pytest_cmdline_main(config)
+
+
 def test_inner_configuration_selects_case(monkeypatch) -> None:
     config = _Config()
     monkeypatch.setenv("RUCIO_PYTEST_INNER", "1")

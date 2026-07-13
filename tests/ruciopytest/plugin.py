@@ -182,6 +182,15 @@ def _run_all_cases(config: pytest.Config) -> int:
                 print(case.id)
         return 0
 
+    if os.environ.get("RUCIO_TEST_IMAGE") and not all(
+        os.environ.get(f"RUCIO_TEST_IMAGE_PY{version}")
+        for version in ("39", "310")
+    ):
+        raise pytest.UsageError(
+            "--suite=all requires RUCIO_TEST_IMAGE_PY39 and "
+            "RUCIO_TEST_IMAGE_PY310 instead of one RUCIO_TEST_IMAGE"
+        )
+
     explicit_selectors = tuple(
         selector
         for selector in config.args
