@@ -37,7 +37,7 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     group = parser.getgroup("rucio", "Rucio test suites")
     group.addoption(
         "--suite",
-        choices=tuple(SUITE_DEFINITIONS),
+        choices=(*SUITE_DEFINITIONS, "all"),
         help="Run a Rucio test suite",
     )
     group.addoption("--case", help="Run one canonical local/CI test case")
@@ -109,6 +109,9 @@ def pytest_cmdline_main(config: pytest.Config) -> "Optional[int]":
         print(json.dumps([_case_data(case) for case in iter_cases()]))
         return 0
 
+    if config.getoption("suite") == "all":
+        return _run_all_cases(config)
+
     case = resolve_requested_case(config, config.rootpath)
     if case is None:
         return None
@@ -131,22 +134,26 @@ def pytest_cmdline_main(config: pytest.Config) -> "Optional[int]":
         for selector in config.args
         if selector in config.invocation_params.args
     )
-    if case.suite == "unit":
-        current_python = f"{sys.version_info.major}.{sys.version_info.minor}"
-        if case.python != current_python:
-            raise pytest.UsageError(
-                f"Case {case.id} requires Python {case.python}; current Python is {current_python}"
-            )
-        config.stash[case_key] = case
-        if not explicit_selectors:
-            config.args = list(case.test_paths)
-        return None
-
     pytest_args = runner.forwarded_pytest_args(config.invocation_params.args)
     workers = config.getoption("xdist_workers")
     if workers is not None:
         pytest_args.extend(("-n", str(workers)))
     container_environment = _parse_environment(config.getoption("container_env"))
+    if case.suite == "unit":
+        current_python = f"{sys.version_info.major}.{sys.version_info.minor}"
+        if case.python == current_python:
+            config.stash[case_key] = case
+            if not explicit_selectors:
+                config.args = list(case.test_paths)
+            return None
+        return runner.run_unit_case(
+            case,
+            config.rootpath,
+            pytest_args,
+            container_environment=container_environment,
+            explicit_selectors=explicit_selectors,
+        )
+
     return runner.run_container_case(
         case,
         config.rootpath,
@@ -155,6 +162,64 @@ def pytest_cmdline_main(config: pytest.Config) -> "Optional[int]":
         container_environment=container_environment,
         explicit_selectors=explicit_selectors,
     )
+
+
+def _run_all_cases(config: pytest.Config) -> int:
+    if config.getoption("case"):
+        raise pytest.UsageError("--case and --suite are mutually exclusive")
+    if config.getoption("policy"):
+        raise pytest.UsageError("--policy cannot be combined with --suite=all")
+
+    cases = tuple(
+        _resolve_policy_paths(case, config.rootpath)
+        for case in iter_cases()
+    )
+    if config.getoption("dry_run") or config.getoption("dry_run_json"):
+        if config.getoption("dry_run_json"):
+            print(json.dumps([_case_data(case) for case in cases]))
+        else:
+            for case in cases:
+                print(case.id)
+        return 0
+
+    explicit_selectors = tuple(
+        selector
+        for selector in config.args
+        if selector in config.invocation_params.args
+    )
+    pytest_args = runner.forwarded_pytest_args(config.invocation_params.args)
+    workers = config.getoption("xdist_workers")
+    if workers is not None:
+        pytest_args.extend(("-n", str(workers)))
+    container_environment = _parse_environment(config.getoption("container_env"))
+    failures = []
+    for case in cases:
+        print(f"\n===== {case.id} =====", flush=True)
+        case_args = runner.qualify_junit(pytest_args, case.id)
+        if case.suite == "unit":
+            result = runner.run_unit_case(
+                case,
+                config.rootpath,
+                case_args,
+                container_environment=container_environment,
+                explicit_selectors=explicit_selectors,
+            )
+        else:
+            result = runner.run_container_case(
+                case,
+                config.rootpath,
+                case_args,
+                keep_db=config.getoption("keep_db"),
+                container_environment=container_environment,
+                explicit_selectors=explicit_selectors,
+            )
+        if result:
+            failures.append(case.id)
+
+    if failures:
+        print(f"Failed cases: {', '.join(failures)}")
+        return 1
+    return 0
 
 
 def resolve_requested_case(
@@ -183,7 +248,9 @@ def resolve_requested_case(
     python = os.environ.get("PYTHON")
     rdbms = os.environ.get("RDBMS")
     if suite == "unit":
-        python = f"{sys.version_info.major}.{sys.version_info.minor}"
+        current_python = f"{sys.version_info.major}.{sys.version_info.minor}"
+        if any(case.python == current_python for case in candidates):
+            python = current_python
     if python:
         candidates = [case for case in candidates if case.python == python]
     if rdbms:

@@ -123,12 +123,50 @@ def test_container_case_forwards_standard_pytest_args(monkeypatch) -> None:
     )
 
 
-def test_unit_case_requires_matching_interpreter(monkeypatch) -> None:
+def test_unit_case_uses_container_for_other_interpreter(monkeypatch) -> None:
     config = _Config(case="unit-py39")
     monkeypatch.setattr(sys, "version_info", SimpleNamespace(major=3, minor=12))
+    captured = {}
 
-    with pytest.raises(pytest.UsageError, match="requires Python 3.9"):
-        plugin.pytest_cmdline_main(config)
+    def run(case, root_path, pytest_args, **kwargs):
+        captured["case"] = case
+        return 0
+
+    monkeypatch.setattr(plugin.runner, "run_unit_case", run)
+
+    assert plugin.pytest_cmdline_main(config) == 0
+    assert captured["case"].id == "unit-py39"
+
+
+def test_all_runs_every_case_and_reports_failures(monkeypatch, capsys) -> None:
+    config = _Config(suite="all")
+    unit_cases = []
+    container_cases = []
+
+    def run_unit(case, *args, **kwargs):
+        unit_cases.append(case.id)
+        return int(case.id == "unit-py310")
+
+    def run_container(case, *args, **kwargs):
+        container_cases.append(case.id)
+        return 0
+
+    monkeypatch.setattr(plugin.runner, "run_unit_case", run_unit)
+    monkeypatch.setattr(plugin.runner, "run_container_case", run_container)
+
+    assert plugin.pytest_cmdline_main(config) == 1
+    assert len(unit_cases) == 4
+    assert len(container_cases) == 15
+    assert "Failed cases: unit-py310" in capsys.readouterr().out
+
+
+def test_all_dry_run_json_is_machine_readable(capsys) -> None:
+    config = _Config(suite="all", dry_run_json=True)
+
+    assert plugin.pytest_cmdline_main(config) == 0
+
+    cases = json.loads(capsys.readouterr().out)
+    assert len(cases) == 19
 
 
 def test_inner_configuration_selects_case(monkeypatch) -> None:
