@@ -343,38 +343,18 @@ database and service state are required::
         --profile '*' \
         down --remove-orphans --volumes
 
-Where do I find the Dockerfile
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Container image sources
+~~~~~~~~~~~~~~~~~~~~~~~
 
-This container can be found on Dockerhub as `rucio/rucio-dev`, and the corresponding `Dockerfile <https://github.com/rucio/containers/tree/master/dev>`_ is also available. It provides a Rucio environment which allows you to mount your local code in the containers `bin`, `lib`, and `tools` directory. The container is set up to run against a PostgreSQL database with fsync and most durability features for the WAL disabled to improve testing IO throughput. Tests and checks can be run against the development code without having to rebuild the container.
+The published interactive image is ``rucio/rucio-dev``. Its
+`Dockerfile <https://github.com/rucio/containers/tree/master/dev>`_ is maintained
+in the ``rucio/containers`` repository. This repository owns the Compose service
+topology and bind mounts in ``etc/docker/dev``.
 
-
-I need a Docker based on another branch (not rucio/master)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-In such case, you can download the Rucio container files and e.g. choose to modify the dev container before build::
-
-    # in a different directory
-    git clone https://github.com/rucio/containers
-    cd containers/dev
-
-
-Change anything you need, e.g. in the Dockerfile the code branch cloned to your docker container::
-
-    # from
-    RUN git clone https://github.com/rucio/rucio.git /tmp/rucio
-    # to e.g.:
-    RUN git clone --single-branch --branch next https://github.com/rucio/rucio.git /tmp/rucio
-    # build your docker
-    docker build -t rucio/rucio-dev .
-
-
-Compose as usual using docker-compose::
-
-    cd /path/to/your/rucio/clone
-    docker compose --file etc/docker/dev/docker-compose.yml up -d
-
-
+Canonical server tests build ``etc/docker/test/runtime.Dockerfile`` from the
+current checkout, while unit cases build ``etc/docker/test/unit.Dockerfile``.
+Source-only branch changes do not require rebuilding ``rucio-dev`` because the
+checkout is mounted into the interactive container.
 
 Start the daemons
 ~~~~~~~~~~~~~~~~~~~
