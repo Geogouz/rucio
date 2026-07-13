@@ -17,6 +17,8 @@ import subprocess  # noqa: S404
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import pytest
+
 from .container_manager import ContainerManager, checkout_id
 
 if TYPE_CHECKING:
@@ -218,6 +220,8 @@ def _run_integration(
             _verify_tpc_transfer(manager)
         return result
 
+    filtered = _has_collection_filter(pytest_args)
+    matched = False
     for index, selector in enumerate(case.test_paths):
         arguments = [
             *qualify_junit(pytest_args, f"{index + 1:02d}"),
@@ -235,11 +239,14 @@ def _run_integration(
             keep_db=keep_db or index > 0,
             environment=environment,
         )
+        if result == pytest.ExitCode.NO_TESTS_COLLECTED and filtered:
+            continue
         if result:
             return result
+        matched = True
         if "test_tpc.py" in selector:
             _verify_tpc_transfer(manager)
-    return 0
+    return 0 if matched else pytest.ExitCode.NO_TESTS_COLLECTED
 
 
 def _verify_tpc_transfer(manager: ContainerManager) -> None:
@@ -329,6 +336,16 @@ def has_xdist_option(arguments: "Sequence[str]") -> bool:
 def _has_coverage_option(arguments: "Sequence[str]") -> bool:
     return any(
         argument == "--no-cov" or argument.startswith("--cov")
+        for argument in arguments
+    )
+
+
+def _has_collection_filter(arguments: "Sequence[str]") -> bool:
+    return any(
+        argument == "-k"
+        or argument.startswith("-k")
+        or argument == "-m"
+        or argument.startswith("-m")
         for argument in arguments
     )
 

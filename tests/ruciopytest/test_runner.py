@@ -161,6 +161,38 @@ def test_integration_preserves_tpc_postcheck_order(tmp_path: "Path", monkeypatch
     )
 
 
+def test_integration_filter_continues_past_unmatched_paths(
+    tmp_path: "Path",
+    monkeypatch,
+) -> None:
+    _reset_manager(monkeypatch, (*([5] * 9), 0, 0, *([5] * 5)))
+
+    result = runner.run_container_case(
+        get_case("integration-py39-postgres14"),
+        tmp_path,
+        ("-k", "tpc"),
+    )
+
+    assert result == 0
+    assert len([command for command in _Manager.commands if "pytest" in command]) == 15
+    assert any(command[1:3] == ("grep", "-Fq") for command in _Manager.commands)
+
+
+def test_integration_filter_fails_when_nothing_matches(
+    tmp_path: "Path",
+    monkeypatch,
+) -> None:
+    _reset_manager(monkeypatch, [5] * 15)
+
+    result = runner.run_container_case(
+        get_case("integration-py39-postgres14"),
+        tmp_path,
+        ("-m", "missing"),
+    )
+
+    assert result == 5
+
+
 def test_postgres_uses_ci_worker_count(tmp_path: "Path", monkeypatch) -> None:
     _reset_manager(monkeypatch)
     manager = _Manager(get_case("remote-dbs-py39-postgres14"), tmp_path)
