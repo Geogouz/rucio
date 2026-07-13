@@ -13,17 +13,17 @@
 # limitations under the License.
 
 from fnmatch import fnmatch
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from .profiles import TestCase
 
 
 case_key = pytest.StashKey["TestCase"]()
+SOURCE_ROOT = Path(__file__).resolve().parents[2]
 
 
 def pytest_collection_modifyitems(
@@ -37,7 +37,7 @@ def pytest_collection_modifyitems(
     selected = []
     deselected = []
     for item in items:
-        target = selected if item_matches_case(item.path, item.nodeid, case, config.rootpath) else deselected
+        target = selected if item_matches_case(item.path, item.nodeid, case, SOURCE_ROOT) else deselected
         target.append(item)
 
     if deselected:
@@ -51,9 +51,15 @@ def item_matches_case(
     case: "TestCase",
     root_path: "Path",
 ) -> bool:
-    relative = path.relative_to(root_path).as_posix()
+    try:
+        relative = path.relative_to(root_path).as_posix()
+    except ValueError:
+        return False
     if any(fnmatch(relative, pattern) for pattern in case.exclude_paths):
         return False
+
+    _, separator, node_suffix = nodeid.partition("::")
+    source_nodeid = f"{relative}::{node_suffix}" if separator else relative
 
     for selector in case.test_paths:
         selector_path, separator, selected_node = selector.partition("::")
@@ -61,9 +67,9 @@ def item_matches_case(
         if separator:
             expected = f"{normalized}::{selected_node}"
             if (
-                nodeid == expected
-                or nodeid.startswith(f"{expected}[")
-                or nodeid.startswith(f"{expected}::")
+                source_nodeid == expected
+                or source_nodeid.startswith(f"{expected}[")
+                or source_nodeid.startswith(f"{expected}::")
             ):
                 return True
         elif relative == normalized or relative.startswith(f"{normalized}/"):
