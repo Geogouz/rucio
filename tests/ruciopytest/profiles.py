@@ -152,6 +152,7 @@ def iter_cases(group: "Optional[str]" = None) -> "Iterator[TestCase]":
                         env_vars["RDBMS"] = rdbms
                     if policy:
                         env_vars["POLICY"] = policy
+                    env_vars["SUITE"] = definition.name
                     yield TestCase(
                         suite=definition.name,
                         group=definition.group,

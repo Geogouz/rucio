@@ -59,6 +59,11 @@ def test_case_ids_include_every_axis() -> None:
         get_case("remote-dbs")
 
 
+def test_cases_export_the_suite_name() -> None:
+    assert get_case("client-py39-postgres14").env_vars["SUITE"] == "client"
+    assert get_case("multi-vo-py39-postgres14").env_vars["SUITE"] == "multi_vo"
+
+
 def test_cases_derive_compose_profiles() -> None:
     assert get_case("remote-dbs-py39-mysql8").compose_profiles == ("mysql8",)
     assert get_case("sqlite-py39-sqlite").compose_profiles == ()
