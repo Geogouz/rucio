@@ -80,6 +80,7 @@ class ContainerManager:
 
         self.environment = dict(self._base_environment)
         self.environment.pop("COMPOSE_PROFILES", None)
+        self.environment.pop("DOCKER_DEFAULT_PLATFORM", None)
         self.environment.update(case.env_vars)
         self.environment.update({
             "RUCIO_TEST_IMAGE": self.image,

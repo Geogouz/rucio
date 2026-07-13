@@ -237,6 +237,21 @@ def test_unit_case_builds_and_runs_requested_python(tmp_path: "Path", monkeypatc
     assert commands[1][-4:] == ["-k", "config", "tests/rucio", "tests/ruciopytest"]
 
 
+def test_unit_case_ignores_inherited_default_platform(tmp_path: "Path", monkeypatch) -> None:
+    environments = []
+
+    def run(command, **kwargs):
+        environments.append(kwargs["env"])
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setenv("DOCKER_DEFAULT_PLATFORM", "linux/amd64")
+    monkeypatch.setattr(runner.subprocess, "run", run)
+
+    runner.run_unit_case(get_case("unit-py312"), tmp_path, ())
+
+    assert all("DOCKER_DEFAULT_PLATFORM" not in env for env in environments)
+
+
 def test_unit_case_preserves_explicit_selector(tmp_path: "Path", monkeypatch) -> None:
     commands = []
 

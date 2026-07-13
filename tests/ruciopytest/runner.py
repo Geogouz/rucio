@@ -109,6 +109,7 @@ def run_unit_case(
     explicit_selectors: "Sequence[str]" = (),
 ) -> int:
     environment = dict(os.environ)
+    environment.pop("DOCKER_DEFAULT_PLATFORM", None)
     runtime = "podman" if environment.get("USE_PODMAN") == "1" else "docker"
     image = (
         f"rucio-test-unit:{checkout_id(root_dir)}-py{case.python.replace('.', '')}"

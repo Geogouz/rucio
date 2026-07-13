@@ -74,6 +74,15 @@ def test_manager_ignores_inherited_compose_profiles(tmp_path: "Path") -> None:
     assert "COMPOSE_PROFILES" not in manager.environment
 
 
+def test_manager_ignores_inherited_default_platform(tmp_path: "Path") -> None:
+    manager = _manager(
+        tmp_path,
+        environ={"DOCKER_DEFAULT_PLATFORM": "linux/amd64"},
+    )
+
+    assert "DOCKER_DEFAULT_PLATFORM" not in manager.environment
+
+
 def test_compose_commands_use_project_and_service_profiles(tmp_path: "Path") -> None:
     manager = _manager(tmp_path)
 
