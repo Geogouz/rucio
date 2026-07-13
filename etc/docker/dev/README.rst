@@ -24,21 +24,22 @@ Oracle XE cannot run on Apple Silicon through Docker Desktop. Run Oracle cases
 with an x86_64 Docker daemon, as described in the
 `Oracle XE image documentation <https://github.com/gvenzl/oci-oracle-xe#oracle-xe-on-apple-m-chips>`_.
 
-Preparing the environment
--------------------------
+Preparing the checkout
+----------------------
 
-First, fork the `main Rucio repository on GitHub <https://github.com/rucio/rucio>`_ by clicking the yellow Fork Star button, and then clone your private forked Rucio repository to your `~/dev/rucio`. Afterwards add the main upstream repository as an additional remote to be able to submit pull requests later on::
+Fork the `Rucio repository <https://github.com/rucio/rucio>`_, clone your fork,
+and add the main repository as ``upstream``::
 
     git clone git@github.com:<your_username>/rucio.git
     cd rucio
-    git remote add upstream git@github.com:rucio/rucio.git
-    git fetch --all
+    git remote add upstream https://github.com/rucio/rucio.git
+    git fetch upstream
 
-Now, ensure that the `.git/config` is proper, i.e., mentioning your full name and email address, and create the `.githubtoken` file that contains a full access token from `Github Account Settings <https://github.com/settings/tokens>`_.
+Configure your Git name and email before contributing. No GitHub token is
+needed to start the development environment.
 
-Next, start the Rucio development environment with Docker Compose. There are three variants: a standard environment for basic development, one which adds the File Transfer Service (FTS) and storage servers, and one which also adds the monitoring stack.
-
-*Note: if you are running with SELinux enabled, you might run into problems. Check troubleshooting with SELinux on the help pages of your container runtime environment.*
+If SELinux is enabled, consult the Docker documentation if bind mounts are
+denied.
 
 Using the standard environment
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
