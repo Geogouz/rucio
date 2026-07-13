@@ -188,7 +188,26 @@ def test_user_xdist_setting_is_preserved(tmp_path: "Path", monkeypatch) -> None:
     )
 
     assert _Manager.commands[0].count("-n") == 1
+    assert _Manager.commands[0].count("xdist") == 1
     assert "--numprocesses=auto" not in _Manager.commands[0]
+
+
+def test_inner_coverage_plugin_is_loaded(tmp_path: "Path", monkeypatch) -> None:
+    _reset_manager(monkeypatch)
+    manager = _Manager(get_case("remote-dbs-py39-postgres14"), tmp_path)
+
+    runner._run_inner_pytest(
+        manager,
+        manager.case,
+        ("--cov=lib/rucio",),
+        keep_db=False,
+    )
+
+    plugin_index = _Manager.commands[0].index("pytest_cov")
+    assert _Manager.commands[0][plugin_index - 1:plugin_index + 1] == (
+        "-p",
+        "pytest_cov",
+    )
 
 
 def test_unit_case_builds_and_runs_requested_python(tmp_path: "Path", monkeypatch) -> None:
@@ -237,3 +256,22 @@ def test_unit_case_preserves_explicit_selector(tmp_path: "Path", monkeypatch) ->
     assert result == 5
     assert commands[1].count("tests/rucio/test_common.py") == 1
     assert "tests/ruciopytest" not in commands[1]
+
+
+def test_unit_case_loads_requested_pytest_plugins(tmp_path: "Path", monkeypatch) -> None:
+    commands = []
+
+    def run(command, **kwargs):
+        commands.append(list(command))
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(runner.subprocess, "run", run)
+
+    runner.run_unit_case(
+        get_case("unit-py312"),
+        tmp_path,
+        ("-n", "2", "--cov=lib/rucio"),
+    )
+
+    assert commands[1].count("xdist") == 1
+    assert commands[1].count("pytest_cov") == 1

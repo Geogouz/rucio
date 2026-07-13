@@ -136,6 +136,14 @@ def test_unit_case_uses_container(monkeypatch) -> None:
     assert captured["case"].id == "unit-py39"
 
 
+def test_serial_case_rejects_xdist(monkeypatch) -> None:
+    config = _Config(case="remote-dbs-py39-oracle", xdist_workers=2)
+    monkeypatch.setattr(plugin.runner, "run_container_case", pytest.fail)
+
+    with pytest.raises(pytest.UsageError, match="does not support xdist"):
+        plugin.pytest_cmdline_main(config)
+
+
 def test_all_runs_every_case_and_reports_failures(monkeypatch, capsys) -> None:
     config = _Config(suite="all")
     unit_cases = []

@@ -149,8 +149,12 @@ def run_unit_case(
         "-r",
         "fExX",
         "--log-level=DEBUG",
-        *pytest_args,
     ))
+    if has_xdist_option(pytest_args):
+        command.extend(("-p", "xdist"))
+    if _has_coverage_option(pytest_args):
+        command.extend(("-p", "pytest_cov"))
+    command.extend(pytest_args)
     if not explicit_selectors:
         command.extend(case.test_paths)
     return subprocess.run(  # noqa: S603
@@ -276,9 +280,13 @@ def _run_inner_pytest(
         "--log-level=DEBUG",
         "--ignore=tests/ruciopytest",
     ]
-    if case.xdist_enabled and not _has_xdist_option(pytest_args):
-        workers = "3" if manager.environment.get("GITHUB_ACTIONS") == "true" else "auto"
-        command.extend(("-p", "xdist", f"--numprocesses={workers}"))
+    if case.xdist_enabled:
+        command.extend(("-p", "xdist"))
+        if not has_xdist_option(pytest_args):
+            workers = "3" if manager.environment.get("GITHUB_ACTIONS") == "true" else "auto"
+            command.append(f"--numprocesses={workers}")
+    if _has_coverage_option(pytest_args):
+        command.extend(("-p", "pytest_cov"))
     command.extend(pytest_args)
     return manager.exec(
         "rucio",
@@ -304,12 +312,19 @@ def qualify_junit(arguments: "Sequence[str]", qualifier: str) -> list[str]:
     return qualified
 
 
-def _has_xdist_option(arguments: "Sequence[str]") -> bool:
+def has_xdist_option(arguments: "Sequence[str]") -> bool:
     return any(
         argument == "-n"
         or argument.startswith("-n")
         or argument == "--numprocesses"
         or argument.startswith("--numprocesses=")
+        for argument in arguments
+    )
+
+
+def _has_coverage_option(arguments: "Sequence[str]") -> bool:
+    return any(
+        argument == "--no-cov" or argument.startswith("--cov")
         for argument in arguments
     )
 

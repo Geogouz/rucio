@@ -137,6 +137,8 @@ def pytest_cmdline_main(config: pytest.Config) -> "Optional[int]":
     workers = config.getoption("xdist_workers")
     if workers is not None:
         pytest_args.extend(("-n", str(workers)))
+    if runner.has_xdist_option(pytest_args) and not case.xdist_enabled:
+        raise pytest.UsageError(f"Case {case.id} does not support xdist")
     container_environment = _parse_environment(config.getoption("container_env"))
     if case.suite == "unit":
         return runner.run_unit_case(
@@ -193,6 +195,12 @@ def _run_all_cases(config: pytest.Config) -> int:
     workers = config.getoption("xdist_workers")
     if workers is not None:
         pytest_args.extend(("-n", str(workers)))
+    if runner.has_xdist_option(pytest_args):
+        unsupported = [case.id for case in cases if not case.xdist_enabled]
+        if unsupported:
+            raise pytest.UsageError(
+                "--suite=all cannot use xdist because some cases are serial"
+            )
     container_environment = _parse_environment(config.getoption("container_env"))
     failures = []
     for case in cases:
