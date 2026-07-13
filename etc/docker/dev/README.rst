@@ -322,13 +322,26 @@ base project with that overlay::
 After catalogue initialization, connect to ``localhost:5432`` using database
 ``rucio``, schema ``dev``, user ``rucio``, and password ``secret``.
 
-Docker is eating my disk space
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Stopping and cleaning the project
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-You can reclaim this with::
+Stop and remove only the development project's containers and network. The
+wildcard includes any profiles that were started::
 
-    docker system prune -f --volumes
+    docker compose --project-name dev \
+        --file etc/docker/dev/docker-compose.yml \
+        --file etc/docker/dev/docker-compose.ports.yml \
+        --profile '*' \
+        down --remove-orphans
 
+Named volumes are retained by default. Add ``--volumes`` only when a clean
+database and service state are required::
+
+    docker compose --project-name dev \
+        --file etc/docker/dev/docker-compose.yml \
+        --file etc/docker/dev/docker-compose.ports.yml \
+        --profile '*' \
+        down --remove-orphans --volumes
 
 Where do I find the Dockerfile
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
