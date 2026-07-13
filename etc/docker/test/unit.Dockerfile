@@ -8,6 +8,7 @@ FROM python:${PYTHON}-slim-bookworm
         gcc \
         git \
         libkrb5-dev \
+        libmagic1 \
         libxmlsec1 \
         libxmlsec1-dev \
         pkg-config && \

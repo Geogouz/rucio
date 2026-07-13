@@ -142,6 +142,7 @@ def test_unit_dockerfile_has_parameterized_runtime() -> None:
     dockerfile = UNIT_DOCKERFILE.read_text()
 
     assert "FROM python:${PYTHON}-slim-bookworm" in dockerfile
+    assert "libmagic1" in dockerfile
     assert 'ENTRYPOINT ["python", "-bb", "-m", "pytest"]' in dockerfile
 
 
