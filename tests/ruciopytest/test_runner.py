@@ -155,3 +155,50 @@ def test_user_xdist_setting_is_preserved(tmp_path: "Path", monkeypatch) -> None:
 
     assert _Manager.commands[0].count("-n") == 1
     assert "--numprocesses=auto" not in _Manager.commands[0]
+
+
+def test_unit_case_builds_and_runs_requested_python(tmp_path: "Path", monkeypatch) -> None:
+    commands = []
+
+    def run(command, **kwargs):
+        commands.append(list(command))
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(runner.subprocess, "run", run)
+
+    result = runner.run_unit_case(
+        get_case("unit-py312"),
+        tmp_path,
+        ("-k", "config"),
+        container_environment={"RUCIO_LOGGING_FORMAT": "json"},
+    )
+
+    assert result == 0
+    assert commands[0][:4] == ["docker", "buildx", "build", "--load"]
+    assert ["--target", "unit"] == commands[0][commands[0].index("--target"):commands[0].index("--target") + 2]
+    assert "PYTHON=3.12" in commands[0]
+    assert commands[1][:3] == ["docker", "run", "--rm"]
+    assert f"{tmp_path.resolve()}:/rucio_source" in commands[1]
+    assert "RUCIO_LOGGING_FORMAT=json" in commands[1]
+    assert commands[1][-4:] == ["-k", "config", "tests/rucio", "tests/ruciopytest"]
+
+
+def test_unit_case_preserves_explicit_selector(tmp_path: "Path", monkeypatch) -> None:
+    commands = []
+
+    def run(command, **kwargs):
+        commands.append(list(command))
+        return subprocess.CompletedProcess(command, 5 if "run" in command else 0)
+
+    monkeypatch.setattr(runner.subprocess, "run", run)
+
+    result = runner.run_unit_case(
+        get_case("unit-py39"),
+        tmp_path,
+        ("tests/rucio/test_common.py",),
+        explicit_selectors=("tests/rucio/test_common.py",),
+    )
+
+    assert result == 5
+    assert commands[1].count("tests/rucio/test_common.py") == 1
+    assert "tests/ruciopytest" not in commands[1]

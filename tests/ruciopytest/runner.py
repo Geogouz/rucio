@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+import subprocess  # noqa: S404
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -93,6 +95,65 @@ def run_container_case(
             keep_db=keep_db,
             environment=container_environment,
         )
+
+
+def run_unit_case(
+    case: "TestCase",
+    root_dir: Path,
+    pytest_args: "Sequence[str]",
+    *,
+    container_environment: "Optional[Mapping[str, str]]" = None,
+    explicit_selectors: "Sequence[str]" = (),
+) -> int:
+    environment = dict(os.environ)
+    runtime = "podman" if environment.get("USE_PODMAN") == "1" else "docker"
+    image = f"rucio-test-unit:py{case.python.replace('.', '')}"
+    if runtime == "docker":
+        build = ["docker", "buildx", "build", "--load"]
+    else:
+        build = ["podman", "build"]
+    build.extend((
+        "--file",
+        str(root_dir / ContainerManager.RUNTIME_DOCKERFILE),
+        "--target",
+        "unit",
+        "--build-arg",
+        f"PYTHON={case.python}",
+        "--tag",
+        image,
+        str(root_dir),
+    ))
+    subprocess.run(build, check=True, cwd=root_dir, env=environment)  # noqa: S603
+
+    command = [
+        runtime,
+        "run",
+        "--rm",
+        "--volume",
+        f"{root_dir.resolve()}:/rucio_source",
+        "--workdir",
+        "/rucio_source",
+    ]
+    for key, value in (container_environment or {}).items():
+        command.extend(("--env", f"{key}={value}"))
+    command.extend((
+        image,
+        "--rootdir=/rucio_source",
+        "-c",
+        "/rucio_source/tools/pytest.ini",
+        "-r",
+        "fExX",
+        "--log-level=DEBUG",
+        *pytest_args,
+    ))
+    if not explicit_selectors:
+        command.extend(case.test_paths)
+    return subprocess.run(  # noqa: S603
+        command,
+        check=False,
+        cwd=root_dir,
+        env=environment,
+    ).returncode
 
 
 def _run_multi_vo(
