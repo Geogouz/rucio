@@ -35,7 +35,7 @@ from rucio.db.sqla.constants import DatabaseOperationType
 from rucio.db.sqla.session import db_session
 from rucio.rse import rsemanager as rsemgr
 from rucio.rse.protocols.posix import Default as PosixProtocol
-from rucio.tests.common import file_generator, scope_name_generator, skip_rse_tests_with_accounts
+from rucio.tests.common import scope_name_generator, skip_rse_tests_with_accounts
 
 
 @pytest.fixture
@@ -55,7 +55,8 @@ def _check_download_result(actual_result, expected_result):
             assert param_name and actual_result[i][param_name] == expected[param_name]
 
 
-def test_download_without_base_dir(rse_factory, did_factory, download_client):
+def test_download_without_base_dir(rse_factory, did_factory, download_client, file_factory, monkeypatch):
+    monkeypatch.chdir(file_factory.base_dir)
     scope = str(did_factory.default_scope)
     rse, _ = rse_factory.make_posix_rse()
     did = did_factory.upload_test_file(rse)
@@ -88,13 +89,13 @@ def test_download_without_base_dir(rse_factory, did_factory, download_client):
         shutil.rmtree(scope)
 
 
-def test_download_exception_return_information(did_factory, rse_factory, download_client):
+def test_download_exception_return_information(did_factory, rse_factory, download_client, file_factory):
     rse, _ = rse_factory.make_posix_rse()
     did = did_factory.upload_test_file(rse)
     did_str = '%s:%s' % (did['scope'], did['name'])
 
     with patch('rucio.client.downloadclient.DownloadClient._download_item', side_effect=Exception()):
-        res = download_client.download_dids([{"did": did_str}], deactivate_file_download_exceptions=True)
+        res = download_client.download_dids([{"did": did_str, "base_dir": file_factory.base_dir}], deactivate_file_download_exceptions=True)
 
     assert len(res) == 1
     assert res[0]["clientState"] == "FAILED"
@@ -634,7 +635,7 @@ def test_transfer_timeout(rse_factory, did_factory, download_client):
             mocks_get[0].assert_called_with(ANY, ANY, transfer_timeout=60)
 
 
-def test_download_file_with_impl(rse_factory, did_factory, download_client, mock_scope):
+def test_download_file_with_impl(rse_factory, did_factory, download_client, mock_scope, file_factory):
     """ Download (CLIENT): Ensure the module associated to the impl value is called """
 
     impl = 'xrootd'
@@ -655,7 +656,7 @@ def test_download_file_with_impl(rse_factory, did_factory, download_client, mock
                           'domains': {
                               'lan': {'read': 1, 'write': 1, 'delete': 1},
                               'wan': {'read': 1, 'write': 1, 'delete': 1}}})
-    path = file_generator()
+    path = file_factory.file_generator()
     name = os.path.basename(path)
 
     item: FileToUploadDict = {
@@ -672,11 +673,11 @@ def test_download_file_with_impl(rse_factory, did_factory, download_client, mock
     with patch('rucio.rse.protocols.%s.Default.get' % impl, side_effect=lambda pfn, dest, **kw: shutil.copy(path, dest)) as mock_get, \
             patch('rucio.rse.protocols.%s.Default.connect' % impl), \
             patch('rucio.rse.protocols.%s.Default.close' % impl):
-        download_client.download_dids([{'did': did_str, 'impl': impl}])
+        download_client.download_dids([{'did': did_str, 'impl': impl, 'base_dir': file_factory.base_dir}])
         mock_get.assert_called()
 
 
-def test_download_file_with_supported_protocol_from_config(rse_factory, did_factory, download_client, mock_scope):
+def test_download_file_with_supported_protocol_from_config(rse_factory, did_factory, download_client, mock_scope, file_factory):
     """ Download (CLIENT): Ensure the module associated to the first protocol supported by both the remote and local config read from rucio.cfg is called """
 
     rse, rse_id = rse_factory.make_rse()
@@ -715,7 +716,7 @@ def test_download_file_with_supported_protocol_from_config(rse_factory, did_fact
 
     supported_impl = 'xrootd'
 
-    path = file_generator()
+    path = file_factory.file_generator()
     name = os.path.basename(path)
 
     item: FileToUploadDict = {
@@ -732,7 +733,7 @@ def test_download_file_with_supported_protocol_from_config(rse_factory, did_fact
     with patch('rucio.rse.protocols.%s.Default.get' % supported_impl, side_effect=lambda pfn, dest, **kw: shutil.copy(path, dest)) as mock_get, \
             patch('rucio.rse.protocols.%s.Default.connect' % supported_impl), \
             patch('rucio.rse.protocols.%s.Default.close' % supported_impl):
-        download_client.download_dids([{'did': did_str, 'impl': supported_impl}])
+        download_client.download_dids([{'did': did_str, 'impl': supported_impl, 'base_dir': file_factory.base_dir}])
         mock_get.assert_called()
 
 
