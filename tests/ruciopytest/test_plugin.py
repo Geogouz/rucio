@@ -63,6 +63,12 @@ def test_list_cases_is_machine_readable(capsys) -> None:
     }
     atlas = next(case for case in cases if case["policy"] == "atlas")
     assert len(atlas["tests"]) == 36
+    assert {case["runtime"] for case in cases} == {
+        "py39",
+        "py310",
+        "py311",
+        "py312",
+    }
 
 
 def test_suite_resolves_every_matrix_case() -> None:
