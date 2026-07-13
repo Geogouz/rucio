@@ -32,15 +32,14 @@ def collect_votest_paths(matrix: dict, policy: str, repo_root: "Path") -> list[s
     def resolve(entries: list[str]) -> set[str]:
         paths: set[str] = set()
         for entry in entries:
-            relative = entry.replace("rucio_tests", "tests", 1)
-            path = repo_root / relative
+            path = repo_root / entry
             if path.is_dir():
                 paths.update(
                     str(test.relative_to(repo_root))
                     for test in path.glob("test_*.py")
                 )
             elif path.is_file():
-                paths.add(relative)
+                paths.add(entry)
             else:
                 raise ValueError(
                     f"Policy {policy!r} references missing test path {entry!r}"

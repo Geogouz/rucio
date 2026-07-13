@@ -43,7 +43,7 @@ def test_policy_selector_rejects_missing_path(tmp_path: Path) -> None:
     matrix = {
         "test": {
             "tests": {
-                "allow": ["rucio_tests/test_missing.py"],
+                "allow": ["tests/test_missing.py"],
                 "deny": [],
             }
         }
@@ -58,7 +58,7 @@ def test_policy_selector_expands_directories(tmp_path: Path) -> None:
     tests.mkdir()
     (tests / "test_selected.py").write_text("")
     (tests / "helper.py").write_text("")
-    matrix = {"test": {"tests": {"allow": ["rucio_tests"], "deny": []}}}
+    matrix = {"test": {"tests": {"allow": ["tests"], "deny": []}}}
 
     assert collect_votest_paths(matrix, "test", tmp_path) == [
         "tests/test_selected.py"
