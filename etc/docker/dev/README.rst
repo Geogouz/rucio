@@ -14,6 +14,10 @@ Start the Docker daemon with `systemctl start docker`. You can confirm that Dock
 
 If successful, this will print an informational message telling you that you are ready to go.  Now, also install the `docker-compose` helper tool with `sudo yum install docker-compose` (might need `EPEL <https://fedoraproject.org/wiki/EPEL>`_ enabled). You are now ready to install the Rucio development environment.
 
+Oracle XE cannot run on Apple Silicon through Docker Desktop. Run Oracle cases
+with an x86_64 Docker daemon, as described in the
+`Oracle XE image documentation <https://github.com/gvenzl/oci-oracle-xe#oracle-xe-on-apple-m-chips>`_.
+
 Preparing the environment
 -------------------------
 
