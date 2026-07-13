@@ -202,7 +202,8 @@ FROM python:${PYTHON}-slim-bookworm AS unit
         git \
         libkrb5-dev \
         libxmlsec1 \
-        libxmlsec1-dev && \
+        libxmlsec1-dev \
+        pkg-config && \
         rm -rf /var/lib/apt/lists/*
 
     COPY requirements/requirements.dev.txt /tmp/requirements.dev.txt
