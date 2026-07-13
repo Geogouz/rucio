@@ -31,8 +31,10 @@ MATRIX_PATH = REPO_ROOT / "etc/docker/test/matrix_policy_package_tests.yml"
 
 @pytest.mark.parametrize("policy", ["atlas", "belleii"])
 def test_policy_selectors_resolve_existing_tests(policy: str) -> None:
-    paths = collect_votest_paths(load_matrix(MATRIX_PATH), policy, REPO_ROOT)
+    matrix = load_matrix(MATRIX_PATH)
+    paths = collect_votest_paths(matrix, policy, REPO_ROOT)
 
+    assert set(matrix[policy]) == {"config_overrides", "tests"}
     assert paths
     assert all((REPO_ROOT / path).is_file() for path in paths)
 
