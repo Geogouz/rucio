@@ -15,7 +15,7 @@
 import json
 import os
 import subprocess  # noqa: S404
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 import pytest
 
@@ -30,8 +30,8 @@ def _manager(
     tmp_path: "Path",
     *,
     keep_db: bool = False,
-    image: str | None = "runtime:test",
-    environ: dict[str, str] | None = None,
+    image: Optional[str] = "runtime:test",
+    environ: Optional[dict[str, str]] = None,
 ) -> ContainerManager:
     return ContainerManager(
         get_case("remote-dbs-py39-postgres14"),

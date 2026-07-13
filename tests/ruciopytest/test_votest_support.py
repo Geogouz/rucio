@@ -14,6 +14,7 @@
 
 import configparser
 from pathlib import Path
+from typing import Optional
 
 import pytest
 
@@ -96,7 +97,7 @@ def test_rewrite_policy_section_creates_section(tmp_path: Path) -> None:
 
 
 class _Config:
-    def __init__(self, policy: str | None) -> None:
+    def __init__(self, policy: Optional[str]) -> None:
         self.policy = policy
 
     def getoption(self, name: str, default=None):

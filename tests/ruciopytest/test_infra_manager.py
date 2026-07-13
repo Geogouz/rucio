@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 from unittest.mock import Mock, call
 
 from tests.ruciopytest import infra_manager
@@ -28,7 +28,7 @@ def _manager(
     case_id: str = "remote-dbs-py39-postgres14",
     *,
     keep_db: bool = False,
-    environment: dict[str, str] | None = None,
+    environment: Optional[dict[str, str]] = None,
 ) -> InfraManager:
     return InfraManager(
         get_case(case_id),
