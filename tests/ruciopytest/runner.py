@@ -172,7 +172,7 @@ def _run_multi_vo(
         result = _run_inner_pytest(
             manager,
             case,
-            _qualify_junit(pytest_args, leg),
+            qualify_junit(pytest_args, leg),
             keep_db=keep_db or index > 0,
             environment=environment,
         )
@@ -208,7 +208,7 @@ def _run_integration(
     first_phase = case.test_paths[:10]
     second_phase = case.test_paths[10:]
     first_args = [
-        *_qualify_junit(pytest_args, "storage"),
+        *qualify_junit(pytest_args, "storage"),
         "--export-artifacts-from=test_tpc",
         *first_phase,
     ]
@@ -228,7 +228,7 @@ def _run_integration(
     return _run_inner_pytest(
         manager,
         case,
-        [*_qualify_junit(pytest_args, "metadata"), *second_phase],
+        [*qualify_junit(pytest_args, "metadata"), *second_phase],
         keep_db=True,
         environment=environment,
     )
@@ -289,7 +289,7 @@ def _run_inner_pytest(
     ).returncode
 
 
-def _qualify_junit(arguments: "Sequence[str]", qualifier: str) -> list[str]:
+def qualify_junit(arguments: "Sequence[str]", qualifier: str) -> list[str]:
     qualified = list(arguments)
     for index, argument in enumerate(qualified):
         if argument.startswith("--junitxml=") or argument.startswith("--junit-xml="):
