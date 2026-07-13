@@ -151,7 +151,9 @@ Run every matrix case for one named suite::
     .venv/bin/python -m pytest --suite=unit
     .venv/bin/python -m pytest --suite=client
     .venv/bin/python -m pytest --suite=remote_dbs
+    .venv/bin/python -m pytest --suite=multi_vo
     .venv/bin/python -m pytest --suite=votest
+    .venv/bin/python -m pytest --suite=integration
 
 Run the full canonical suite::
 
