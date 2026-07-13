@@ -1682,7 +1682,7 @@ def test_transfer_with_tokens(vo, did_factory, root_account, caches_mock, file_c
             RECEIVER_GRACEFUL_STOP.clear()
 
 
-@pytest.mark.noparallel(groups=[NoParallelGroups.PREPARER])
+@pytest.mark.noparallel(reason="dependency cleanup touches shared transfer rows")
 @pytest.mark.parametrize("file_config_mock", [{
     "overrides": [('conveyor', 'use_preparer', 'true')]
 }], indirect=True)

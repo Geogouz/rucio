@@ -1,0 +1,25 @@
+services:
+  workspace:
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-lgtm:4318
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_METRICS_EXPORTER: otlp
+      OTEL_LOGS_EXPORTER: otlp
+      OTEL_PYTHON_LOG_AUTO_INSTRUMENTATION: "true"
+      OTEL_PYTHON_LOG_CORRELATION: "true"
+      OTEL_TRACES_EXPORTER: otlp
+    depends_on:
+      otel-lgtm:
+        condition: service_started
+
+  otel-lgtm:
+    image: docker.io/grafana/otel-lgtm:0.27.1
+    profiles:
+      - observe
+    ports:
+      - "127.0.0.1:3001:3000"
+    volumes:
+      - vol-otel-lgtm:/data
+
+volumes:
+  vol-otel-lgtm:

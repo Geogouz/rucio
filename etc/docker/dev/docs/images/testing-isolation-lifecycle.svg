@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080" role="img" aria-labelledby="title description">
+  <title id="title">Rucio resolved test lifecycle</title>
+  <desc id="description">Database-backed cases resolve a canonical or locally overridden configuration, use a supplied runtime image or a checkout-scoped local build, create an isolated Compose project and a fresh database by default, run pytest, retain private logs, and clean up only that project. The keep-db option retains the reusable database volume. Unit cases instead use a temporary container without Compose or a database.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto"><path d="M0 0 L12 6 L0 12 Z" fill="#24736b"/></marker>
+    <marker id="arrow-muted" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto"><path d="M0 0 L12 6 L0 12 Z" fill="#7a8b87"/></marker>
+  </defs>
+  <rect width="1920" height="1080" fill="#f4f7f6"/>
+  <text x="88" y="88" fill="#102a26" font-family="Arial, sans-serif" font-size="46" font-weight="700">Each test case owns its complete lifecycle</text>
+  <text x="88" y="137" fill="#506762" font-family="Arial, sans-serif" font-size="25">The resolved case fixes Python, database, policy, and services. --keep-db explicitly changes retention.</text>
+
+  <rect x="88" y="204" width="1744" height="610" rx="30" fill="#ffffff" stroke="#cad8d4" stroke-width="3"/>
+  <text x="132" y="260" fill="#24736b" font-family="Arial, sans-serif" font-size="20" font-weight="700" letter-spacing="2">DATABASE-BACKED CASE</text>
+
+  <g font-family="Arial, sans-serif">
+    <rect x="132" y="324" width="236" height="136" rx="18" fill="#e2f1ee"/>
+    <text x="164" y="370" fill="#102a26" font-size="25" font-weight="700">1 · Resolve case</text>
+    <text x="164" y="407" fill="#506762" font-size="19">matrix + selector</text>
+    <text x="164" y="434" fill="#506762" font-size="19">validation</text>
+
+    <rect x="412" y="324" width="236" height="136" rx="18" fill="#e2f1ee"/>
+    <text x="444" y="370" fill="#102a26" font-size="25" font-weight="700">2 · Runtime</text>
+    <text x="444" y="407" fill="#506762" font-size="19">resolved image</text>
+    <text x="444" y="434" fill="#506762" font-size="19">supplied or local</text>
+
+    <rect x="692" y="324" width="236" height="136" rx="18" fill="#eaf0f7"/>
+    <text x="724" y="370" fill="#102a26" font-size="25" font-weight="700">3 · Isolate</text>
+    <text x="724" y="407" fill="#506762" font-size="19">unique Compose</text>
+    <text x="724" y="434" fill="#506762" font-size="19">project + network</text>
+
+    <rect x="972" y="324" width="236" height="136" rx="18" fill="#f1ece2"/>
+    <text x="1004" y="370" fill="#102a26" font-size="25" font-weight="700">4 · Database</text>
+    <text x="1004" y="407" fill="#506762" font-size="19">fresh catalogue</text>
+    <text x="1004" y="434" fill="#506762" font-size="19">migrate + bootstrap</text>
+
+    <rect x="1252" y="324" width="236" height="136" rx="18" fill="#f3eaf4"/>
+    <text x="1284" y="370" fill="#102a26" font-size="25" font-weight="700">5 · Pytest</text>
+    <text x="1284" y="407" fill="#506762" font-size="19">current checkout</text>
+    <text x="1284" y="434" fill="#506762" font-size="19">inside runtime</text>
+
+    <rect x="1532" y="324" width="236" height="136" rx="18" fill="#e9f0ed"/>
+    <text x="1564" y="370" fill="#102a26" font-size="25" font-weight="700">6 · Finalize</text>
+    <text x="1564" y="407" fill="#506762" font-size="19">private logs</text>
+    <text x="1564" y="434" fill="#506762" font-size="19">project cleanup</text>
+  </g>
+
+  <g stroke="#24736b" stroke-width="5" fill="none" marker-end="url(#arrow)">
+    <path d="M368 392 H394"/><path d="M648 392 H674"/><path d="M928 392 H954"/><path d="M1208 392 H1234"/><path d="M1488 392 H1514"/>
+  </g>
+
+  <rect x="132" y="536" width="1636" height="206" rx="20" fill="#f6f9f8" stroke="#d8e2df" stroke-width="2"/>
+  <text x="170" y="588" fill="#102a26" font-family="Arial, sans-serif" font-size="25" font-weight="700">Failure and interrupt path</text>
+  <text x="170" y="632" fill="#506762" font-family="Arial, sans-serif" font-size="22">A test failure or interrupt remains primary. Log capture and project-scoped cleanup are still attempted.</text>
+  <path d="M170 682 H500" stroke="#7a8b87" stroke-width="5" fill="none" marker-end="url(#arrow-muted)"/>
+  <text x="532" y="691" fill="#102a26" font-family="Arial, sans-serif" font-size="22" font-weight="700">.test-logs/&lt;project&gt;/</text>
+  <text x="862" y="691" fill="#506762" font-family="Arial, sans-serif" font-size="21">0700 directory · 0600 files · inspect before sharing</text>
+
+  <rect x="88" y="862" width="1744" height="142" rx="24" fill="#163d37"/>
+  <text x="132" y="916" fill="#aee6dc" font-family="Arial, sans-serif" font-size="20" font-weight="700" letter-spacing="2">UNIT CASE DIFFERENCE</text>
+  <text x="132" y="961" fill="#ffffff" font-family="Arial, sans-serif" font-size="25">Unit cases use an ephemeral docker run --rm container. They do not create a Compose project, catalogue, or Apache log.</text>
+</svg>

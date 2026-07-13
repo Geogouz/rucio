@@ -1,0 +1,302 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Rucio: Up",
+      "type": "process",
+      "command": "${workspaceFolder}/tools/dev",
+      "args": [
+        "up"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "group": "build"
+    },
+    {
+      "label": "Rucio: Test",
+      "type": "process",
+      "command": "${workspaceFolder}/tools/dev",
+      "args": [
+        "test",
+        "${input:rucioTestCase}",
+        "${input:rucioTestSelector}"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "Rucio: Full PostgreSQL test",
+      "type": "process",
+      "command": "${workspaceFolder}/tools/dev",
+      "args": [
+        "test",
+        "remote-dbs-py310-postgres14"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "Rucio: Debug test",
+      "type": "process",
+      "command": "${workspaceFolder}/tools/dev",
+      "args": [
+        "debug",
+        "test",
+        "${input:rucioTestCase}",
+        "${input:rucioTestSelector}"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "rucio-debug",
+        "pattern": {
+          "regexp": "^(.*)$",
+          "message": 1
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "^Rucio debugger starting$",
+          "endsPattern": "^Rucio debugger ready on 127\\.0\\.0\\.1:5678$"
+        }
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "runOptions": {
+        "instanceLimit": 1
+      }
+    },
+    {
+      "label": "Rucio: Debug daemon",
+      "type": "process",
+      "command": "${workspaceFolder}/tools/dev",
+      "args": [
+        "debug",
+        "daemon",
+        "${input:rucioDaemon}",
+        "${input:rucioDaemonOption}"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "rucio-debug-daemon",
+        "pattern": {
+          "regexp": "^(.*)$",
+          "message": 1
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "^Rucio debugger starting$",
+          "endsPattern": "^Rucio debugger ready on 127\\.0\\.0\\.1:5678$"
+        }
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "runOptions": {
+        "instanceLimit": 1
+      }
+    },
+    {
+      "label": "Rucio: CPU profile",
+      "type": "process",
+      "command": "${workspaceFolder}/tools/dev",
+      "args": [
+        "profile",
+        "cpu",
+        "test",
+        "${input:rucioTestCase}",
+        "${input:rucioTestSelector}"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "Rucio: Memory profile",
+      "type": "process",
+      "command": "${workspaceFolder}/tools/dev",
+      "args": [
+        "profile",
+        "memory",
+        "test",
+        "${input:rucioTestCase}",
+        "${input:rucioTestSelector}"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "Rucio: Call profile",
+      "type": "process",
+      "command": "${workspaceFolder}/tools/dev",
+      "args": [
+        "profile",
+        "calls",
+        "test",
+        "${input:rucioTestCase}",
+        "${input:rucioTestSelector}"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "Rucio: Resource profile",
+      "type": "process",
+      "command": "${workspaceFolder}/tools/dev",
+      "args": [
+        "profile",
+        "resources",
+        "test",
+        "${input:rucioTestCase}",
+        "${input:rucioTestSelector}"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "Rucio: Full PostgreSQL performance report",
+      "type": "process",
+      "command": "${workspaceFolder}/tools/dev",
+      "args": [
+        "report",
+        "--workers",
+        "4",
+        "tests"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "Rucio: Profile daemon",
+      "type": "process",
+      "command": "${workspaceFolder}/tools/dev",
+      "args": [
+        "profile",
+        "${input:rucioProfileKind}",
+        "daemon",
+        "${input:rucioDaemon}",
+        "${input:rucioDaemonOption}"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "Rucio: Observe daemon",
+      "type": "process",
+      "command": "${workspaceFolder}/tools/dev",
+      "args": [
+        "observe",
+        "daemon",
+        "${input:rucioDaemon}",
+        "${input:rucioDaemonOption}"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    }
+  ],
+  "inputs": [
+    {
+      "id": "rucioTestCase",
+      "type": "promptString",
+      "description": "Canonical Rucio test case",
+      "default": "remote-dbs-py310-postgres14"
+    },
+    {
+      "id": "rucioTestSelector",
+      "type": "promptString",
+      "description": "Optional pytest path or node ID; leave empty for the whole case",
+      "default": ""
+    },
+    {
+      "id": "rucioProfileKind",
+      "type": "pickString",
+      "description": "Profiler",
+      "options": [
+        "cpu",
+        "memory",
+        "calls",
+        "resources"
+      ],
+      "default": "cpu"
+    },
+    {
+      "id": "rucioDaemon",
+      "type": "promptString",
+      "description": "Rucio daemon name",
+      "default": "hermes"
+    },
+    {
+      "id": "rucioDaemonOption",
+      "type": "promptString",
+      "description": "One bounded daemon option; leave empty when unsupported",
+      "default": "--run-once"
+    }
+  ]
+}

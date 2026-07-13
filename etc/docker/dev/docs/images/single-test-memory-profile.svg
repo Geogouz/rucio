@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" role="img" aria-labelledby="title desc">
+  <title id="title">Peak allocation profile for one Rucio PostgreSQL REST test</title>
+  <desc id="desc">Static vector rendering of genuine Memray peak-allocation data, showing two cumulative application call paths, direct allocations, and interpretation guidance.</desc>
+  <style>
+    .bg{fill:#0b1916}.title{font:700 50px system-ui,sans-serif;fill:#f5faf8}.subtitle{font:26px system-ui,sans-serif;fill:#a9bbb5}.card,.panel{fill:#10231f;stroke:#28564d;stroke-width:2}.card-label,.muted{font:20px system-ui,sans-serif;fill:#94aaa3}.card-value{font:700 32px system-ui,sans-serif;fill:#f4faf7}.panel-title{font:700 28px system-ui,sans-serif;fill:#eef7f4}.branch-title{font:700 22px system-ui,sans-serif;fill:#dce9e5}.bar-a{fill:#1d6f63}.bar-b{fill:#315e8e}.bar-root{fill:#255149;stroke:#58d8bd;stroke-width:2}.bar-label{font:18px ui-monospace,SFMono-Regular,monospace;fill:#f4faf7}.bar-value{font:700 18px system-ui,sans-serif;fill:#ffffff}.body{font:21px system-ui,sans-serif;fill:#cad8d3}.small{font:18px system-ui,sans-serif;fill:#9fb3ac}.rule{stroke:#2e4943;stroke-width:1}.accent{font:700 22px system-ui,sans-serif;fill:#66ddc3}.direct{font:20px ui-monospace,SFMono-Regular,monospace;fill:#eff8f5}.footer{font:20px system-ui,sans-serif;fill:#90a59e}
+  </style>
+  <rect class="bg" width="1920" height="1080"/>
+  <text class="title" x="48" y="66">Peak allocations · one PostgreSQL REST test</text>
+  <text class="subtitle" x="48" y="110">Actual Memray high-water-mark data · cumulative application paths · no host identity</text>
+
+  <g>
+    <rect class="card" x="48" y="142" width="426" height="116" rx="17"/>
+    <text class="card-label" x="72" y="176">Peak captured memory</text>
+    <text class="card-value" x="72" y="222">109.6 MB</text>
+    <text class="muted" x="72" y="248">Parent Python process</text>
+  </g>
+  <g>
+    <rect class="card" x="510" y="142" width="426" height="116" rx="17"/>
+    <text class="card-label" x="534" y="176">Allocations recorded</text>
+    <text class="card-value" x="534" y="222">296,278</text>
+    <text class="muted" x="534" y="248">Peak snapshot retains 36,384</text>
+  </g>
+  <g>
+    <rect class="card" x="972" y="142" width="426" height="116" rx="17"/>
+    <text class="card-label" x="996" y="176">Capture duration</text>
+    <text class="card-value" x="996" y="222">13.531 s</text>
+    <text class="muted" x="996" y="248">Focused ping REST test</text>
+  </g>
+  <g>
+    <rect class="card" x="1434" y="142" width="426" height="116" rx="17"/>
+    <text class="card-label" x="1458" y="176">Python allocator</text>
+    <text class="card-value" x="1458" y="222">pymalloc</text>
+    <text class="muted" x="1458" y="248">Diagnostic capture</text>
+  </g>
+
+  <rect class="panel" x="48" y="288" width="1180" height="706" rx="20"/>
+  <text class="panel-title" x="78" y="332">Selected cumulative application paths at the memory high-water mark</text>
+  <text class="small" x="78" y="366">Nested rows are one caller → callee path. Their values overlap and must not be added.</text>
+  <rect class="bar-root" x="78" y="390" width="1120" height="52" rx="9"/>
+  <text class="bar-label" x="96" y="423">Python process at peak</text>
+  <text class="bar-value" x="1178" y="423" text-anchor="end">109.6 MB</text>
+
+  <text class="branch-title" x="78" y="486">REST fixture / server import branch</text>
+  <text class="branch-title" x="646" y="486">Client / configuration import branch</text>
+
+  <g>
+    <rect class="bar-a" x="78" y="506" width="520" height="48" rx="7"/><text class="bar-label" x="92" y="536">conftest::rest_client</text><text class="bar-value" x="584" y="536" text-anchor="end">42.2 MB</text>
+    <rect class="bar-a" x="92" y="560" width="506" height="48" rx="7"/><text class="bar-label" x="106" y="590">rest/main.py::&lt;module&gt;</text><text class="bar-value" x="584" y="590" text-anchor="end">37.0 MB</text>
+    <rect class="bar-a" x="106" y="614" width="492" height="48" rx="7"/><text class="bar-label" x="120" y="644">rest/common.py::&lt;module&gt;</text><text class="bar-value" x="584" y="644" text-anchor="end">35.9 MB</text>
+    <rect class="bar-a" x="120" y="668" width="478" height="48" rx="7"/><text class="bar-label" x="134" y="698">gateway/authentication.py</text><text class="bar-value" x="584" y="698" text-anchor="end">17.5 MB</text>
+    <rect class="bar-a" x="134" y="722" width="464" height="48" rx="7"/><text class="bar-label" x="148" y="752">gateway/permission.py</text><text class="bar-value" x="584" y="752" text-anchor="end">17.5 MB</text>
+    <rect class="bar-a" x="148" y="776" width="450" height="48" rx="7"/><text class="bar-label" x="162" y="806">core/did.py::&lt;module&gt;</text><text class="bar-value" x="584" y="806" text-anchor="end">16.4 MB</text>
+  </g>
+
+  <g>
+    <rect class="bar-b" x="646" y="506" width="520" height="48" rx="7"/><text class="bar-label" x="660" y="536">test_ping.py::&lt;module&gt;</text><text class="bar-value" x="1152" y="536" text-anchor="end">21.7 MB</text>
+    <rect class="bar-b" x="660" y="560" width="520" height="48" rx="7"/><text class="bar-label" x="674" y="590">client/__init__.py::&lt;module&gt;</text><text class="bar-value" x="1166" y="590" text-anchor="end">21.7 MB</text>
+    <rect class="bar-b" x="674" y="614" width="506" height="48" rx="7"/><text class="bar-label" x="688" y="644">client/client.py::&lt;module&gt;</text><text class="bar-value" x="1166" y="644" text-anchor="end">16.3 MB</text>
+    <rect class="bar-b" x="688" y="668" width="492" height="48" rx="7"/><text class="bar-label" x="702" y="698">OpenDataClient</text><text class="bar-value" x="1166" y="698" text-anchor="end">16.3 MB</text>
+    <rect class="bar-b" x="702" y="722" width="478" height="48" rx="7"/><text class="bar-label" x="716" y="752">common.config::config_get</text><text class="bar-value" x="1166" y="752" text-anchor="end">16.3 MB</text>
+    <rect class="bar-b" x="716" y="776" width="464" height="48" rx="7"/><text class="bar-label" x="730" y="806">__config_get_table</text><text class="bar-value" x="1166" y="806" text-anchor="end">13.1 MB</text>
+    <rect class="bar-b" x="730" y="830" width="450" height="48" rx="7"/><text class="bar-label" x="744" y="860">core/config.py::&lt;module&gt;</text><text class="bar-value" x="1166" y="860" text-anchor="end">13.0 MB</text>
+  </g>
+  <text class="small" x="78" y="940">The short capture is dominated by setup and import paths; zoom the interactive flame graph before choosing an optimization target.</text>
+
+  <rect class="panel" x="1260" y="288" width="612" height="706" rx="20"/>
+  <text class="panel-title" x="1290" y="332">What this evidence says</text>
+  <text class="accent" x="1290" y="382">Largest direct allocations at peak</text>
+  <line class="rule" x1="1290" y1="400" x2="1842" y2="400"/>
+  <text class="direct" x="1290" y="438">rest/auth.py:&lt;module&gt;</text>
+  <text class="body" x="1290" y="470">1.05 MB · two allocations · line 222</text>
+  <text class="direct" x="1290" y="518">client/rseclient.py::RSEClient</text>
+  <text class="body" x="1290" y="550">1.05 MB · one allocation · line 1444</text>
+  <text class="small" x="1290" y="590">Direct bytes exclude child frames; they are not</text>
+  <text class="small" x="1290" y="616">the same quantity as cumulative branch width.</text>
+  <line class="rule" x1="1290" y1="650" x2="1842" y2="650"/>
+  <text class="accent" x="1290" y="694">Interpretation</text>
+  <text class="body" x="1290" y="736">• Peak attribution is not retained memory.</text>
+  <text class="body" x="1290" y="778">• Import/setup cost dominates this short run.</text>
+  <text class="body" x="1290" y="820">• Search and zoom in memory.html.</text>
+  <text class="body" x="1290" y="862">• Repeat a longer controlled workload.</text>
+  <text class="body" x="1290" y="904">• Correlate with the container memory line.</text>
+  <text class="small" x="1290" y="956">Forked workloads receive one report per process.</text>
+
+  <text class="footer" x="48" y="1042">Static vector from the genuine Memray packed-data payload · generated memory.html remains interactive · diagnostic example, not a memory baseline</text>
+</svg>
