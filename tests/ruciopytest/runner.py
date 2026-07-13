@@ -438,6 +438,7 @@ def qualify_junit(arguments: "Sequence[str]", qualifier: str) -> list[str]:
 
 def qualify_paths(arguments: "Sequence[str]", qualifier: str) -> list[str]:
     qualified = qualify_junit(arguments, qualifier)
+    qualified = _qualify_debug(qualified, qualifier)
     qualified = _qualify_path_option(
         qualified,
         ("--log-file",),
@@ -454,6 +455,23 @@ def qualify_paths(arguments: "Sequence[str]", qualifier: str) -> list[str]:
         "log_file",
         qualifier,
     )
+    return qualified
+
+
+def _qualify_debug(arguments: "Sequence[str]", qualifier: str) -> list[str]:
+    qualified = list(arguments)
+    for index, argument in enumerate(qualified):
+        if argument.startswith("--debug="):
+            value = argument.split("=", 1)[1]
+            if value:
+                qualified[index] = f"--debug={_qualify_path(value, qualifier, directory=False)}"
+        elif argument == "--debug":
+            if index + 1 < len(qualified) and not qualified[index + 1].startswith("-"):
+                qualified[index + 1] = _qualify_path(
+                    qualified[index + 1], qualifier, directory=False
+                )
+            else:
+                qualified[index] = f"--debug=pytestdebug-{qualifier}.log"
     return qualified
 
 

@@ -526,6 +526,18 @@ def test_pytest_device_paths_are_preserved() -> None:
     assert "log_file=/dev/null" in arguments
 
 
+@pytest.mark.parametrize(
+    ("arguments", "expected"),
+    (
+        (("--debug", "-q"), "--debug=pytestdebug-case.log"),
+        (("--debug", "logs/debug.log"), "logs/debug-case.log"),
+        (("--debug=logs/debug.log",), "--debug=logs/debug-case.log"),
+    ),
+)
+def test_pytest_debug_paths_are_qualified(arguments, expected) -> None:
+    assert expected in runner.qualify_paths(arguments, "case")
+
+
 def test_unit_case_builds_and_runs_requested_python(tmp_path: "Path", monkeypatch) -> None:
     commands = []
     timeouts = []
