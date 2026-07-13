@@ -177,6 +177,42 @@ def test_pytest_configuration_file_is_required(tmp_path: "Path") -> None:
         runner.container_pytest_config((), tmp_path, tmp_path, None)
 
 
+def test_internal_symlinked_config_keeps_lexical_path(tmp_path: "Path") -> None:
+    source_root = tmp_path / "source"
+    config_directory = source_root / "config"
+    config_directory.mkdir(parents=True)
+    config_path = config_directory / "pytest.ini"
+    config_path.write_text("[pytest]\n")
+    config_link = source_root / "pytest.ini"
+    config_link.symlink_to(config_path.relative_to(source_root))
+
+    arguments = runner.container_pytest_config(
+        (),
+        source_root,
+        source_root,
+        config_link,
+    )
+
+    assert "/rucio_source/pytest.ini" in arguments
+
+
+def test_config_symlink_cannot_escape_checkout(tmp_path: "Path") -> None:
+    source_root = tmp_path / "source"
+    source_root.mkdir()
+    external_config = tmp_path / "pytest.ini"
+    external_config.write_text("[pytest]\n")
+    config_link = source_root / "pytest.ini"
+    config_link.symlink_to(external_config)
+
+    with pytest.raises(pytest.UsageError, match="must be inside"):
+        runner.container_pytest_config(
+            (),
+            source_root,
+            source_root,
+            config_link,
+        )
+
+
 def test_outer_args_include_pytest_addopts(monkeypatch) -> None:
     monkeypatch.setenv("PYTEST_ADDOPTS", "-k 'rule creation' -q")
 

@@ -97,8 +97,10 @@ def container_pytest_config(
         raise pytest.UsageError("pytest configuration file is required")
 
     def map_path(path: Path, description: str) -> Path:
+        lexical_path = Path(os.path.abspath(path))
         try:
-            relative = path.resolve().relative_to(source_root)
+            relative = lexical_path.relative_to(source_root)
+            lexical_path.resolve().relative_to(source_root)
         except ValueError as error:
             raise pytest.UsageError(
                 f"pytest {description} must be inside {source_root}"
