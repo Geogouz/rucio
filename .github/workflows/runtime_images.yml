@@ -58,9 +58,11 @@ jobs:
       - name: Prepare metadata
         id: metadata
         run: |
-          echo "build_date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
-          echo "commit_sha=${{ github.sha }}" >> $GITHUB_OUTPUT
-          echo "commit_ref=${{ github.ref }}" >> $GITHUB_OUTPUT
+          {
+            echo "build_date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            echo "commit_sha=${{ github.sha }}"
+            echo "commit_ref=${{ github.ref }}"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Build Runtime Images
         id: build_images
@@ -114,7 +116,7 @@ jobs:
             docker buildx build \
               --file etc/docker/test/runtime.Dockerfile \
               --target final \
-              --build-arg PYTHON=${PYVER} \
+              --build-arg "PYTHON=${PYVER}" \
               --push \
               --tag "$IMAGE" \
               --label "org.opencontainers.image.title=Rucio Runtime Image Python ${PYVER}" \
@@ -128,10 +130,12 @@ jobs:
               --label "rucio.image.build.date=${BUILD_DATE}" \
               --label "rucio.image.build.workflow=${{ github.workflow }}" \
               --label "rucio.image.build.run_id=${{ github.run_id }}" \
-              --cache-from type=registry,ref=ghcr.io/${REPO}/rucio-dev-runtime:py${PYVER//.}-buildcache \
-              --cache-to type=registry,ref=ghcr.io/${REPO}/rucio-dev-runtime:py${PYVER//.}-buildcache,mode=max \
+              --cache-from "type=registry,ref=ghcr.io/${REPO}/rucio-dev-runtime:py${PYVER//.}-buildcache" \
+              --cache-to "type=registry,ref=ghcr.io/${REPO}/rucio-dev-runtime:py${PYVER//.}-buildcache,mode=max" \
               .
           done
 
-          echo "images=$IMAGES" >> $GITHUB_OUTPUT
-          echo "build_locally=$BUILD_LOCALLY" >> $GITHUB_OUTPUT
+          {
+            echo "images=$IMAGES"
+            echo "build_locally=$BUILD_LOCALLY"
+          } >> "$GITHUB_OUTPUT"
