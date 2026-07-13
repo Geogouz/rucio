@@ -217,45 +217,63 @@ Initialize the catalogue and integration RSEs::
 Use the canonical pytest command rather than this long-lived environment when
 the result must match CI exactly.
 
-Using the environment including monitoring
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Environment including monitoring
+--------------------------------
 
-Again run the containers using Docker Compose::
+Start storage and monitoring with the ports overlay so the web interfaces are
+available on the host::
 
-    docker compose --file etc/docker/dev/docker-compose.yml --profile storage --profile monitoring up -d
+    DEV_PROFILES=storage,monitoring \
+    docker compose --project-name dev \
+        --file etc/docker/dev/docker-compose.yml \
+        --file etc/docker/dev/docker-compose.ports.yml \
+        --profile storage \
+        --profile monitoring \
+        up --detach --wait
 
+Monitoring adds Kibana and Grafana. Elasticsearch is already a base service,
+and the development Hermes configuration sends events to it directly.
 
-Now you will have the same containers as before plus a full monitoring stack with Logstash, Elasticsearch, Kibana and Grafana.
+Prepare the catalogue and storage RSEs, then enter the Rucio container::
 
-To create some events and write them to Elasticsearch first run again the tests as before::
-
-    docker compose --file etc/docker/dev/docker-compose.yml \
-        --profile storage --profile monitoring exec rucio \
-        python -m tests.ruciopytest.infra_manager \
+    docker compose --project-name dev \
+        --file etc/docker/dev/docker-compose.yml \
+        --file etc/docker/dev/docker-compose.ports.yml \
+        --profile storage \
+        --profile monitoring \
+        exec rucio python -m tests.ruciopytest.infra_manager \
         --case integration-py39-postgres14
+    docker compose --project-name dev \
+        --file etc/docker/dev/docker-compose.yml \
+        --file etc/docker/dev/docker-compose.ports.yml \
+        --profile storage \
+        --profile monitoring \
+        exec rucio /bin/bash
 
+Inside the container, process the prepared transfer and publish its events::
 
-Then you will have to run the transfer daemons (conveyor-\*) and messaging daemon (hermes) to send the events to ActiveMQ. There a script for that which repeats these daemons in single execution mode from the section in a loop::
+    rucio-conveyor-submitter --run-once
+    rucio-conveyor-poller --run-once --older-than 0
+    rucio-conveyor-finisher --run-once
+    rucio-hermes --run-once
 
-    run_daemons
+Confirm that Hermes populated the development index::
 
+    curl 'http://elasticsearch:9200/rucio-events-dev/_search?pretty'
 
-When all the daemons ran you will be able to find the events in Kibana. If you run the docker environment on you local machine you can access Kibana at http://localhost:5601. The necessary index pattern will be added automatically. There is also one dashboard available in Kibana. If it is running on remote machine you can SSH forward it::
+With the ports overlay, Kibana is available at ``http://localhost:5601`` and
+Grafana at ``http://localhost:3000`` (default credentials ``admin/admin``).
+Create a Kibana data view for ``rucio-events-*`` using ``created_at`` as its
+time field. The ActiveMQ console remains available at
+``http://localhost:8161``. Queue-based external monitoring pipelines remain
+supported through Hermes' ActiveMQ output; configure that sink explicitly and
+follow the `operator monitoring guide
+<https://rucio.cern.ch/documentation/operator/monitoring/>`_.
+
+For a remote Docker host, forward a port before opening the corresponding local
+URL, for example::
 
     ssh -L 5601:127.0.0.1:5601 <hostname>
-
-
-Additionally, there is also a Grafana server running with one simple dashboard. You can access it at http://localhost:3000. The default credentials are "admin/admin". Also ActiveMQ web console can be accessed at http://localhost:8161.
-
-If you would like to continuously create some transfers and events there are scripts available for that. Open two different shells and in one run::
-
-    create_monit_data
-
-
-And in the other run::
-
-    run_daemons
-
 
 Development
 -----------
