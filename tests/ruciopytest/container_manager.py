@@ -14,6 +14,7 @@
 
 import fcntl
 import hashlib
+import json
 import os
 import secrets
 import subprocess  # noqa: S404
@@ -168,7 +169,11 @@ class ContainerManager:
             if not self.keep_db:
                 command.append("--volumes")
             result = self._run(command, check=False, timeout=120)
-            self._stopped = result.returncode == 0
+            volumes_removed = (
+                result.returncode == 0
+                and (not self.keep_db or self._remove_non_database_volumes())
+            )
+            self._stopped = result.returncode == 0 and volumes_removed
         finally:
             self._release_project_lock()
 
@@ -238,6 +243,33 @@ class ContainerManager:
         fcntl.flock(self._lock_handle, fcntl.LOCK_UN)
         self._lock_handle.close()
         self._lock_handle = None
+
+    def _remove_non_database_volumes(self) -> bool:
+        result = self._run(
+            self.compose_command("config", "--format", "json"),
+            check=False,
+            capture_output=True,
+            timeout=30,
+        )
+        if result.returncode:
+            return False
+        try:
+            volumes = json.loads(result.stdout).get("volumes", {}).values()
+        except (AttributeError, json.JSONDecodeError):
+            return False
+        removable = [
+            volume["name"]
+            for volume in volumes
+            if volume.get("labels", {}).get("rucio.test.database") != self.case.rdbms
+        ]
+        if not removable:
+            return True
+        result = self._run(
+            (self.runtime, "volume", "rm", *removable),
+            check=False,
+            timeout=60,
+        )
+        return result.returncode == 0
 
     def _build_image(self) -> None:
         if self.runtime == "docker":

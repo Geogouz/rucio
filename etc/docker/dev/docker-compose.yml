@@ -557,13 +557,19 @@ volumes:
   vol-ftsdb-mysql:
   vol-minio-data:
   vol-postgres14-data:
+    labels:
+      rucio.test.database: postgres14
   vol-mongo-noauth-configdb:
   vol-mongo-noauth-db:
   vol-mongo-configdb:
   vol-mongo-db:
   vol-iam-db-mysql:
   vol-mysql8-mysql:
+    labels:
+      rucio.test.database: mysql8
   vol-oracle-data:
+    labels:
+      rucio.test.database: oracle
   vol-postgres-data:
 
 networks:

@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 import os
 import subprocess  # noqa: S404
 from typing import TYPE_CHECKING
@@ -164,12 +165,40 @@ def test_keep_db_preserves_compose_volumes(tmp_path: "Path", monkeypatch) -> Non
 
     def run(command, **kwargs):
         commands.append(list(command))
-        return subprocess.CompletedProcess(command, 0, stdout="")
+        stdout = '{"volumes": {}}' if "config" in command else ""
+        return subprocess.CompletedProcess(command, 0, stdout=stdout)
 
     monkeypatch.setattr(manager, "_run", run)
     manager.stop()
 
-    assert "--volumes" not in commands[-1]
+    down = next(command for command in commands if "down" in command)
+    assert "--volumes" not in down
+
+
+def test_keep_db_removes_only_non_database_volumes(tmp_path: "Path", monkeypatch) -> None:
+    manager = _manager(tmp_path, keep_db=True)
+    commands = []
+    config = {
+        "volumes": {
+            "database": {
+                "name": "owned_database",
+                "labels": {"rucio.test.database": "postgres14"},
+            },
+            "logs": {"name": "owned_logs"},
+        },
+    }
+
+    def run(command, **kwargs):
+        commands.append(list(command))
+        stdout = json.dumps(config) if "config" in command else ""
+        return subprocess.CompletedProcess(command, 0, stdout=stdout)
+
+    monkeypatch.setattr(manager, "_run", run)
+
+    manager.stop()
+
+    volume_rm = next(command for command in commands if command[:3] == ["docker", "volume", "rm"])
+    assert volume_rm == ["docker", "volume", "rm", "owned_logs"]
 
 
 def test_reusable_project_rejects_concurrent_run(tmp_path: "Path") -> None:

@@ -46,6 +46,8 @@ def test_all_databases_use_persistent_storage() -> None:
     assert "vol-mysql8-mysql:/var/lib/mysql" in compose["services"]["mysql8"]["volumes"]
     assert "vol-oracle-data:/opt/oracle/oradata" in compose["services"]["oracle"]["volumes"]
     assert "vol-test-tmp:/tmp" in overlay["services"]["rucio"]["volumes"]
+    assert compose["volumes"]["vol-postgres14-data"]["labels"]["rucio.test.database"] == "postgres14"
+    assert overlay["volumes"]["vol-test-tmp"]["labels"]["rucio.test.database"] == "sqlite"
 
 
 def test_test_overlay_consumes_prebuilt_image() -> None:
