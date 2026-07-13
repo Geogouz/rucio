@@ -19,6 +19,7 @@ import os
 import secrets
 import subprocess  # noqa: S404
 import sys
+import threading
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -58,6 +59,8 @@ class ContainerManager:
     )
     RUNTIME_DOCKERFILE = "etc/docker/test/runtime.Dockerfile"
     _locally_built_images: set[tuple[str, str]] = set()
+    _image_build_lock = threading.Lock()
+    _editable_install_lock = threading.Lock()
 
     def __init__(
         self,
@@ -138,22 +141,24 @@ class ContainerManager:
             self._set_native_platform()
             if self.build_local:
                 image_key = (str(self.root_dir), self.image)
-                if image_key not in self._locally_built_images:
-                    self._build_image()
-                    self._locally_built_images.add(image_key)
+                with self._image_build_lock:
+                    if image_key not in self._locally_built_images:
+                        self._build_image()
+                        self._locally_built_images.add(image_key)
             self._run(self.compose_command("up", "-d", "--wait", "--wait-timeout", "180"), timeout=240)
-            self.exec(
-                "rucio",
-                "python",
-                "-m",
-                "pip",
-                "install",
-                "--no-deps",
-                "--no-build-isolation",
-                "-e",
-                "/rucio_source",
-                timeout=180,
-            )
+            with self._editable_install_lock:
+                self.exec(
+                    "rucio",
+                    "python",
+                    "-m",
+                    "pip",
+                    "install",
+                    "--no-deps",
+                    "--no-build-isolation",
+                    "-e",
+                    "/rucio_source",
+                    timeout=180,
+                )
             self.exec("rucio", "httpd", "-k", "graceful", timeout=30)
             self.exec(
                 "rucio",
