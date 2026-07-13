@@ -274,6 +274,22 @@ def test_unit_case_preserves_explicit_selector(tmp_path: "Path", monkeypatch) ->
     assert "tests/ruciopytest" not in commands[1]
 
 
+def test_unit_case_applies_canonical_collection(tmp_path: "Path", monkeypatch) -> None:
+    commands = []
+
+    def run(command, **kwargs):
+        commands.append(list(command))
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(runner.subprocess, "run", run)
+
+    runner.run_unit_case(get_case("unit-py39"), tmp_path, ())
+
+    assert "RUCIO_PYTEST_INNER=1" in commands[1]
+    assert "RUCIO_SKIP_TEST_SETUP=1" in commands[1]
+    assert "RUCIO_TEST_CASE=unit-py39" in commands[1]
+
+
 def test_unit_case_loads_requested_pytest_plugins(tmp_path: "Path", monkeypatch) -> None:
     commands = []
 

@@ -136,7 +136,14 @@ def run_unit_case(
         "--workdir",
         "/rucio_source",
     ))
-    for key, value in (container_environment or {}).items():
+    inner_environment = dict(case.env_vars)
+    inner_environment.update(container_environment or {})
+    inner_environment.update({
+        "RUCIO_PYTEST_INNER": "1",
+        "RUCIO_SKIP_TEST_SETUP": "1",
+        "RUCIO_TEST_CASE": case.id,
+    })
+    for key, value in inner_environment.items():
         command.extend(("--env", f"{key}={value}"))
     command.extend((
         image,
