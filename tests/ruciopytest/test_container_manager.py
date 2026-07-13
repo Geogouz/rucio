@@ -57,6 +57,28 @@ def test_reusable_projects_are_stable_per_checkout(tmp_path: "Path") -> None:
     assert first.project_name == second.project_name
 
 
+@pytest.mark.parametrize(
+    "relative_path",
+    (
+        "lib/rucio/db/sqla/models.py",
+        "lib/rucio/db/sqla/migrate_repo/versions/revision.py",
+    ),
+)
+def test_reusable_project_changes_with_database_schema(
+    tmp_path: "Path",
+    relative_path: str,
+) -> None:
+    schema_path = tmp_path / relative_path
+    schema_path.parent.mkdir(parents=True)
+    schema_path.write_text("before")
+    before = _manager(tmp_path, keep_db=True)
+
+    schema_path.write_text("after")
+    after = _manager(tmp_path, keep_db=True)
+
+    assert before.project_name != after.project_name
+
+
 def test_manager_does_not_mutate_process_environment(tmp_path: "Path", monkeypatch) -> None:
     monkeypatch.delenv("RUCIO_NETWORK_NAME", raising=False)
 

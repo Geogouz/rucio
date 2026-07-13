@@ -33,6 +33,23 @@ def checkout_id(root_dir: "Path") -> str:
     return hashlib.sha256(str(root_dir.resolve()).encode()).hexdigest()[:8]
 
 
+def database_schema_id(root_dir: "Path") -> str:
+    root_dir = root_dir.resolve()
+    sqla_dir = root_dir / "lib/rucio/db/sqla"
+    schema_paths = [
+        sqla_dir / "constants.py",
+        sqla_dir / "models.py",
+        sqla_dir / "types.py",
+        *(sqla_dir / "migrate_repo/versions").glob("*.py"),
+    ]
+    digest = hashlib.sha256(str(root_dir).encode())
+    for path in sorted(schema_paths):
+        if path.is_file():
+            digest.update(str(path.relative_to(root_dir)).encode())
+            digest.update(path.read_bytes())
+    return digest.hexdigest()[:8]
+
+
 class ContainerManager:
     COMPOSE_FILES = (
         "etc/docker/dev/docker-compose.yml",
@@ -101,9 +118,7 @@ class ContainerManager:
             for character in case_id.lower()
         ).strip("-")
         if reusable:
-            suffix = hashlib.sha256(
-                str(root_dir.resolve()).encode()
-            ).hexdigest()[:8]
+            suffix = database_schema_id(root_dir)
         else:
             suffix = nonce or secrets.token_hex(4)
         return f"rucio-test-{slug[:40]}-{suffix}"
