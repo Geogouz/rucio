@@ -27,9 +27,11 @@ jobs:
     name: Delete untagged images older than 7 days
     runs-on: ubuntu-latest
     if: |
-      (github.event.schedule == '0 2 * * 0') ||
-      (github.event_name == 'workflow_dispatch' && (github.event.inputs.cleanup_type == 'untagged' || github.event.inputs.cleanup_type == 'both')) ||
-      (github.event_name == 'pull_request')
+      github.repository_owner == 'rucio' && (
+        (github.event.schedule == '0 2 * * 0') ||
+        (github.event_name == 'workflow_dispatch' && (github.event.inputs.cleanup_type == 'untagged' || github.event.inputs.cleanup_type == 'both')) ||
+        (github.event_name == 'pull_request')
+      )
     steps:
       - name: Delete untagged images older than 7 days
         run: |
@@ -69,9 +71,11 @@ jobs:
     name: Delete tagged images older than 30 days
     runs-on: ubuntu-latest
     if: |
-      (github.event.schedule == '0 3 1 * *') ||
-      (github.event_name == 'workflow_dispatch' && (github.event.inputs.cleanup_type == 'tagged' || github.event.inputs.cleanup_type == 'both')) ||
-      (github.event_name == 'pull_request')
+      github.repository_owner == 'rucio' && (
+        (github.event.schedule == '0 3 1 * *') ||
+        (github.event_name == 'workflow_dispatch' && (github.event.inputs.cleanup_type == 'tagged' || github.event.inputs.cleanup_type == 'both')) ||
+        (github.event_name == 'pull_request')
+      )
     steps:
       - name: Delete tagged images older than 30 days
         run: |
