@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import configparser
 from pathlib import Path
 
 import yaml
@@ -19,6 +20,7 @@ import yaml
 COMPOSE_DIR = Path(__file__).resolve().parents[2] / "etc/docker/dev"
 RUNTIME_DOCKERFILE = COMPOSE_DIR.parent / "test/runtime.Dockerfile"
 UNIT_DOCKERFILE = COMPOSE_DIR.parent / "test/unit.Dockerfile"
+DEFAULT_CONFIG = COMPOSE_DIR.parent / "test/extra/rucio_default.cfg"
 
 
 def test_compose_services_do_not_use_global_container_names() -> None:
@@ -61,6 +63,31 @@ def test_compose_omits_unsupported_databases() -> None:
     compose = yaml.safe_load((COMPOSE_DIR / "docker-compose.yml").read_text())
 
     assert "mysql8" not in compose["services"]
+
+
+def test_monitoring_stack_matches_elasticsearch() -> None:
+    compose = yaml.safe_load((COMPOSE_DIR / "docker-compose.yml").read_text())
+    services = compose["services"]
+    version = services["elasticsearch"]["image"].rsplit(":", 1)[1]
+
+    assert services["kibana"]["image"] == (
+        f"docker.elastic.co/kibana/kibana:{version}"
+    )
+    assert "logstash" not in services
+    assert not (COMPOSE_DIR / "pipeline.conf").exists()
+
+    ports = yaml.safe_load((COMPOSE_DIR / "docker-compose.ports.yml").read_text())
+    assert "logstash" not in ports["services"]
+
+
+def test_default_monitoring_uses_direct_elasticsearch() -> None:
+    config = configparser.ConfigParser()
+    config.read(DEFAULT_CONFIG)
+
+    assert config.get("hermes", "services_list") == "elastic"
+    assert config.get("hermes", "elastic_endpoint") == (
+        "http://elasticsearch:9200/rucio-events-dev/_bulk"
+    )
 
 
 def test_test_overlay_consumes_prebuilt_image() -> None:
