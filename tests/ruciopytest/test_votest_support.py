@@ -18,6 +18,7 @@ from typing import Optional
 
 import pytest
 
+from tests.ruciopytest.profiles import iter_cases
 from tests.ruciopytest.votest_support import (
     collect_votest_paths,
     load_matrix,
@@ -27,6 +28,12 @@ from tests.ruciopytest.votest_support import (
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 MATRIX_PATH = REPO_ROOT / "etc/docker/test/matrix_policy_package_tests.yml"
+
+
+def test_policy_matrix_matches_case_registry() -> None:
+    matrix = load_matrix(MATRIX_PATH)
+
+    assert set(matrix) == {case.policy for case in iter_cases("votest")}
 
 
 @pytest.mark.parametrize("policy", ["atlas", "belleii"])
