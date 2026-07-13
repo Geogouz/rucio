@@ -96,6 +96,33 @@ def test_multi_vo_runs_both_legs_in_order(tmp_path: "Path", monkeypatch) -> None
     assert "--junitxml=results-ts2.xml" in _Manager.commands[1]
 
 
+def test_client_case_runs_only_its_test_paths(tmp_path: "Path", monkeypatch) -> None:
+    _reset_manager(monkeypatch)
+    case = get_case("client-py39-postgres14")
+
+    result = runner.run_container_case(case, tmp_path, ())
+
+    assert result == 0
+    assert _Manager.commands[0][-len(case.test_paths):] == case.test_paths
+
+
+def test_explicit_selector_replaces_case_paths(tmp_path: "Path", monkeypatch) -> None:
+    _reset_manager(monkeypatch)
+    case = get_case("client-py39-postgres14")
+    selector = "tests/test_clients.py::test_get_protocols"
+
+    result = runner.run_container_case(
+        case,
+        tmp_path,
+        (selector,),
+        explicit_selectors=(selector,),
+    )
+
+    assert result == 0
+    assert _Manager.commands[0].count(selector) == 1
+    assert "tests/test_bin_rucio.py" not in _Manager.commands[0]
+
+
 def test_multi_vo_stops_after_first_failure(tmp_path: "Path", monkeypatch) -> None:
     _reset_manager(monkeypatch, (1, 0))
 

@@ -88,10 +88,13 @@ def run_container_case(
                 container_environment or {},
                 explicit_selectors,
             )
+        arguments = list(pytest_args)
+        if not explicit_selectors:
+            arguments.extend(case.test_paths)
         return _run_inner_pytest(
             manager,
             case,
-            pytest_args,
+            arguments,
             keep_db=keep_db,
             environment=container_environment,
         )
