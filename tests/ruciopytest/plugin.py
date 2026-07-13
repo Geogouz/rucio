@@ -105,7 +105,10 @@ def pytest_cmdline_main(config: pytest.Config) -> "Optional[int]":
         return None
 
     if config.getoption("list_cases"):
-        print(json.dumps([_case_data(case) for case in iter_cases()]))
+        print(json.dumps([
+            _case_data(_resolve_policy_paths(case, config.rootpath))
+            for case in iter_cases()
+        ]))
         return 0
 
     cases = resolve_requested_cases(config, config.rootpath)
