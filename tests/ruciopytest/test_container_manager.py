@@ -170,9 +170,11 @@ def test_local_image_uses_runtime_dockerfile(tmp_path: "Path", monkeypatch) -> N
     ContainerManager._locally_built_images.clear()
     manager = _manager(tmp_path, image=None)
     commands = []
+    timeouts = []
 
     def run(command, **kwargs):
         commands.append(list(command))
+        timeouts.append(kwargs.get("timeout"))
         return subprocess.CompletedProcess(command, 0, stdout="")
 
     monkeypatch.setattr(manager, "_run", run)
@@ -180,6 +182,7 @@ def test_local_image_uses_runtime_dockerfile(tmp_path: "Path", monkeypatch) -> N
 
     assert commands[0][:3] == ["docker", "buildx", "build"]
     assert str(tmp_path / manager.RUNTIME_DOCKERFILE) in commands[0]
+    assert timeouts[0] == 3600
 
 
 def test_local_runtime_is_built_once_per_interpreter(tmp_path: "Path", monkeypatch) -> None:

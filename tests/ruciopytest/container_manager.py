@@ -361,7 +361,7 @@ class ContainerManager:
             self.image,
             str(self.root_dir),
         ))
-        self._run(command, timeout=1800)
+        self._run(command, timeout=3600)
 
     def _run(
         self,
