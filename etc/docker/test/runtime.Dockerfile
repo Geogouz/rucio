@@ -134,6 +134,21 @@ FROM python AS rucio-runtime
         chmod -R 777 /var/log/rucio && \
         mkdir -p /etc/grid-security
 
+    # Set environment variable for source directory
+    ENV RUCIO_SOURCE_DIR="/rucio_source"
+
+FROM rucio-runtime AS requirements
+    # Install Python dependencies
+    COPY requirements /tmp/requirements
+    RUN dnf -y --skip-broken install make gcc krb5-devel xmlsec1-devel xmlsec1-openssl-devel pkg-config libtool-ltdl-devel git && \
+        python3 -m pip --no-cache-dir install --upgrade pip && \
+        python3 -m pip --no-cache-dir install --upgrade fts3 && \
+        python3 -m pip --no-cache-dir install --upgrade setuptools wheel && \
+        python3 -m pip --no-cache-dir install --upgrade -r /tmp/requirements/requirements.server.txt -r /tmp/requirements/requirements.dev.txt
+    RUN curl https://rclone.org/install.sh | bash
+
+FROM requirements AS final
+
     # Set up Apache configuration
     COPY etc/docker/test/extra/httpd.conf /etc/httpd/conf/httpd.conf
     COPY etc/docker/test/extra/rucio.conf /etc/httpd/conf.d/rucio.conf
@@ -156,21 +171,6 @@ FROM python AS rucio-runtime
     # Copy entrypoint script
     COPY etc/docker/dev/rucio/entrypoint.sh /usr/local/bin/entrypoint.sh
     RUN chmod +x /usr/local/bin/entrypoint.sh
-
-    # Set environment variable for source directory
-    ENV RUCIO_SOURCE_DIR="/rucio_source"
-
-FROM rucio-runtime AS requirements
-    # Install Python dependencies
-    COPY requirements /tmp/requirements
-    RUN dnf -y --skip-broken install make gcc krb5-devel xmlsec1-devel xmlsec1-openssl-devel pkg-config libtool-ltdl-devel git && \
-        python3 -m pip --no-cache-dir install --upgrade pip && \
-        python3 -m pip --no-cache-dir install --upgrade fts3 && \
-        python3 -m pip --no-cache-dir install --upgrade setuptools wheel && \
-        python3 -m pip --no-cache-dir install --upgrade -r /tmp/requirements/requirements.server.txt -r /tmp/requirements/requirements.dev.txt
-    RUN curl https://rclone.org/install.sh | bash
-
-FROM requirements AS final
 
     COPY --from=gfal2 /usr/include/gfal2 /usr/include/gfal2
     COPY --from=gfal2 /usr/lib64/* /usr/lib64/
