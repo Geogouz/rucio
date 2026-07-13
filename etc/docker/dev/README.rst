@@ -30,50 +30,72 @@ First, fork the `main Rucio repository on GitHub <https://github.com/rucio/rucio
 
 Now, ensure that the `.git/config` is proper, i.e., mentioning your full name and email address, and create the `.githubtoken` file that contains a full access token from `Github Account Settings <https://github.com/settings/tokens>`_.
 
-Next, startup the Rucio development environment with docker-compose. There are three different types: a standard one to just run the unittests and do basic development, which includes just Rucio without any transfer capabilities. One slightly larger one, which includes the File Transfer Service (FTS) and three XrootD storage servers to develop upload/download and transfers capabilities. And a third large one, which adds the full monitoring stack with Logstash, Elasticsearch, Kibana and Grafana.
+Next, start the Rucio development environment with Docker Compose. There are three variants: a standard environment for basic development, one which adds the File Transfer Service (FTS) and storage servers, and one which also adds the monitoring stack.
 
 *Note: if you are running with SELinux enabled, you might run into problems. Check troubleshooting with SELinux on the help pages of your container runtime environment.*
 
 Using the standard environment
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Run the containers using docker-compose (again might need `sudo`)::
+Run the containers using Docker Compose (again might need `sudo`)::
 
     docker compose --file etc/docker/dev/docker-compose.yml up -d
 
 And verify that it is running properly::
 
-    docker ps
+    docker compose --file etc/docker/dev/docker-compose.yml ps
 
 This should show you a few running containers: the Rucio server, the PostgreSQL database and the Graphite monitoring.
 
 Finally, you can jump into the container with::
 
-    docker exec -it dev-rucio-1 /bin/bash
+    docker compose --file etc/docker/dev/docker-compose.yml exec rucio /bin/bash
 
-To verify that everything is in order, you can now either run the full unit tests or only set up the database. Running the full testing suite takes ~10 minutes::
+Initialize the catalogue in an existing development container with the same setup implementation used by the test runner::
 
-    tools/run_tests.sh
+    docker compose --file etc/docker/dev/docker-compose.yml exec rucio \
+        python -m tests.ruciopytest.infra_manager \
+        --case remote-dbs-py39-postgres14
 
-Alternatively, you can bootstrap the test environment once with the `-i` option and then selectively or repeatedly run test case modules, test case groups, or even single test cases, for example::
+Running tests
+~~~~~~~~~~~~~
 
-    tools/run_tests.sh -i
-    tools/pytest.sh tests/test_replica.py
-    tools/pytest.sh -vvv tests/test_replica.py::TestReplicaCore
-    tools/pytest.sh -vvv --full-trace tests/test_replica.py::TestReplicaCore::test_delete_replicas
+The test runner creates its own isolated Compose project, so a development stack does not need to be running first. Install only its host-side orchestration dependencies::
+
+    python -m pip install --constraint requirements/requirements.dev.txt pytest pyyaml
+
+List the 15 canonical local and CI cases, or run all of them::
+
+    python -m pytest --list-cases
+    python -m pytest --suite=all
+
+Run one case, one module, or one test::
+
+    python -m pytest --case=remote-dbs-py39-postgres14
+    python -m pytest --case=remote-dbs-py39-postgres14 tests/test_replica.py
+    python -m pytest --case=remote-dbs-py39-postgres14 \
+        tests/test_replica.py::TestReplicaCore::test_delete_replicas
+
+All normal pytest arguments are forwarded. For example, ``-k``, ``-x``, ``--pdb``, coverage options, and JUnit output work as usual. ``--keep-db`` retains only the selected case's database volume between runs. The supported server test databases are PostgreSQL and Oracle; MySQL and SQLite are not development test targets.
 
 Using the environment including storage
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Again run the containers using docker-compose::
+Again run the containers using Docker Compose::
 
     docker compose --file etc/docker/dev/docker-compose.yml --profile storage up -d
 
 This should show you a few more running containers: the Rucio server, the PostgreSQL database, FTS and its associated MySQL database, the Graphite monitoring, and three XrootD storage servers.
 
-With this container you can upload and download data to/from the storage and submit data transfers. To set this up, add the `-r` option to the setup.::
+With this environment you can upload and download data and submit transfers. Initialize the catalogue and storage RSEs with::
 
-    tools/run_tests.sh -ir
+    docker compose --file etc/docker/dev/docker-compose.yml --profile storage exec rucio \
+        python -m tests.ruciopytest.infra_manager \
+        --case integration-py39-postgres14
+
+Run the complete storage and external-metadata integration case in an isolated environment with::
+
+    python -m pytest --case=integration-py39-postgres14
 
 This creates a few random files and uploads them, creates a few datasets and containers, and requests a replication rule for the container, which starts in state REPLICATING. To demonstrate the transfer capability, the daemons can be run in single-execution mode in order:::
 
@@ -91,7 +113,7 @@ On the second display of the rule, its state has cleared to OK.
 Using the environment including monitoring
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Again run the containers using docker-compose::
+Again run the containers using Docker Compose::
 
     docker compose --file etc/docker/dev/docker-compose.yml --profile storage --profile monitoring up -d
 
@@ -100,7 +122,10 @@ Now you will have the same containers as before plus a full monitoring stack wit
 
 To create some events and write them to Elasticsearch first run again the tests as before::
 
-    tools/run_tests.sh -ir
+    docker compose --file etc/docker/dev/docker-compose.yml \
+        --profile storage --profile monitoring exec rucio \
+        python -m tests.ruciopytest.infra_manager \
+        --case integration-py39-postgres14
 
 
 Then you will have to run the transfer daemons (conveyor-\*) and messaging daemon (hermes) to send the events to ActiveMQ. There a script for that which repeats these daemons in single execution mode from the section in a loop::
@@ -134,13 +159,13 @@ To see your changes in action the recommended way is to jump twice into the cont
 
 From your host, get a separate Terminal 1 (the Rucio "server log show")::
 
-    docker exec -it dev-rucio-1 /bin/bash
+    docker compose --file etc/docker/dev/docker-compose.yml exec rucio /bin/bash
     logshow
 
 
 Terminal 1 can now be left open, and then from your host go into a new Terminal 2 (the "interactive" terminal)::
 
-    docker exec -it dev-rucio-1 /bin/bash
+    docker compose --file etc/docker/dev/docker-compose.yml exec rucio /bin/bash
     rucio whoami
 
 
@@ -148,7 +173,7 @@ The command will output in Terminal 2, and at the same time the server debug out
 
 The same `logshow` is also available in the FTS container::
 
-    docker exec -it dev-fts-1 /bin/bash
+    docker compose --file etc/docker/dev/docker-compose.yml --profile storage exec fts /bin/bash
     logshow
 
 
@@ -214,7 +239,8 @@ Start the daemons
 
 Daemons are not running in the docker environment, but all daemons support single-execution mode with the --run-once argument. Reset the system first with::
 
-    tools/run_tests.sh -ir
+    python -m tests.ruciopytest.infra_manager \
+        --case integration-py39-postgres14
 
 
 Some files are created. Let's add them to a new dataset::
