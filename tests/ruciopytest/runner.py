@@ -252,7 +252,6 @@ def _run_integration(
             )
         return result
 
-    filtered = _has_collection_filter(pytest_args)
     matched = False
     for index, selector in enumerate(case.test_paths):
         arguments = qualify_junit(pytest_args, f"{index + 1:02d}")
@@ -273,7 +272,7 @@ def _run_integration(
             keep_db=keep_db or index > 0,
             environment=environment,
         )
-        if result == pytest.ExitCode.NO_TESTS_COLLECTED and filtered:
+        if result == pytest.ExitCode.NO_TESTS_COLLECTED:
             continue
         if result:
             return result
@@ -422,16 +421,6 @@ def _has_coverage_option(arguments: "Sequence[str]") -> bool:
 def _coverage_enabled(arguments: "Sequence[str]") -> bool:
     return "--no-cov" not in arguments and any(
         argument == "--cov" or argument.startswith("--cov=")
-        for argument in arguments
-    )
-
-
-def _has_collection_filter(arguments: "Sequence[str]") -> bool:
-    return any(
-        argument == "-k"
-        or argument.startswith("-k")
-        or argument == "-m"
-        or argument.startswith("-m")
         for argument in arguments
     )
 

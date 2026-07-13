@@ -215,7 +215,7 @@ def test_integration_preserves_tpc_postcheck_order(tmp_path: "Path", monkeypatch
     )
 
 
-def test_integration_filter_continues_past_unmatched_paths(
+def test_integration_continues_past_empty_filtered_paths(
     tmp_path: "Path",
     monkeypatch,
 ) -> None:
@@ -224,7 +224,7 @@ def test_integration_filter_continues_past_unmatched_paths(
     result = runner.run_container_case(
         get_case("integration-py39-postgres14"),
         tmp_path,
-        ("-k", "tpc"),
+        ("--lf",),
     )
 
     assert result == 0
