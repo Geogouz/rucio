@@ -167,7 +167,7 @@ def iter_cases(group: "Optional[str]" = None) -> "Iterator[TestCase]":
                         env_vars=env_vars,
                         xdist_enabled=(
                             definition.xdist_enabled
-                            and rdbms in _XDIST_RDBMS
+                            and (not rdbms or rdbms in _XDIST_RDBMS)
                         ),
                     )
 

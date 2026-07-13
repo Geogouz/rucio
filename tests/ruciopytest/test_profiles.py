@@ -79,6 +79,10 @@ def test_cases_derive_compose_profiles() -> None:
     )
 
 
+def test_database_free_unit_cases_support_xdist() -> None:
+    assert get_case("unit-py39").xdist_enabled
+
+
 def test_every_selector_exists() -> None:
     for definition in SUITE_DEFINITIONS.values():
         for selector in definition.test_paths:
