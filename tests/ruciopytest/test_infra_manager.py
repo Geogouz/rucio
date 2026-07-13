@@ -42,6 +42,7 @@ def _mock_setup_steps(manager: InfraManager, monkeypatch) -> Mock:
     for method in (
         "_ensure_memcached",
         "_cleanup_temporary_state",
+        "_wait_for_database",
         "_database_initialized",
         "_reset_database",
         "_run_alembic_migration",
@@ -63,6 +64,7 @@ def test_standard_setup_preserves_initialization_order(tmp_path: "Path", monkeyp
     assert calls.mock_calls == [
         call._ensure_memcached(),
         call._cleanup_temporary_state(),
+        call._wait_for_database(),
         call._reset_database(),
         call._run_alembic_migration(),
         call._restart_httpd(),

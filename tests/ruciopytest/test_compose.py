@@ -29,6 +29,15 @@ def test_compose_services_do_not_use_global_container_names() -> None:
     )
 
 
+def test_database_services_have_healthchecks() -> None:
+    compose = yaml.safe_load((COMPOSE_DIR / "docker-compose.yml").read_text())
+
+    assert all(
+        "healthcheck" in compose["services"][service]
+        for service in ("postgres14", "mysql8", "oracle")
+    )
+
+
 def test_test_overlay_consumes_prebuilt_image() -> None:
     compose = yaml.safe_load(
         (COMPOSE_DIR / "docker-compose.test.yml").read_text()

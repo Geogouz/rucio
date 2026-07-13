@@ -62,6 +62,7 @@ class InfraManager:
         if self.case.policy:
             self._apply_policy()
 
+        self._wait_for_database()
         database_ready = self.keep_db and self._database_initialized()
         second_vo = self.case.suite == "multi_vo" and multi_vo_leg == "ts2"
         if not database_ready and not second_vo:
@@ -92,6 +93,12 @@ class InfraManager:
             return "accounts" in inspect(get_engine()).get_table_names()
         except Exception:
             return False
+
+    @staticmethod
+    def _wait_for_database() -> None:
+        from rucio.db.sqla.session import wait_for_database
+
+        wait_for_database()
 
     def _reset_database(self) -> None:
         sqlite_database = Path("/tmp/rucio.db")

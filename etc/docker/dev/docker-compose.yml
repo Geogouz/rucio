@@ -70,6 +70,9 @@ services:
       postgres14:
         condition: service_healthy
         required: false
+      mysql8:
+        condition: service_healthy
+        required: false
       elasticsearch:
         condition: service_healthy
         required: false
@@ -184,6 +187,12 @@ services:
       - "--character-set-server=latin1"
     volumes:
       - vol-mysql8-mysql:/var/lib/mysql
+    healthcheck:
+      test: [ "CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -P 3308 -urucio -prucio" ]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 10
 
   oracle:
     image: docker.io/gvenzl/oracle-xe:18.4.0
