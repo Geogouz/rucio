@@ -524,6 +524,11 @@ def test_case_workers_require_positive_suite_selection() -> None:
             _Config(case="unit-py39", case_workers=2),
             REPO_ROOT,
         )
+    with pytest.raises(pytest.UsageError, match="cannot be negative"):
+        plugin.resolve_requested_cases(
+            _Config(case="unit-py39", xdist_workers=-1),
+            REPO_ROOT,
+        )
 
 
 def test_all_dry_run_json_is_machine_readable(capsys) -> None:

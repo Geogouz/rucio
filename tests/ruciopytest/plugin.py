@@ -328,8 +328,11 @@ def resolve_requested_cases(
     suite = config.getoption("suite")
     policy = config.getoption("policy")
     case_workers = config.getoption("case_workers")
+    xdist_workers = config.getoption("xdist_workers")
     if case_workers is not None and case_workers < 1:
         raise pytest.UsageError("--case-workers must be at least 1")
+    if xdist_workers is not None and xdist_workers < 0:
+        raise pytest.UsageError("--xdist-workers cannot be negative")
     if case_id and suite:
         raise pytest.UsageError("--case and --suite are mutually exclusive")
     if case_id and case_workers is not None:
