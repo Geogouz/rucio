@@ -60,22 +60,6 @@ class TestCase:
         return "-".join(parts)
 
 
-@dataclass(frozen=True)
-class SuiteProfile:
-    name: str
-    rdbms: str
-    compose_profiles: tuple[str, ...] = ()
-    xdist_enabled: bool = True
-    run_in_container: bool = True
-    default_workers_ci: int = 3
-    default_workers_local: str = "auto"
-    test_paths: tuple[str, ...] = ("tests/",)
-    markers: tuple[str, ...] = ()
-    exclude_paths: tuple[str, ...] = ()
-    env_vars: dict[str, str] = field(default_factory=dict)
-    policy: "Optional[str]" = None
-
-
 SUITE_DEFINITIONS: dict[str, SuiteDefinition] = {
     "unit": SuiteDefinition(
         name="unit",
@@ -190,38 +174,3 @@ def get_case(case_id: str) -> TestCase:
         if case.id == case_id:
             return case
     raise ValueError(f"Unknown test case {case_id!r}")
-
-
-def resolve_profile(
-    suite_name: str,
-    rdbms_override: "Optional[str]" = None,
-) -> SuiteProfile:
-    if suite_name not in SUITE_DEFINITIONS:
-        raise ValueError(
-            f"Unknown suite: {suite_name!r}. Available: {sorted(SUITE_DEFINITIONS)}"
-        )
-
-    definition = SUITE_DEFINITIONS[suite_name]
-    rdbms = rdbms_override or (definition.rdbms[0] if definition.rdbms else "")
-    profiles = definition.compose_profiles
-    if rdbms and rdbms != "sqlite":
-        profiles = (rdbms, *profiles)
-    xdist_enabled = definition.xdist_enabled and rdbms in _XDIST_RDBMS
-    return SuiteProfile(
-        name=definition.name,
-        rdbms=rdbms,
-        compose_profiles=profiles,
-        xdist_enabled=xdist_enabled,
-        run_in_container=definition.name != "unit",
-        default_workers_ci=3 if xdist_enabled else 0,
-        default_workers_local="auto" if xdist_enabled else "0",
-        test_paths=definition.test_paths,
-        exclude_paths=definition.exclude_paths,
-        env_vars=definition.env_vars,
-    )
-
-
-SUITE_PROFILES = {
-    name: resolve_profile(name)
-    for name in SUITE_DEFINITIONS
-}

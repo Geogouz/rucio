@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from .profiles import SUITE_DEFINITIONS, get_case, iter_cases, resolve_profile
+from .profiles import SUITE_DEFINITIONS, get_case, iter_cases
 
 
 def test_case_registry_covers_current_ci() -> None:
@@ -59,10 +59,10 @@ def test_case_ids_include_every_axis() -> None:
         get_case("remote-dbs")
 
 
-def test_profiles_derive_compose_profiles_from_cases() -> None:
-    assert resolve_profile("remote_dbs", "mysql8").compose_profiles == ("mysql8",)
-    assert resolve_profile("sqlite").compose_profiles == ()
-    assert resolve_profile("integration").compose_profiles == (
+def test_cases_derive_compose_profiles() -> None:
+    assert get_case("remote-dbs-py39-mysql8").compose_profiles == ("mysql8",)
+    assert get_case("sqlite-py39-sqlite").compose_profiles == ()
+    assert get_case("integration-py39-postgres14").compose_profiles == (
         "postgres14",
         "storage",
         "externalmetadata",
