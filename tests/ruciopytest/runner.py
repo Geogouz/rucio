@@ -252,9 +252,9 @@ def run_unit_case(
         "--log-level=DEBUG",
         "-p",
         "rerunfailures",
+        "-p",
+        "xdist",
     ))
-    if has_xdist_option(pytest_args):
-        command.extend(("-p", "xdist"))
     if _has_coverage_option(pytest_args):
         command.extend(("-p", "pytest_cov"))
     command.extend(pytest_args)
@@ -456,9 +456,10 @@ def _run_inner_pytest(
         "--ignore=tests/ruciopytest",
         "-p",
         "rerunfailures",
+        "-p",
+        "xdist",
     ]
     if case.xdist_enabled:
-        command.extend(("-p", "xdist"))
         if not has_xdist_option(pytest_args):
             workers = "3" if manager.environment.get("GITHUB_ACTIONS") == "true" else "auto"
             command.append(f"--numprocesses={workers}")

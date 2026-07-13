@@ -519,6 +519,7 @@ def test_postgres_uses_ci_worker_count(tmp_path: "Path", monkeypatch) -> None:
     )
 
     assert "--numprocesses=3" in _Manager.commands[0]
+    assert _Manager.commands[0].count("xdist") == 1
 
 
 def test_user_xdist_setting_is_preserved(tmp_path: "Path", monkeypatch) -> None:
@@ -535,6 +536,20 @@ def test_user_xdist_setting_is_preserved(tmp_path: "Path", monkeypatch) -> None:
     assert _Manager.commands[0].count("-n") == 1
     assert _Manager.commands[0].count("xdist") == 1
     assert "--numprocesses=auto" not in _Manager.commands[0]
+
+
+def test_serial_case_loads_xdist_parser(tmp_path: "Path", monkeypatch) -> None:
+    _reset_manager(monkeypatch)
+    manager = _Manager(get_case("remote-dbs-py39-oracle"), tmp_path)
+
+    runner._run_inner_pytest(
+        manager,
+        manager.case,
+        ("--maxprocesses=2",),
+        keep_db=False,
+    )
+
+    assert _Manager.commands[0].count("xdist") == 1
 
 
 def test_inner_coverage_plugin_is_loaded(tmp_path: "Path", monkeypatch) -> None:
