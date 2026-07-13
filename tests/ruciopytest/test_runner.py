@@ -26,6 +26,7 @@ class _Manager:
     results: list[int] = []
     commands: list[tuple[str, ...]] = []
     environments: list[dict[str, str]] = []
+    stops: list[bool] = []
 
     def __init__(self, case, root_dir, keep_db=False):
         self.case = case
@@ -38,6 +39,12 @@ class _Manager:
 
     def __exit__(self, *args):
         return None
+
+    def start(self):
+        return None
+
+    def stop(self, *, check=True):
+        self.stops.append(check)
 
     def exec(
         self,
@@ -59,6 +66,7 @@ def _reset_manager(monkeypatch, results=()):
     _Manager.results = list(results)
     _Manager.commands = []
     _Manager.environments = []
+    _Manager.stops = []
     monkeypatch.setattr(runner, "ContainerManager", _Manager)
 
 
@@ -134,6 +142,7 @@ def test_multi_vo_stops_after_first_failure(tmp_path: "Path", monkeypatch) -> No
 
     assert result == 1
     assert len(_Manager.commands) == 1
+    assert _Manager.stops == [False]
 
 
 def test_integration_preserves_tpc_postcheck_order(tmp_path: "Path", monkeypatch) -> None:

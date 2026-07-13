@@ -73,17 +73,19 @@ def run_container_case(
     container_environment: "Optional[Mapping[str, str]]" = None,
     explicit_selectors: "Sequence[str]" = (),
 ) -> int:
-    with ContainerManager(case, root_dir, keep_db=keep_db) as manager:
+    manager = ContainerManager(case, root_dir, keep_db=keep_db)
+    manager.start()
+    try:
         if case.suite == "multi_vo":
-            return _run_multi_vo(
+            result = _run_multi_vo(
                 manager,
                 case,
                 pytest_args,
                 keep_db,
                 container_environment or {},
             )
-        if case.suite == "integration":
-            return _run_integration(
+        elif case.suite == "integration":
+            result = _run_integration(
                 manager,
                 case,
                 pytest_args,
@@ -91,16 +93,22 @@ def run_container_case(
                 container_environment or {},
                 explicit_selectors,
             )
-        arguments = list(pytest_args)
-        if not explicit_selectors:
-            arguments.extend(case.test_paths)
-        return _run_inner_pytest(
-            manager,
-            case,
-            arguments,
-            keep_db=keep_db,
-            environment=container_environment,
-        )
+        else:
+            arguments = list(pytest_args)
+            if not explicit_selectors:
+                arguments.extend(case.test_paths)
+            result = _run_inner_pytest(
+                manager,
+                case,
+                arguments,
+                keep_db=keep_db,
+                environment=container_environment,
+            )
+    except BaseException:
+        manager.stop(check=False)
+        raise
+    manager.stop(check=result == 0)
+    return result
 
 
 def run_unit_case(

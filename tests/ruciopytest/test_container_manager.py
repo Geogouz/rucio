@@ -307,7 +307,11 @@ def test_failed_cleanup_can_be_retried(tmp_path: "Path", monkeypatch) -> None:
     assert manager._stopped
 
 
-def test_cleanup_failure_does_not_hide_test_failure(tmp_path: "Path", monkeypatch) -> None:
+def test_cleanup_failure_does_not_hide_test_failure(
+    tmp_path: "Path",
+    monkeypatch,
+    capsys,
+) -> None:
     manager = _manager(tmp_path)
 
     def run(command, **kwargs):
@@ -319,3 +323,4 @@ def test_cleanup_failure_does_not_hide_test_failure(tmp_path: "Path", monkeypatc
     manager.__exit__(ValueError, ValueError("test failed"), None)
 
     assert not manager._stopped
+    assert "Warning: Failed to clean up test project" in capsys.readouterr().err

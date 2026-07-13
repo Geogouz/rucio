@@ -18,6 +18,7 @@ import json
 import os
 import secrets
 import subprocess  # noqa: S404
+import sys
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -194,10 +195,11 @@ class ContainerManager:
             cleanup_error = error
         finally:
             self._release_project_lock()
-        if check and cleanup_failed:
-            raise RuntimeError(
-                f"Failed to clean up test project {self.project_name}"
-            ) from cleanup_error
+        if cleanup_failed:
+            message = f"Failed to clean up test project {self.project_name}"
+            if check:
+                raise RuntimeError(message) from cleanup_error
+            print(f"Warning: {message}", file=sys.stderr)
 
     def compose_command(self, *arguments: str) -> list[str]:
         command = ["docker", "compose", "-p", self.project_name]
