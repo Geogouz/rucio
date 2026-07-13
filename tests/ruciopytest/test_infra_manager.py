@@ -74,14 +74,14 @@ def test_standard_setup_preserves_initialization_order(tmp_path: "Path", monkeyp
     ]
 
 
-def test_keep_db_skips_only_database_reset(tmp_path: "Path", monkeypatch) -> None:
+def test_keep_db_skips_destructive_database_setup(tmp_path: "Path", monkeypatch) -> None:
     manager = _manager(tmp_path, keep_db=True)
     calls = _mock_setup_steps(manager, monkeypatch)
 
     manager.setup()
 
     calls._reset_database.assert_not_called()
-    calls._run_alembic_migration.assert_called_once()
+    calls._run_alembic_migration.assert_not_called()
     assert calls._run_tool.call_count == 3
 
 

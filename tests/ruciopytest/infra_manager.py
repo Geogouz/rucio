@@ -67,7 +67,7 @@ class InfraManager:
         second_vo = self.case.suite == "multi_vo" and multi_vo_leg == "ts2"
         if not database_ready and not second_vo:
             self._reset_database()
-        if not second_vo:
+        if not database_ready and not second_vo:
             self._run_alembic_migration()
 
         self._restart_httpd()
