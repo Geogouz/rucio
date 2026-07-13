@@ -26,6 +26,10 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 class _Config:
+    class ArgsSource:
+        ARGS = object()
+        TESTPATHS = object()
+
     def __init__(self, **options) -> None:
         defaults = {
             "case": None,
@@ -43,6 +47,7 @@ class _Config:
         self.options = defaults
         self.rootpath = REPO_ROOT
         self.args = ["tests"]
+        self.args_source = self.ArgsSource.TESTPATHS
         self.invocation_params = SimpleNamespace(args=())
         self.stash = pytest.Stash()
 
@@ -140,6 +145,7 @@ def test_runner_options_require_case_or_suite(options: dict) -> None:
 def test_container_case_forwards_standard_pytest_args(monkeypatch) -> None:
     config = _Config(case="remote-dbs-py39-postgres14")
     config.args = ["tests/test_rule.py::test_rule"]
+    config.args_source = config.ArgsSource.ARGS
     config.invocation_params = SimpleNamespace(args=(
         "--case=remote-dbs-py39-postgres14",
         "-k",
@@ -163,6 +169,26 @@ def test_container_case_forwards_standard_pytest_args(monkeypatch) -> None:
     assert captured["kwargs"]["explicit_selectors"] == (
         "tests/test_rule.py::test_rule",
     )
+
+
+def test_implicit_testpaths_are_not_explicit_selectors(monkeypatch) -> None:
+    config = _Config(case="client-py39-postgres14")
+    config.invocation_params = SimpleNamespace(args=(
+        "--case=client-py39-postgres14",
+        "-k",
+        "tests",
+    ))
+    captured = {}
+
+    def run(case, root_path, pytest_args, **kwargs):
+        captured.update(args=pytest_args, kwargs=kwargs)
+        return 0
+
+    monkeypatch.setattr(plugin.runner, "run_container_case", run)
+
+    assert plugin.pytest_cmdline_main(config) == 0
+    assert captured["args"] == ["-k", "tests"]
+    assert captured["kwargs"]["explicit_selectors"] == ()
 
 
 def test_container_case_forwards_pytest_addopts(monkeypatch) -> None:

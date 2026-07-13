@@ -139,11 +139,7 @@ def pytest_cmdline_main(config: pytest.Config) -> "Optional[int]":
         return 0
 
     outer_args = runner.outer_pytest_args(config.invocation_params.args)
-    explicit_selectors = tuple(
-        selector
-        for selector in config.args
-        if selector in outer_args
-    )
+    explicit_selectors = _explicit_selectors(config)
     pytest_args = runner.forwarded_pytest_args(outer_args)
     workers = config.getoption("xdist_workers")
     if workers is not None:
@@ -201,11 +197,7 @@ def _run_cases(
         )
 
     outer_args = runner.outer_pytest_args(config.invocation_params.args)
-    explicit_selectors = tuple(
-        selector
-        for selector in config.args
-        if selector in outer_args
-    )
+    explicit_selectors = _explicit_selectors(config)
     pytest_args = runner.forwarded_pytest_args(outer_args)
     workers = config.getoption("xdist_workers")
     if workers is not None:
@@ -377,6 +369,12 @@ def _parse_environment(values: "Sequence[str]") -> dict[str, str]:
             )
         environment[key] = item
     return environment
+
+
+def _explicit_selectors(config: pytest.Config) -> tuple[str, ...]:
+    if config.args_source is config.ArgsSource.ARGS:
+        return tuple(config.args)
+    return ()
 
 
 def _case_data(case: "TestCase") -> dict:
