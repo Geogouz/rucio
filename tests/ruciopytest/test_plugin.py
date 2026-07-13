@@ -118,6 +118,22 @@ def test_dry_run_does_not_start_containers(monkeypatch, capsys) -> None:
     assert "remote-dbs-py39-postgres14" in capsys.readouterr().out
 
 
+@pytest.mark.parametrize(
+    "options",
+    (
+        {"keep_db": True},
+        {"dry_run": True},
+        {"dry_run_json": True},
+        {"container_env": ["DEBUG=1"]},
+        {"xdist_workers": 2},
+        {"policy": "atlas"},
+    ),
+)
+def test_runner_options_require_case_or_suite(options: dict) -> None:
+    with pytest.raises(pytest.UsageError, match="require --case or --suite"):
+        plugin.resolve_requested_cases(_Config(**options), REPO_ROOT)
+
+
 def test_container_case_forwards_standard_pytest_args(monkeypatch) -> None:
     config = _Config(case="remote-dbs-py39-postgres14")
     config.args = ["tests/test_rule.py::test_rule"]

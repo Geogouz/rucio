@@ -247,6 +247,17 @@ def resolve_requested_cases(
     policy = config.getoption("policy")
     if case_id and suite:
         raise pytest.UsageError("--case and --suite are mutually exclusive")
+    if not case_id and not suite and any((
+        config.getoption("keep_db"),
+        config.getoption("dry_run"),
+        config.getoption("dry_run_json"),
+        config.getoption("container_env"),
+        config.getoption("xdist_workers") is not None,
+        policy,
+    )):
+        raise pytest.UsageError(
+            "Rucio runner options require --case or --suite"
+        )
     if case_id:
         try:
             case = get_case(case_id)
