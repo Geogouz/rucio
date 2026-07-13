@@ -15,6 +15,8 @@
 import subprocess  # noqa: S404
 from typing import TYPE_CHECKING
 
+import pytest
+
 from tests.ruciopytest import runner
 from tests.ruciopytest.profiles import get_case
 
@@ -27,6 +29,7 @@ class _Manager:
     commands: list[tuple[str, ...]] = []
     environments: list[dict[str, str]] = []
     stops: list[bool] = []
+    artifact = "/fts/log/*__transfer-id"
 
     def __init__(self, case, root_dir, keep_db=False):
         self.case = case
@@ -57,7 +60,11 @@ class _Manager:
         self.commands.append((service, *arguments))
         self.environments.append(dict(environment or {}))
         if arguments[:2] == ("cat", "/tmp/test_tpc.artifact"):
-            return subprocess.CompletedProcess(arguments, 0, stdout="/fts/log\n")
+            return subprocess.CompletedProcess(
+                arguments,
+                int(self.artifact is None),
+                stdout=f"{self.artifact}\n" if self.artifact else "",
+            )
         result = self.results.pop(0) if self.results else 0
         return subprocess.CompletedProcess(arguments, result, stdout="")
 
@@ -67,6 +74,7 @@ def _reset_manager(monkeypatch, results=()):
     _Manager.commands = []
     _Manager.environments = []
     _Manager.stops = []
+    _Manager.artifact = "/fts/log/*__transfer-id"
     monkeypatch.setattr(runner, "ContainerManager", _Manager)
 
 
@@ -194,11 +202,11 @@ def test_integration_preserves_tpc_postcheck_order(tmp_path: "Path", monkeypatch
     assert result == 0
     pytest_commands = [command for command in _Manager.commands if "pytest" in command]
     cat_index = next(index for index, command in enumerate(_Manager.commands) if command[1:3] == ("cat", "/tmp/test_tpc.artifact"))
-    grep_index = next(index for index, command in enumerate(_Manager.commands) if command[1:3] == ("grep", "-Fq"))
+    verify_index = next(index for index, command in enumerate(_Manager.commands) if command[1:3] == ("bash", "-c"))
     assert len(pytest_commands) == 15
-    assert _Manager.commands.index(pytest_commands[0]) < cat_index < grep_index
+    assert _Manager.commands.index(pytest_commands[0]) < cat_index < verify_index
     assert _Manager.commands.index(pytest_commands[9]) < cat_index
-    assert grep_index < _Manager.commands.index(pytest_commands[10])
+    assert verify_index < _Manager.commands.index(pytest_commands[10])
     assert "RUCIO_SKIP_TEST_SETUP" not in _Manager.environments[0]
     assert all(
         environment["RUCIO_SKIP_TEST_SETUP"] == "1"
@@ -221,7 +229,67 @@ def test_integration_filter_continues_past_unmatched_paths(
 
     assert result == 0
     assert len([command for command in _Manager.commands if "pytest" in command]) == 15
-    assert any(command[1:3] == ("grep", "-Fq") for command in _Manager.commands)
+    assert any(command[1:3] == ("bash", "-c") for command in _Manager.commands)
+
+
+def test_integration_broad_selector_verifies_exported_tpc(
+    tmp_path: "Path",
+    monkeypatch,
+) -> None:
+    _reset_manager(monkeypatch)
+
+    result = runner.run_container_case(
+        get_case("integration-py39-postgres14"),
+        tmp_path,
+        ("tests/",),
+        explicit_selectors=("tests/",),
+    )
+
+    assert result == 0
+    assert "--export-artifacts-from=test_tpc" in _Manager.commands[0]
+    verify = next(
+        command for command in _Manager.commands
+        if command[1:3] == ("bash", "-c")
+    )
+    assert verify[-1] == "/fts/log/*__transfer-id"
+
+
+def test_integration_collect_only_skips_missing_tpc_artifact(
+    tmp_path: "Path",
+    monkeypatch,
+) -> None:
+    _reset_manager(monkeypatch)
+    _Manager.artifact = None
+
+    result = runner.run_container_case(
+        get_case("integration-py39-postgres14"),
+        tmp_path,
+        ("--collect-only", "tests/"),
+        explicit_selectors=("tests/",),
+    )
+
+    assert result == 0
+    assert not any(
+        command[1:3] == ("bash", "-c")
+        for command in _Manager.commands
+    )
+
+
+def test_integration_tpc_requires_exported_artifact(
+    tmp_path: "Path",
+    monkeypatch,
+) -> None:
+    _reset_manager(monkeypatch)
+    _Manager.artifact = None
+    selector = "tests/test_tpc.py"
+
+    with pytest.raises(RuntimeError, match="did not export"):
+        runner.run_container_case(
+            get_case("integration-py39-postgres14"),
+            tmp_path,
+            (selector,),
+            explicit_selectors=(selector,),
+        )
 
 
 def test_integration_filter_fails_when_nothing_matches(

@@ -237,8 +237,7 @@ def _run_integration(
     if explicit_selectors:
         selected_tpc = any("test_tpc.py" in path for path in explicit_selectors)
         selected_args = list(pytest_args)
-        if selected_tpc:
-            selected_args.append("--export-artifacts-from=test_tpc")
+        selected_args.append("--export-artifacts-from=test_tpc")
         result = _run_inner_pytest(
             manager,
             case,
@@ -246,8 +245,11 @@ def _run_integration(
             keep_db=keep_db,
             environment=container_environment,
         )
-        if result == 0 and selected_tpc:
-            _verify_tpc_transfer(manager)
+        if result == 0:
+            _verify_tpc_transfer(
+                manager,
+                required=selected_tpc and _executes_tests(pytest_args),
+            )
         return result
 
     filtered = _has_collection_filter(pytest_args)
@@ -277,20 +279,43 @@ def _run_integration(
             return result
         matched = True
         if "test_tpc.py" in selector:
-            _verify_tpc_transfer(manager)
+            _verify_tpc_transfer(
+                manager,
+                required=_executes_tests(pytest_args),
+            )
     return 0 if matched else pytest.ExitCode.NO_TESTS_COLLECTED
 
 
-def _verify_tpc_transfer(manager: ContainerManager) -> None:
-    artifact = manager.exec(
+def _verify_tpc_transfer(
+    manager: ContainerManager,
+    *,
+    required: bool,
+) -> None:
+    exported = manager.exec(
         "rucio",
         "cat",
         "/tmp/test_tpc.artifact",
+        check=False,
         capture_output=True,
-    ).stdout.strip()
+    )
+    if exported.returncode:
+        if required:
+            raise RuntimeError("TPC test did not export its FTS log path")
+        return
+    artifact = exported.stdout.strip()
     if not artifact:
         raise RuntimeError("TPC test did not export its FTS log path")
-    manager.exec("fts", "grep", "-Fq", "3rd pull", artifact)
+    manager.exec(
+        "fts",
+        "bash",
+        "-c",
+        (
+            'mapfile -t files < <(compgen -G "$1"); '
+            '((${#files[@]})) && grep -Fq "3rd pull" "${files[@]}"'
+        ),
+        "verify-tpc",
+        artifact,
+    )
 
 
 def _run_inner_pytest(
@@ -409,6 +434,18 @@ def _has_collection_filter(arguments: "Sequence[str]") -> bool:
         or argument.startswith("-m")
         for argument in arguments
     )
+
+
+def _executes_tests(arguments: "Sequence[str]") -> bool:
+    info_options = {
+        "--co",
+        "--collect-only",
+        "--fixtures",
+        "--fixtures-per-test",
+        "--funcargs",
+        "--setup-plan",
+    }
+    return info_options.isdisjoint(arguments)
 
 
 def _is_interactive(arguments: "Sequence[str]") -> bool:
