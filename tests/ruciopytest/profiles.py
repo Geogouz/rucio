@@ -85,12 +85,14 @@ SUITE_DEFINITIONS: dict[str, SuiteDefinition] = {
         group="autotest",
         python_versions=("3.9", "3.10"),
         rdbms=("oracle", "postgres14"),
+        compose_profiles=("test-dependencies",),
     ),
     "multi_vo": SuiteDefinition(
         name="multi_vo",
         group="autotest",
         python_versions=("3.9", "3.10"),
         rdbms=("postgres14",),
+        compose_profiles=("test-dependencies",),
         env_vars={"RUCIO_HOME": "/opt/rucio/etc/multi_vo/tst"},
     ),
     "votest": SuiteDefinition(
@@ -98,6 +100,7 @@ SUITE_DEFINITIONS: dict[str, SuiteDefinition] = {
         group="votest",
         python_versions=("3.9",),
         rdbms=("postgres14",),
+        compose_profiles=("test-dependencies",),
         policies=("atlas", "belleii"),
     ),
     "integration": SuiteDefinition(
@@ -105,7 +108,12 @@ SUITE_DEFINITIONS: dict[str, SuiteDefinition] = {
         group="integration",
         python_versions=("3.9",),
         rdbms=("postgres14",),
-        compose_profiles=("storage", "externalmetadata", "iam"),
+        compose_profiles=(
+            "test-dependencies",
+            "storage",
+            "externalmetadata",
+            "iam",
+        ),
         test_paths=(
             "tests/test_rucio_server.py",
             "tests/test_upload.py",

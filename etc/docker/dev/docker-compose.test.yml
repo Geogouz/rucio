@@ -1,6 +1,24 @@
 services:
   elasticsearch:
     platform: "${RUCIO_TEST_NATIVE_PLATFORM:-linux/amd64}"
+    profiles:
+      - test-dependencies
+
+  graphite:
+    profiles:
+      - test-dependencies
+
+  influxdb:
+    profiles:
+      - test-dependencies
+
+  activemq:
+    profiles:
+      - test-dependencies
+
+  web1:
+    profiles:
+      - test-dependencies
 
   rucio:
     image: "${RUCIO_TEST_IMAGE:?Set RUCIO_TEST_IMAGE to a test runtime image}"
