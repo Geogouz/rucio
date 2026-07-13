@@ -318,12 +318,15 @@ def test_keep_db_removes_only_non_database_volumes(tmp_path: "Path", monkeypatch
 
 
 def test_reusable_project_rejects_concurrent_run(tmp_path: "Path") -> None:
-    first = _manager(tmp_path, keep_db=True)
-    second = _manager(tmp_path, keep_db=True)
+    first = _manager(tmp_path, keep_db=True, log_output=True)
+    second = _manager(tmp_path, keep_db=True, log_output=True)
+    first.log_dir.mkdir(parents=True)
+    first.output_log.write_text("active run\n")
     first._acquire_project_lock()
     try:
         with pytest.raises(RuntimeError, match="already running"):
-            second._acquire_project_lock()
+            second.start()
+        assert first.output_log.read_text() == "active run\n"
     finally:
         first._release_project_lock()
 

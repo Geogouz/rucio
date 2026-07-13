@@ -138,12 +138,12 @@ class ContainerManager:
         self.stop(check=exc_type is None)
 
     def start(self) -> None:
-        if self.output_log:
-            self.log_dir.mkdir(parents=True, exist_ok=True)
-            self.output_log.write_text("")
-            print(f"Case output: {self.output_log}", flush=True)
         self._acquire_project_lock()
         try:
+            if self.output_log:
+                self.log_dir.mkdir(parents=True, exist_ok=True)
+                self.output_log.write_text("")
+                print(f"Case output: {self.output_log}", flush=True)
             self._set_native_platform()
             if self.build_local:
                 image_key = (str(self.root_dir), self.image)
