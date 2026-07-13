@@ -258,6 +258,21 @@ def test_suite_continues_after_infrastructure_failure(monkeypatch, capsys) -> No
     assert "compose failed" in capsys.readouterr().err
 
 
+def test_suite_exitfirst_stops_after_failed_case(monkeypatch) -> None:
+    config = _Config(suite="client", maxfail=1)
+    config.invocation_params = SimpleNamespace(args=("--suite=client", "-x"))
+    cases = []
+
+    def run(case, *args, **kwargs):
+        cases.append(case.id)
+        return 1
+
+    monkeypatch.setattr(plugin.runner, "run_container_case", run)
+
+    assert plugin.pytest_cmdline_main(config) == 1
+    assert cases == ["client-py39-postgres14"]
+
+
 def test_suite_combines_coverage(monkeypatch) -> None:
     config = _Config(suite="client")
     config.invocation_params = SimpleNamespace(args=(

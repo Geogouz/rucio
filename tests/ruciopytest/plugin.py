@@ -211,6 +211,7 @@ def _run_cases(
                 "The selected suite cannot use xdist because some cases are serial"
             )
     container_environment = _parse_environment(config.getoption("container_env"))
+    fail_fast = config.getoption("maxfail", 0) == 1
     failures = []
     for index, case in enumerate(cases):
         print(f"\n===== {case.id} =====", flush=True)
@@ -240,9 +241,13 @@ def _run_cases(
         except Exception as error:
             print(f"Case {case.id} failed: {error}", file=sys.stderr)
             failures.append(case.id)
+            if fail_fast:
+                break
             continue
         if result:
             failures.append(case.id)
+            if fail_fast:
+                break
 
     if failures:
         print(f"Failed cases: {', '.join(failures)}")
