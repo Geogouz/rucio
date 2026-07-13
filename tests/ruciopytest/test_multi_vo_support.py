@@ -34,4 +34,5 @@ def test_generate_multi_vo_configs(tmp_path: Path, monkeypatch) -> None:
         config.read(generated[vo])
         assert config["client"]["vo"] == expected_long_vo
         assert config["common"].getboolean("multi_vo")
+        assert "@ruciodb/" in config["database"]["default"]
         assert generated[vo].with_name("alembic.ini").is_file()

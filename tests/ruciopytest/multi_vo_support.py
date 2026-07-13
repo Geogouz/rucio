@@ -38,7 +38,11 @@ def generate_multi_vo_configs(
         destination.mkdir(parents=True, exist_ok=True)
         rucio_cfg = destination / "rucio.cfg"
         merge_configs(
-            [common, config_dir / source_name],
+            [
+                common,
+                config_dir / "rucio_postgres14.cfg",
+                config_dir / source_name,
+            ],
             rucio_cfg,
             use_env=True,
         )
