@@ -235,9 +235,11 @@ def _run_integration(
     container_environment: "Mapping[str, str]",
     explicit_selectors: "Sequence[str]",
 ) -> int:
-    if explicit_selectors:
+    if explicit_selectors or _requires_single_session(pytest_args):
         selected_tpc = any("test_tpc.py" in path for path in explicit_selectors)
         selected_args = list(pytest_args)
+        if not explicit_selectors:
+            selected_args.extend(case.test_paths)
         selected_args.append("--export-artifacts-from=test_tpc")
         result = _run_inner_pytest(
             manager,
@@ -433,9 +435,33 @@ def _executes_tests(arguments: "Sequence[str]") -> bool:
         "--fixtures",
         "--fixtures-per-test",
         "--funcargs",
+        "--setup-only",
         "--setup-plan",
     }
-    return info_options.isdisjoint(arguments)
+    return info_options.isdisjoint(arguments) and not any(
+        argument == "--cache-show" or argument.startswith("--cache-show=")
+        for argument in arguments
+    )
+
+
+def _requires_single_session(arguments: "Sequence[str]") -> bool:
+    options = {
+        "--cache-clear",
+        "--cache-show",
+        "--failed-first",
+        "--ff",
+        "--last-failed",
+        "--lf",
+        "--new-first",
+        "--nf",
+        "--stepwise",
+        "--stepwise-reset",
+        "--stepwise-skip",
+        "--sw",
+        "--sw-reset",
+        "--sw-skip",
+    }
+    return any(argument.split("=", 1)[0] in options for argument in arguments)
 
 
 def is_interactive(arguments: "Sequence[str]") -> bool:

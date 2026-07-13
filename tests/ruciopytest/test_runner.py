@@ -225,12 +225,27 @@ def test_integration_continues_past_empty_filtered_paths(
     result = runner.run_container_case(
         get_case("integration-py39-postgres14"),
         tmp_path,
-        ("--lf",),
+        ("--deselect=tests/test_upload.py",),
     )
 
     assert result == 0
     assert len([command for command in _Manager.commands if "pytest" in command]) == 15
     assert any(command[1:3] == ("bash", "-c") for command in _Manager.commands)
+
+
+def test_integration_last_failed_uses_one_pytest_session(
+    tmp_path: "Path",
+    monkeypatch,
+) -> None:
+    _reset_manager(monkeypatch)
+    case = get_case("integration-py39-postgres14")
+
+    result = runner.run_container_case(case, tmp_path, ("--lf",))
+
+    assert result == 0
+    commands = [command for command in _Manager.commands if "pytest" in command]
+    assert len(commands) == 1
+    assert all(selector in commands[0] for selector in case.test_paths)
 
 
 def test_integration_broad_selector_verifies_exported_tpc(
@@ -267,6 +282,28 @@ def test_integration_collect_only_skips_missing_tpc_artifact(
         tmp_path,
         ("--collect-only", "tests/"),
         explicit_selectors=("tests/",),
+    )
+
+    assert result == 0
+    assert not any(
+        command[1:3] == ("bash", "-c")
+        for command in _Manager.commands
+    )
+
+
+def test_integration_setup_only_skips_missing_tpc_artifact(
+    tmp_path: "Path",
+    monkeypatch,
+) -> None:
+    _reset_manager(monkeypatch)
+    _Manager.artifact = None
+    selector = "tests/test_tpc.py"
+
+    result = runner.run_container_case(
+        get_case("integration-py39-postgres14"),
+        tmp_path,
+        ("--setup-only", selector),
+        explicit_selectors=(selector,),
     )
 
     assert result == 0
