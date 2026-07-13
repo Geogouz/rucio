@@ -18,9 +18,18 @@ on:
     branches:
       - master
     paths:
+      - '.dockerignore'
       - 'etc/docker/test/runtime.Dockerfile'
-      - 'requirements/requirements.server.txt'
-      - 'requirements/requirements.dev.txt'
+      - 'etc/docker/dev/rucio/entrypoint.sh'
+      - 'etc/docker/test/extra/00-mpm.conf'
+      - 'etc/docker/test/extra/httpd.conf'
+      - 'etc/docker/test/extra/rucio.conf'
+      - 'etc/certs/hostcert_rucio.key.pem'
+      - 'etc/certs/hostcert_rucio.pem'
+      - 'etc/certs/rucio_ca.pem'
+      - 'etc/certs/ruciouser.key.pem'
+      - 'etc/certs/ruciouser.pem'
+      - 'requirements/**'
   workflow_dispatch:
 
 jobs:
@@ -60,7 +69,20 @@ jobs:
       - name: Build Runtime Images
         id: build_images
         run: |
-          FILES_TO_HASH="etc/docker/test/runtime.Dockerfile requirements/requirements.server.txt requirements/requirements.dev.txt"
+          BUILD_INPUTS=(
+            .dockerignore
+            etc/docker/test/runtime.Dockerfile
+            etc/docker/dev/rucio/entrypoint.sh
+            etc/docker/test/extra/00-mpm.conf
+            etc/docker/test/extra/httpd.conf
+            etc/docker/test/extra/rucio.conf
+            etc/certs/hostcert_rucio.key.pem
+            etc/certs/hostcert_rucio.pem
+            etc/certs/rucio_ca.pem
+            etc/certs/ruciouser.key.pem
+            etc/certs/ruciouser.pem
+            requirements
+          )
           BUILD_LOCALLY=false
           BUILD_DATE="${{ steps.metadata.outputs.build_date }}"
           COMMIT_SHA="${{ steps.metadata.outputs.commit_sha }}"
@@ -68,7 +90,10 @@ jobs:
           REPO=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
 
           for PYVER in 3.9 3.10; do
-            HASH=$(echo "PYTHON=${PYVER}" | cat - $FILES_TO_HASH | sha256sum | cut -d' ' -f1 | head -c 12)
+            HASH=$(
+              { echo "PYTHON=${PYVER}"; git ls-files -s -- "${BUILD_INPUTS[@]}"; } |
+                sha256sum | cut -d' ' -f1 | head -c 12
+            )
             IMAGE="ghcr.io/${REPO}/rucio-dev-runtime:py${PYVER//.}-${HASH}"
             echo "Python ${PYVER} image tag: $IMAGE"
 
