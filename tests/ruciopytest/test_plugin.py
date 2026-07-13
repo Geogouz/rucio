@@ -63,25 +63,31 @@ def test_list_cases_is_machine_readable(capsys) -> None:
     }
 
 
-def test_suite_defaults_to_postgres() -> None:
-    case = plugin.resolve_requested_case(_Config(suite="remote_dbs"), REPO_ROOT)
+def test_suite_resolves_every_matrix_case() -> None:
+    cases = plugin.resolve_requested_cases(_Config(suite="remote_dbs"), REPO_ROOT)
 
-    assert case is not None
-    assert case.id == "remote-dbs-py39-postgres14"
+    assert {case.id for case in cases} == {
+        "remote-dbs-py39-oracle",
+        "remote-dbs-py39-postgres14",
+        "remote-dbs-py310-oracle",
+        "remote-dbs-py310-postgres14",
+    }
 
 
-def test_votest_requires_policy() -> None:
-    with pytest.raises(pytest.UsageError, match="requires --policy"):
-        plugin.resolve_requested_case(_Config(suite="votest"), REPO_ROOT)
+def test_votest_suite_resolves_every_policy() -> None:
+    cases = plugin.resolve_requested_cases(_Config(suite="votest"), REPO_ROOT)
+
+    assert {case.policy for case in cases} == {"atlas", "belleii"}
 
 
 def test_votest_resolves_policy_selectors() -> None:
-    case = plugin.resolve_requested_case(
+    cases = plugin.resolve_requested_cases(
         _Config(suite="votest", policy="atlas"),
         REPO_ROOT,
     )
 
-    assert case is not None
+    assert len(cases) == 1
+    case = cases[0]
     assert case.policy == "atlas"
     assert len(case.test_paths) == 36
 
@@ -166,6 +172,23 @@ def test_all_runs_every_case_and_reports_failures(monkeypatch, capsys) -> None:
     assert "Failed cases: unit-py310" in capsys.readouterr().out
 
 
+def test_suite_runs_every_matching_case(monkeypatch) -> None:
+    config = _Config(suite="client")
+    cases = []
+
+    def run(case, *args, **kwargs):
+        cases.append(case.id)
+        return 0
+
+    monkeypatch.setattr(plugin.runner, "run_container_case", run)
+
+    assert plugin.pytest_cmdline_main(config) == 0
+    assert cases == [
+        "client-py39-postgres14",
+        "client-py310-postgres14",
+    ]
+
+
 def test_all_dry_run_json_is_machine_readable(capsys) -> None:
     config = _Config(suite="all", dry_run_json=True)
 
@@ -179,7 +202,7 @@ def test_all_rejects_one_runtime_for_two_python_versions(monkeypatch) -> None:
     config = _Config(suite="all")
     monkeypatch.setenv("RUCIO_TEST_IMAGE", "runtime:one-version")
 
-    with pytest.raises(pytest.UsageError, match="RUCIO_TEST_IMAGE_PY39"):
+    with pytest.raises(pytest.UsageError, match="Multi-version suites"):
         plugin.pytest_cmdline_main(config)
 
 
