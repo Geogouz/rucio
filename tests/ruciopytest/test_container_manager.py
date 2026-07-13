@@ -252,11 +252,26 @@ def test_failed_cleanup_can_be_retried(tmp_path: "Path", monkeypatch) -> None:
 
     monkeypatch.setattr(manager, "_run", run)
 
-    manager.stop()
+    with pytest.raises(RuntimeError, match="Failed to clean up test project"):
+        manager.stop()
     manager.stop()
 
     assert sum("down" in command for command in commands) == 2
     assert manager._stopped
+
+
+def test_cleanup_failure_does_not_hide_test_failure(tmp_path: "Path", monkeypatch) -> None:
+    manager = _manager(tmp_path)
+
+    def run(command, **kwargs):
+        returncode = 1 if "down" in command else 0
+        return subprocess.CompletedProcess(command, returncode, stdout="")
+
+    monkeypatch.setattr(manager, "_run", run)
+
+    manager.__exit__(ValueError, ValueError("test failed"), None)
+
+    assert not manager._stopped
 
 
 def test_podman_uses_the_same_compose_model(tmp_path: "Path") -> None:

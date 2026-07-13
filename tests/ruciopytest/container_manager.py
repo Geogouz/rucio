@@ -118,7 +118,7 @@ class ContainerManager:
         exc_value: "Optional[BaseException]",
         traceback: "Optional[TracebackType]",
     ) -> None:
-        self.stop()
+        self.stop(check=exc_type is None)
 
     def start(self) -> None:
         self._acquire_project_lock()
@@ -158,12 +158,14 @@ class ContainerManager:
                 timeout=60,
             )
         except BaseException:
-            self.stop()
+            self.stop(check=False)
             raise
 
-    def stop(self) -> None:
+    def stop(self, *, check: bool = True) -> None:
         if self._stopped:
             return
+        cleanup_failed = False
+        cleanup_error = None
         try:
             self.capture_logs()
             command = [*self.compose_command("down", "--timeout", "30")]
@@ -175,8 +177,16 @@ class ContainerManager:
                 and (not self.keep_db or self._remove_non_database_volumes())
             )
             self._stopped = result.returncode == 0 and volumes_removed
+            cleanup_failed = not self._stopped
+        except (OSError, subprocess.SubprocessError) as error:
+            cleanup_failed = True
+            cleanup_error = error
         finally:
             self._release_project_lock()
+        if check and cleanup_failed:
+            raise RuntimeError(
+                f"Failed to clean up test project {self.project_name}"
+            ) from cleanup_error
 
     def compose_command(self, *arguments: str) -> list[str]:
         command = [self.runtime, "compose", "-p", self.project_name]
