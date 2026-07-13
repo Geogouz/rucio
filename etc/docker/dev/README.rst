@@ -122,26 +122,54 @@ Initialize the catalogue in an existing development container::
         exec rucio python -m tests.ruciopytest.infra_manager \
         --case remote-dbs-py39-postgres14
 
-Running tests
-~~~~~~~~~~~~~
+Running canonical tests
+-----------------------
 
-The test runner creates its own isolated Compose project, so a development stack does not need to be running first. Install only its host-side orchestration dependencies::
+The test runner creates a separate Compose project for each case. The
+interactive ``dev`` project does not need to be running. Create a small host
+virtual environment for the orchestration dependencies::
 
-    python -m pip install --constraint requirements/requirements.dev.txt pytest pytest-cov pytest-xdist pyyaml
+    python3 -m venv .venv
+    .venv/bin/python -m pip install \
+        --constraint requirements/requirements.dev.txt \
+        pytest pytest-cov pytest-xdist pyyaml
 
-List the 15 canonical local and CI cases, or run all of them::
+List the 15 canonical local and CI cases::
 
-    python -m pytest --list-cases
-    python -m pytest --suite=all
+    .venv/bin/python -m pytest --list-cases
 
 Run one case, one module, or one test::
 
-    python -m pytest --case=remote-dbs-py39-postgres14
-    python -m pytest --case=remote-dbs-py39-postgres14 tests/test_replica.py
-    python -m pytest --case=remote-dbs-py39-postgres14 \
+    .venv/bin/python -m pytest --case=remote-dbs-py39-postgres14
+    .venv/bin/python -m pytest --case=remote-dbs-py39-postgres14 \
+        tests/test_replica.py
+    .venv/bin/python -m pytest --case=remote-dbs-py39-postgres14 \
         tests/test_replica.py::TestReplicaCore::test_delete_replicas
 
-All normal pytest arguments are forwarded. For example, ``-k``, ``-x``, ``--pdb``, coverage options, and JUnit output work as usual. ``--keep-db`` retains only the selected case's database volume between runs. The supported server test databases are PostgreSQL and Oracle; MySQL and SQLite are not development test targets.
+Run every matrix case for one named suite::
+
+    .venv/bin/python -m pytest --suite=unit
+    .venv/bin/python -m pytest --suite=client
+    .venv/bin/python -m pytest --suite=remote_dbs
+    .venv/bin/python -m pytest --suite=votest
+
+Run the full canonical suite::
+
+    .venv/bin/python -m pytest --suite=all
+
+The complete integration case is::
+
+    .venv/bin/python -m pytest --case=integration-py39-postgres14
+
+It starts the PostgreSQL test database together with the ``storage``,
+``externalmetadata``, and ``iam`` profiles. The test-only ``postgres14`` and
+``test-dependencies`` profiles are supplied by ``docker-compose.test.yml`` and
+are selected automatically; they are not manual development profiles.
+
+Normal pytest arguments such as ``-k``, ``-x``, ``--pdb``, coverage options,
+and JUnit output are forwarded. ``--keep-db`` retains the database volume for
+each selected case. PostgreSQL and Oracle are the supported server test
+databases; MySQL and SQLite are not development test targets.
 
 Using the environment including storage
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
