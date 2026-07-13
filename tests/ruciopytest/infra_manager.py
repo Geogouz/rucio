@@ -75,6 +75,7 @@ class InfraManager:
         self._run_tool("tools/sync_meta.py")
 
         if self.case.suite == "integration":
+            self._configure_integration()
             self._run_tool("tools/docker_activate_rses.sh")
         if self.case.suite == "client":
             shutil.copyfile(
@@ -112,6 +113,28 @@ class InfraManager:
             str(self.rucio_home / "etc/rucio.cfg"),
             matrix[self.case.policy]["config_overrides"],
         )
+
+    def _configure_integration(self) -> None:
+        config_dir = self.rucio_home / "etc"
+        accounts = self.repo_root / "etc/rse-accounts.cfg.template"
+        shutil.copyfile(accounts, config_dir / "rse-accounts.cfg")
+        shutil.copyfile(accounts, config_dir / "rse-accounts.cfg.template")
+        shutil.copyfile(
+            self.repo_root / "etc/rclone-init.cfg",
+            config_dir / "rclone-init.cfg",
+        )
+        self._run((
+            "ln",
+            "-sf",
+            "/root/.ssh/ruciouser_sshkey",
+            "/root/.ssh/id_rsa",
+        ))
+        self._run((
+            "ln",
+            "-sf",
+            "/root/.ssh/ruciouser_sshkey.pub",
+            "/root/.ssh/id_rsa.pub",
+        ))
 
     def _restart_httpd(self) -> None:
         self._run(("httpd", "-k", "graceful"))

@@ -46,6 +46,7 @@ def _mock_setup_steps(manager: InfraManager, monkeypatch) -> Mock:
         "_reset_database",
         "_run_alembic_migration",
         "_restart_httpd",
+        "_configure_integration",
         "_run_tool",
     ):
         monkeypatch.setattr(manager, method, getattr(calls, method))
@@ -120,4 +121,29 @@ def test_integration_setup_activates_storage_rses(tmp_path: "Path", monkeypatch)
 
     manager.setup()
 
+    calls._configure_integration.assert_called_once()
     calls._run_tool.assert_any_call("tools/docker_activate_rses.sh")
+
+
+def test_integration_configures_protocol_credentials(tmp_path: "Path", monkeypatch) -> None:
+    home = tmp_path / "home"
+    config_dir = home / "etc"
+    config_dir.mkdir(parents=True)
+    source_dir = tmp_path / "etc"
+    source_dir.mkdir()
+    (source_dir / "rse-accounts.cfg.template").write_text("accounts")
+    (source_dir / "rclone-init.cfg").write_text("rclone")
+    manager = _manager(
+        tmp_path,
+        "integration-py39-postgres14",
+        environment={"RUCIO_HOME": str(home)},
+    )
+    run = Mock()
+    monkeypatch.setattr(manager, "_run", run)
+
+    manager._configure_integration()
+
+    assert (config_dir / "rse-accounts.cfg").read_text() == "accounts"
+    assert (config_dir / "rse-accounts.cfg.template").read_text() == "accounts"
+    assert (config_dir / "rclone-init.cfg").read_text() == "rclone"
+    assert run.call_count == 2
