@@ -1,0 +1,157 @@
+# Copyright European Organization for Nuclear Research (CERN) since 2012
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import subprocess  # noqa: S404
+from typing import TYPE_CHECKING
+
+from tests.ruciopytest import runner
+from tests.ruciopytest.profiles import get_case
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+
+class _Manager:
+    results: list[int] = []
+    commands: list[tuple[str, ...]] = []
+    environments: list[dict[str, str]] = []
+
+    def __init__(self, case, root_dir, keep_db=False):
+        self.case = case
+        self.root_dir = root_dir
+        self.keep_db = keep_db
+        self.environment = {}
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return None
+
+    def exec(
+        self,
+        service,
+        *arguments,
+        environment=None,
+        capture_output=False,
+        **kwargs,
+    ):
+        self.commands.append((service, *arguments))
+        self.environments.append(dict(environment or {}))
+        if arguments[:2] == ("cat", "/tmp/test_tpc.artifact"):
+            return subprocess.CompletedProcess(arguments, 0, stdout="/fts/log\n")
+        result = self.results.pop(0) if self.results else 0
+        return subprocess.CompletedProcess(arguments, result, stdout="")
+
+
+def _reset_manager(monkeypatch, results=()):
+    _Manager.results = list(results)
+    _Manager.commands = []
+    _Manager.environments = []
+    monkeypatch.setattr(runner, "ContainerManager", _Manager)
+
+
+def test_forwarded_args_remove_only_runner_options() -> None:
+    assert runner.forwarded_pytest_args([
+        "--suite=remote_dbs",
+        "--keep-db",
+        "-k",
+        "rule",
+        "tests/test_rule.py::test_add_rule",
+        "--container-env",
+        "DEBUG=1",
+    ]) == [
+        "-k",
+        "rule",
+        "tests/test_rule.py::test_add_rule",
+    ]
+
+
+def test_multi_vo_runs_both_legs_in_order(tmp_path: "Path", monkeypatch) -> None:
+    _reset_manager(monkeypatch, (0, 0))
+
+    result = runner.run_container_case(
+        get_case("multi-vo-py39-postgres14"),
+        tmp_path,
+        ("--junitxml=results.xml",),
+    )
+
+    assert result == 0
+    assert [environment["RUCIO_MULTI_VO_LEG"] for environment in _Manager.environments] == [
+        "tst",
+        "ts2",
+    ]
+    assert "--junitxml=results-tst.xml" in _Manager.commands[0]
+    assert "--junitxml=results-ts2.xml" in _Manager.commands[1]
+
+
+def test_multi_vo_stops_after_first_failure(tmp_path: "Path", monkeypatch) -> None:
+    _reset_manager(monkeypatch, (1, 0))
+
+    result = runner.run_container_case(
+        get_case("multi-vo-py39-postgres14"),
+        tmp_path,
+        (),
+    )
+
+    assert result == 1
+    assert len(_Manager.commands) == 1
+
+
+def test_integration_preserves_tpc_postcheck_order(tmp_path: "Path", monkeypatch) -> None:
+    _reset_manager(monkeypatch)
+
+    result = runner.run_container_case(
+        get_case("integration-py39-postgres14"),
+        tmp_path,
+        (),
+    )
+
+    assert result == 0
+    pytest_commands = [command for command in _Manager.commands if "pytest" in command]
+    cat_index = next(index for index, command in enumerate(_Manager.commands) if command[1:3] == ("cat", "/tmp/test_tpc.artifact"))
+    grep_index = next(index for index, command in enumerate(_Manager.commands) if command[1:3] == ("grep", "-Fq"))
+    assert len(pytest_commands) == 2
+    assert _Manager.commands.index(pytest_commands[0]) < cat_index < grep_index
+    assert grep_index < _Manager.commands.index(pytest_commands[1])
+
+
+def test_postgres_uses_ci_worker_count(tmp_path: "Path", monkeypatch) -> None:
+    _reset_manager(monkeypatch)
+    manager = _Manager(get_case("remote-dbs-py39-postgres14"), tmp_path)
+    manager.environment["GITHUB_ACTIONS"] = "true"
+
+    runner._run_inner_pytest(
+        manager,
+        manager.case,
+        (),
+        keep_db=False,
+    )
+
+    assert "--numprocesses=3" in _Manager.commands[0]
+
+
+def test_user_xdist_setting_is_preserved(tmp_path: "Path", monkeypatch) -> None:
+    _reset_manager(monkeypatch)
+    manager = _Manager(get_case("remote-dbs-py39-postgres14"), tmp_path)
+
+    runner._run_inner_pytest(
+        manager,
+        manager.case,
+        ("-n", "1"),
+        keep_db=False,
+    )
+
+    assert _Manager.commands[0].count("-n") == 1
+    assert "--numprocesses=auto" not in _Manager.commands[0]
