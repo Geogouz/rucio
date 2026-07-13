@@ -27,12 +27,17 @@ if TYPE_CHECKING:
     from .profiles import TestCase
 
 
+def checkout_id(root_dir: "Path") -> str:
+    return hashlib.sha256(str(root_dir.resolve()).encode()).hexdigest()[:8]
+
+
 class ContainerManager:
     COMPOSE_FILES = (
         "etc/docker/dev/docker-compose.yml",
         "etc/docker/dev/docker-compose.test.yml",
     )
     RUNTIME_DOCKERFILE = "etc/docker/test/runtime.Dockerfile"
+    _locally_built_images: set[tuple[str, str]] = set()
 
     def __init__(
         self,
@@ -52,9 +57,14 @@ class ContainerManager:
             if self._base_environment.get("USE_PODMAN") == "1"
             else "docker"
         )
-        supplied_image = image or self._base_environment.get("RUCIO_TEST_IMAGE")
+        version_key = f"RUCIO_TEST_IMAGE_PY{case.python.replace('.', '')}"
+        supplied_image = (
+            image
+            or self._base_environment.get(version_key)
+            or self._base_environment.get("RUCIO_TEST_IMAGE")
+        )
         self.image = supplied_image or (
-            f"rucio-test-runtime:py{case.python.replace('.', '')}"
+            f"rucio-test-runtime:{checkout_id(self.root_dir)}-py{case.python.replace('.', '')}"
         )
         self.build_local = supplied_image is None
         self.project_name = self.make_project_name(
@@ -66,6 +76,7 @@ class ContainerManager:
         self._stopped = False
 
         self.environment = dict(self._base_environment)
+        self.environment.pop("COMPOSE_PROFILES", None)
         self.environment.update(case.env_vars)
         self.environment.update({
             "RUCIO_TEST_IMAGE": self.image,
@@ -108,7 +119,10 @@ class ContainerManager:
     def start(self) -> None:
         try:
             if self.build_local:
-                self._build_image()
+                image_key = (str(self.root_dir), self.image)
+                if image_key not in self._locally_built_images:
+                    self._build_image()
+                    self._locally_built_images.add(image_key)
             self._run(self.compose_command("up", "-d", "--wait", "--wait-timeout", "180"), timeout=240)
             self.exec(
                 "rucio",

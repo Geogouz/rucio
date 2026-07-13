@@ -62,6 +62,15 @@ def test_manager_does_not_mutate_process_environment(tmp_path: "Path", monkeypat
     assert "RUCIO_NETWORK_NAME" not in os.environ
 
 
+def test_manager_ignores_inherited_compose_profiles(tmp_path: "Path") -> None:
+    manager = _manager(
+        tmp_path,
+        environ={"COMPOSE_PROFILES": "storage,donotstart"},
+    )
+
+    assert "COMPOSE_PROFILES" not in manager.environment
+
+
 def test_compose_commands_use_project_and_service_profiles(tmp_path: "Path") -> None:
     manager = _manager(tmp_path)
 
@@ -88,6 +97,7 @@ def test_prebuilt_image_skips_build(tmp_path: "Path", monkeypatch) -> None:
 
 
 def test_local_image_uses_runtime_dockerfile(tmp_path: "Path", monkeypatch) -> None:
+    ContainerManager._locally_built_images.clear()
     manager = _manager(tmp_path, image=None)
     commands = []
 
@@ -100,6 +110,33 @@ def test_local_image_uses_runtime_dockerfile(tmp_path: "Path", monkeypatch) -> N
 
     assert commands[0][:3] == ["docker", "buildx", "build"]
     assert str(tmp_path / manager.RUNTIME_DOCKERFILE) in commands[0]
+
+
+def test_local_runtime_is_built_once_per_interpreter(tmp_path: "Path", monkeypatch) -> None:
+    ContainerManager._locally_built_images.clear()
+    managers = [_manager(tmp_path, image=None), _manager(tmp_path, image=None)]
+    commands = []
+
+    def run(command, **kwargs):
+        commands.append(list(command))
+        return subprocess.CompletedProcess(command, 0, stdout="")
+
+    for manager in managers:
+        monkeypatch.setattr(manager, "_run", run)
+        manager.start()
+
+    assert sum(command[:3] == ["docker", "buildx", "build"] for command in commands) == 1
+
+
+def test_runtime_image_can_be_selected_per_python(tmp_path: "Path") -> None:
+    manager = _manager(
+        tmp_path,
+        image=None,
+        environ={"RUCIO_TEST_IMAGE_PY39": "runtime:py39"},
+    )
+
+    assert manager.image == "runtime:py39"
+    assert not manager.build_local
 
 
 def test_stop_removes_only_owned_project(tmp_path: "Path", monkeypatch) -> None:
