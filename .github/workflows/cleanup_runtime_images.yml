@@ -60,9 +60,10 @@ jobs:
               # Check if older than 7 days
               if [[ "$UPDATED_AT" < "$CUTOFF_DATE" ]]; then
                 echo "Deleting untagged image ID: $VERSION_ID (updated: $UPDATED_AT)"
-                curl -s -X DELETE \
-                  -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-                  "https://api.github.com/orgs/${{ github.repository_owner }}/packages/container/rucio%2Frucio-dev-runtime/versions/$VERSION_ID"
+                gh api --method DELETE --silent \
+                  -H "Accept: application/vnd.github+json" \
+                  -H "X-GitHub-Api-Version: 2026-03-10" \
+                  "/orgs/${{ github.repository_owner }}/packages/container/rucio%2Frucio-dev-runtime/versions/${VERSION_ID}"
               else
                 echo "Keeping untagged image ID: $VERSION_ID (updated: $UPDATED_AT - less than 7 days old)"
               fi
@@ -114,9 +115,10 @@ jobs:
 
               if [[ "$UPDATED_AT" < "$CUTOFF_DATE" ]]; then
                 echo "Deleting tagged image ID: $VERSION_ID with tags: $TAG_LIST (updated: $UPDATED_AT)"
-                curl -s -X DELETE \
-                  -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-                  "https://api.github.com/orgs/${{ github.repository_owner }}/packages/container/rucio%2Frucio-dev-runtime/versions/$VERSION_ID"
+                gh api --method DELETE --silent \
+                  -H "Accept: application/vnd.github+json" \
+                  -H "X-GitHub-Api-Version: 2026-03-10" \
+                  "/orgs/${{ github.repository_owner }}/packages/container/rucio%2Frucio-dev-runtime/versions/${VERSION_ID}"
               else
                 echo "Keeping tagged image with tags: $TAG_LIST (updated: $UPDATED_AT - less than 30 days old)"
               fi

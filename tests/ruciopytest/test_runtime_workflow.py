@@ -66,3 +66,9 @@ def test_runtime_cleanup_paginates_package_versions() -> None:
     workflow = CLEANUP_WORKFLOW.read_text()
 
     assert "gh api --paginate --slurp" in workflow
+
+
+def test_runtime_cleanup_propagates_deletion_failures() -> None:
+    workflow = CLEANUP_WORKFLOW.read_text()
+
+    assert "gh api --method DELETE --silent" in workflow
