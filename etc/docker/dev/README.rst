@@ -4,7 +4,9 @@ Setting up a Rucio development environment
 Prerequisites
 --------------
 
-We provide a containerised version of the Rucio development environment for a quick start. Our containers are ready-made for Docker, but we provide best-effort support for Podman and podman-compose. If you use podman-compose, you need to add `-t cntnet` to the podman-compose commands. For simplicity all commands explained in this documentation are using docker-compose.
+We provide a containerised version of the Rucio development environment for a
+quick start. Docker Compose v2 (``docker compose``) is the supported container
+runtime.
 
 To install Docker for your platform, please refer to the `Docker installation guide <https://docs.docker.com/install/>`_, for example, for CentOS `follow these instructions for the Docker Community Edition <https://docs.docker.com/install/linux/docker-ce/centos/>`_. Please make sure that you install this recent Docker version especially if you are on CentOS, i.e. its default version is ancient and does not support some features we rely on.
 

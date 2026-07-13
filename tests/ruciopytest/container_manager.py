@@ -71,11 +71,6 @@ class ContainerManager:
         self.root_dir = root_dir.resolve()
         self.keep_db = keep_db
         self._base_environment = dict(os.environ if environ is None else environ)
-        self.runtime = (
-            "podman"
-            if self._base_environment.get("USE_PODMAN") == "1"
-            else "docker"
-        )
         version_key = f"RUCIO_TEST_IMAGE_PY{case.python.replace('.', '')}"
         supplied_image = (
             image
@@ -204,7 +199,7 @@ class ContainerManager:
             ) from cleanup_error
 
     def compose_command(self, *arguments: str) -> list[str]:
-        command = [self.runtime, "compose", "-p", self.project_name]
+        command = ["docker", "compose", "-p", self.project_name]
         for compose_file in self.COMPOSE_FILES:
             command.extend(("-f", str(self.root_dir / compose_file)))
         for profile in self.case.compose_profiles:
@@ -302,24 +297,21 @@ class ContainerManager:
         if not removable:
             return True
         result = self._run(
-            (self.runtime, "volume", "rm", *removable),
+            ("docker", "volume", "rm", *removable),
             check=False,
             timeout=60,
         )
         return result.returncode == 0
 
     def _build_image(self) -> None:
-        if self.runtime == "docker":
-            command = [
-                "docker",
-                "buildx",
-                "build",
-                "--platform",
-                "linux/amd64",
-                "--load",
-            ]
-        else:
-            command = ["podman", "build", "--platform", "linux/amd64"]
+        command = [
+            "docker",
+            "buildx",
+            "build",
+            "--platform",
+            "linux/amd64",
+            "--load",
+        ]
         command.extend((
             "--file",
             str(self.root_dir / self.RUNTIME_DOCKERFILE),

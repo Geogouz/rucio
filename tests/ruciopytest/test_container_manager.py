@@ -294,13 +294,3 @@ def test_cleanup_failure_does_not_hide_test_failure(tmp_path: "Path", monkeypatc
     manager.__exit__(ValueError, ValueError("test failed"), None)
 
     assert not manager._stopped
-
-
-def test_podman_uses_the_same_compose_model(tmp_path: "Path") -> None:
-    manager = _manager(
-        tmp_path,
-        image="runtime:test",
-        environ={"USE_PODMAN": "1"},
-    )
-
-    assert manager.compose_command("up")[:2] == ["podman", "compose"]

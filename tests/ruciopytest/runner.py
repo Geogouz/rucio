@@ -111,14 +111,10 @@ def run_unit_case(
 ) -> int:
     environment = dict(os.environ)
     environment.pop("DOCKER_DEFAULT_PLATFORM", None)
-    runtime = "podman" if environment.get("USE_PODMAN") == "1" else "docker"
     image = (
         f"rucio-test-unit:{checkout_id(root_dir)}-py{case.python.replace('.', '')}"
     )
-    if runtime == "docker":
-        build = ["docker", "buildx", "build", "--load"]
-    else:
-        build = ["podman", "build"]
+    build = ["docker", "buildx", "build", "--load"]
     build.extend((
         "--file",
         str(root_dir / _UNIT_DOCKERFILE),
@@ -130,7 +126,7 @@ def run_unit_case(
     ))
     subprocess.run(build, check=True, cwd=root_dir, env=environment)  # noqa: S603
 
-    command = [runtime, "run"]
+    command = ["docker", "run"]
     if _is_interactive(pytest_args):
         command.extend(("--interactive", "--tty"))
     command.extend((
