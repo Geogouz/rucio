@@ -89,6 +89,9 @@ def test_monitoring_stack_matches_elasticsearch() -> None:
     )
     assert "logstash" not in services
     assert not (COMPOSE_DIR / "pipeline.conf").exists()
+    assert not (
+        COMPOSE_DIR.parents[2] / "tools/monitoring/logstash-pipeline"
+    ).exists()
 
     ports = yaml.safe_load((COMPOSE_DIR / "docker-compose.ports.yml").read_text())
     assert "logstash" not in ports["services"]
