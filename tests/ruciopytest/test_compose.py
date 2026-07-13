@@ -89,3 +89,16 @@ def test_runtime_dockerfile_exposes_source_commands() -> None:
 
     assert 'ENV PATH="/rucio_source/bin:${PYTHON_VENV}/bin:${PATH}"' in dockerfile
     assert "VOLUME /opt/rucio" not in dockerfile
+
+
+def test_runtime_dependency_stage_only_copies_requirements() -> None:
+    dockerfile = RUNTIME_DOCKERFILE.read_text()
+    dependency_stages, marker, _ = dockerfile.partition("FROM requirements AS final")
+    local_copies = [
+        line.strip() for line in dependency_stages.splitlines()
+        if line.strip().startswith("COPY ")
+        and "--from=" not in line
+    ]
+
+    assert marker
+    assert local_copies == ["COPY requirements /tmp/requirements"]
