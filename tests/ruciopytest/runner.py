@@ -169,6 +169,8 @@ def run_unit_case(
         "-r",
         "fExX",
         "--log-level=DEBUG",
+        "-p",
+        "rerunfailures",
     ))
     if has_xdist_option(pytest_args):
         command.extend(("-p", "xdist"))
@@ -312,6 +314,8 @@ def _run_inner_pytest(
         "fExX",
         "--log-level=DEBUG",
         "--ignore=tests/ruciopytest",
+        "-p",
+        "rerunfailures",
     ]
     if case.xdist_enabled:
         command.extend(("-p", "xdist"))

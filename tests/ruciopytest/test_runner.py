@@ -291,6 +291,7 @@ def test_inner_coverage_plugin_is_loaded(tmp_path: "Path", monkeypatch) -> None:
         "-p",
         "pytest_cov",
     )
+    assert "rerunfailures" in _Manager.commands[0]
 
 
 def test_no_cov_does_not_enable_coverage_aggregation() -> None:
@@ -398,6 +399,7 @@ def test_unit_case_loads_requested_pytest_plugins(tmp_path: "Path", monkeypatch)
 
     assert commands[1].count("xdist") == 1
     assert commands[1].count("pytest_cov") == 1
+    assert commands[1].count("rerunfailures") == 1
 
 
 def test_unit_case_allocates_terminal_for_pdb(tmp_path: "Path", monkeypatch) -> None:
