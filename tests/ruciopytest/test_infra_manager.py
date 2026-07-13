@@ -15,6 +15,7 @@
 from typing import TYPE_CHECKING
 from unittest.mock import Mock, call
 
+from tests.ruciopytest import infra_manager
 from tests.ruciopytest.infra_manager import InfraManager
 from tests.ruciopytest.profiles import get_case
 
@@ -159,3 +160,20 @@ def test_integration_configures_protocol_credentials(tmp_path: "Path", monkeypat
     assert (config_dir / "rse-accounts.cfg.template").read_text() == "accounts"
     assert (config_dir / "rclone-init.cfg").read_text() == "rclone"
     assert run.call_count == 2
+
+
+def test_main_prepares_requested_case(monkeypatch) -> None:
+    manager = Mock()
+    create_manager = Mock(return_value=manager)
+    monkeypatch.setattr(infra_manager, "InfraManager", create_manager)
+
+    assert infra_manager.main([
+        "--case",
+        "integration-py39-postgres14",
+        "--keep-db",
+    ]) == 0
+
+    case = create_manager.call_args.args[0]
+    assert case.id == "integration-py39-postgres14"
+    assert create_manager.call_args.kwargs == {"keep_db": True}
+    manager.setup.assert_called_once()

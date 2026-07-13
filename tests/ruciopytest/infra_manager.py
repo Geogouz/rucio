@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
 import os
 import shutil
 import socket
@@ -192,3 +193,24 @@ class InfraManager:
             except OSError:
                 time.sleep(1)
         raise RuntimeError("memcached did not become ready")
+
+
+def main(arguments: "Optional[Sequence[str]]" = None) -> int:
+    from .profiles import get_case
+
+    parser = argparse.ArgumentParser(
+        description="Prepare an existing Rucio development container",
+    )
+    parser.add_argument("--case", required=True)
+    parser.add_argument("--keep-db", action="store_true")
+    options = parser.parse_args(arguments)
+    try:
+        case = get_case(options.case)
+    except ValueError as error:
+        parser.error(str(error))
+    InfraManager(case, keep_db=options.keep_db).setup()
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
