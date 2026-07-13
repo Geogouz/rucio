@@ -243,6 +243,33 @@ def test_suite_continues_after_infrastructure_failure(monkeypatch, capsys) -> No
     assert "compose failed" in capsys.readouterr().err
 
 
+def test_suite_combines_coverage(monkeypatch) -> None:
+    config = _Config(suite="client")
+    config.invocation_params = SimpleNamespace(args=(
+        "--suite=client",
+        "--cov=lib/rucio",
+        "--cov-report=xml:test-results/coverage.xml",
+        "--cov-fail-under=80",
+    ))
+    arguments = []
+
+    def run(case, root_path, pytest_args, **kwargs):
+        arguments.append(pytest_args)
+        return 0
+
+    monkeypatch.setattr(plugin.runner, "run_container_case", run)
+
+    assert plugin.pytest_cmdline_main(config) == 0
+    assert "--cov-append" not in arguments[0]
+    assert "--cov-fail-under=0" in arguments[0]
+    assert "--cov-append" in arguments[1]
+    assert "--cov-fail-under=0" not in arguments[1]
+    assert all(
+        "--cov-report=xml:test-results/coverage.xml" in case_args
+        for case_args in arguments
+    )
+
+
 def test_all_dry_run_json_is_machine_readable(capsys) -> None:
     config = _Config(suite="all", dry_run_json=True)
 

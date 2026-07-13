@@ -210,9 +210,13 @@ def _run_cases(
             )
     container_environment = _parse_environment(config.getoption("container_env"))
     failures = []
-    for case in cases:
+    for index, case in enumerate(cases):
         print(f"\n===== {case.id} =====", flush=True)
         case_args = runner.qualify_junit(pytest_args, case.id)
+        if index:
+            case_args = runner.append_coverage(case_args)
+        if index < len(cases) - 1:
+            case_args = runner.defer_coverage_threshold(case_args)
         try:
             if case.suite == "unit":
                 result = runner.run_unit_case(

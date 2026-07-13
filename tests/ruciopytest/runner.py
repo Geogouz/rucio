@@ -186,16 +186,22 @@ def _run_multi_vo(
     keep_db: bool,
     container_environment: "Mapping[str, str]",
 ) -> int:
-    for index, leg in enumerate(("tst", "ts2")):
+    legs = ("tst", "ts2")
+    for index, leg in enumerate(legs):
         environment = dict(container_environment)
         environment.update({
             "RUCIO_HOME": f"/opt/rucio/etc/multi_vo/{leg}",
             "RUCIO_MULTI_VO_LEG": leg,
         })
+        arguments = qualify_junit(pytest_args, leg)
+        if index:
+            arguments = append_coverage(arguments)
+        if index < len(legs) - 1:
+            arguments = defer_coverage_threshold(arguments)
         result = _run_inner_pytest(
             manager,
             case,
-            qualify_junit(pytest_args, leg),
+            arguments,
             keep_db=keep_db or index > 0,
             environment=environment,
         )
@@ -231,12 +237,14 @@ def _run_integration(
     filtered = _has_collection_filter(pytest_args)
     matched = False
     for index, selector in enumerate(case.test_paths):
-        arguments = [
-            *qualify_junit(pytest_args, f"{index + 1:02d}"),
-            selector,
-        ]
+        arguments = qualify_junit(pytest_args, f"{index + 1:02d}")
+        if index:
+            arguments = append_coverage(arguments)
+        if index < len(case.test_paths) - 1:
+            arguments = defer_coverage_threshold(arguments)
         if "test_tpc.py" in selector:
-            arguments.insert(-1, "--export-artifacts-from=test_tpc")
+            arguments.append("--export-artifacts-from=test_tpc")
+        arguments.append(selector)
         environment = dict(container_environment)
         if index:
             environment["RUCIO_SKIP_TEST_SETUP"] = "1"
@@ -331,6 +339,26 @@ def qualify_junit(arguments: "Sequence[str]", qualifier: str) -> list[str]:
     return qualified
 
 
+def append_coverage(arguments: "Sequence[str]") -> list[str]:
+    updated = list(arguments)
+    if _coverage_enabled(updated) and "--cov-append" not in updated:
+        updated.append("--cov-append")
+    return updated
+
+
+def defer_coverage_threshold(arguments: "Sequence[str]") -> list[str]:
+    updated = list(arguments)
+    zero_threshold = "--cov-fail-under=0" in updated or any(
+        argument == "--cov-fail-under"
+        and index + 1 < len(updated)
+        and updated[index + 1] == "0"
+        for index, argument in enumerate(updated)
+    )
+    if _coverage_enabled(updated) and not zero_threshold:
+        updated.append("--cov-fail-under=0")
+    return updated
+
+
 def has_xdist_option(arguments: "Sequence[str]") -> bool:
     return any(
         argument == "-n"
@@ -344,6 +372,13 @@ def has_xdist_option(arguments: "Sequence[str]") -> bool:
 def _has_coverage_option(arguments: "Sequence[str]") -> bool:
     return any(
         argument == "--no-cov" or argument.startswith("--cov")
+        for argument in arguments
+    )
+
+
+def _coverage_enabled(arguments: "Sequence[str]") -> bool:
+    return "--no-cov" not in arguments and any(
+        argument == "--cov" or argument.startswith("--cov=")
         for argument in arguments
     )
 

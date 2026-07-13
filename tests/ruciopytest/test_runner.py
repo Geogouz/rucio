@@ -104,6 +104,31 @@ def test_multi_vo_runs_both_legs_in_order(tmp_path: "Path", monkeypatch) -> None
     assert "--junitxml=results-ts2.xml" in _Manager.commands[1]
 
 
+def test_multi_vo_combines_coverage(tmp_path: "Path", monkeypatch) -> None:
+    _reset_manager(monkeypatch)
+    coverage_args = (
+        "--cov=lib/rucio",
+        "--cov-report=xml:test-results/coverage.xml",
+        "--cov-fail-under=80",
+    )
+
+    result = runner.run_container_case(
+        get_case("multi-vo-py39-postgres14"),
+        tmp_path,
+        coverage_args,
+    )
+
+    assert result == 0
+    assert "--cov-append" not in _Manager.commands[0]
+    assert "--cov-fail-under=0" in _Manager.commands[0]
+    assert "--cov-append" in _Manager.commands[1]
+    assert "--cov-fail-under=0" not in _Manager.commands[1]
+    assert all(
+        "--cov-report=xml:test-results/coverage.xml" in command
+        for command in _Manager.commands
+    )
+
+
 def test_client_case_runs_only_its_test_paths(tmp_path: "Path", monkeypatch) -> None:
     _reset_manager(monkeypatch)
     case = get_case("client-py39-postgres14")
@@ -202,6 +227,23 @@ def test_integration_filter_fails_when_nothing_matches(
     assert result == 5
 
 
+def test_integration_combines_coverage(tmp_path: "Path", monkeypatch) -> None:
+    _reset_manager(monkeypatch)
+
+    result = runner.run_container_case(
+        get_case("integration-py39-postgres14"),
+        tmp_path,
+        ("--cov=lib/rucio", "--cov-fail-under=80"),
+    )
+
+    assert result == 0
+    commands = [command for command in _Manager.commands if "pytest" in command]
+    assert "--cov-append" not in commands[0]
+    assert all("--cov-append" in command for command in commands[1:])
+    assert all("--cov-fail-under=0" in command for command in commands[:-1])
+    assert "--cov-fail-under=0" not in commands[-1]
+
+
 def test_postgres_uses_ci_worker_count(tmp_path: "Path", monkeypatch) -> None:
     _reset_manager(monkeypatch)
     manager = _Manager(get_case("remote-dbs-py39-postgres14"), tmp_path)
@@ -249,6 +291,11 @@ def test_inner_coverage_plugin_is_loaded(tmp_path: "Path", monkeypatch) -> None:
         "-p",
         "pytest_cov",
     )
+
+
+def test_no_cov_does_not_enable_coverage_aggregation() -> None:
+    assert runner.append_coverage(("--no-cov",)) == ["--no-cov"]
+    assert runner.defer_coverage_threshold(("-k", "rule")) == ["-k", "rule"]
 
 
 def test_unit_case_builds_and_runs_requested_python(tmp_path: "Path", monkeypatch) -> None:
