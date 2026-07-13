@@ -82,6 +82,16 @@ def test_suite_resolves_every_matrix_case() -> None:
     }
 
 
+def test_suite_selection_ignores_legacy_environment(monkeypatch) -> None:
+    monkeypatch.setenv("PYTHON", "3.9")
+    monkeypatch.setenv("RDBMS", "oracle")
+    monkeypatch.setenv("POLICY", "atlas")
+
+    cases = plugin.resolve_requested_cases(_Config(suite="remote_dbs"), REPO_ROOT)
+
+    assert len(cases) == 4
+
+
 def test_votest_suite_resolves_every_policy() -> None:
     cases = plugin.resolve_requested_cases(_Config(suite="votest"), REPO_ROOT)
 

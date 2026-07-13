@@ -244,7 +244,7 @@ def resolve_requested_cases(
 ) -> "tuple[TestCase, ...]":
     case_id = config.getoption("case")
     suite = config.getoption("suite")
-    policy = config.getoption("policy") or os.environ.get("POLICY")
+    policy = config.getoption("policy")
     if case_id and suite:
         raise pytest.UsageError("--case and --suite are mutually exclusive")
     if case_id:
@@ -269,18 +269,11 @@ def resolve_requested_cases(
         )
 
     candidates = [case for case in iter_cases() if case.suite == suite]
-    python = os.environ.get("PYTHON")
-    rdbms = os.environ.get("RDBMS")
-    if python:
-        candidates = [case for case in candidates if case.python == python]
-    if rdbms:
-        candidates = [case for case in candidates if case.rdbms == rdbms]
     if policy:
         candidates = [case for case in candidates if case.policy == policy]
     if not candidates:
         raise pytest.UsageError(
-            f"No canonical case matches suite={suite!r}, "
-            f"python={python!r}, rdbms={rdbms!r}, policy={policy!r}"
+            f"No canonical case matches suite={suite!r}, policy={policy!r}"
         )
 
     return tuple(
