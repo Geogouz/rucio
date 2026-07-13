@@ -675,6 +675,15 @@ def explicit_xdist_mode(arguments: "Sequence[str]") -> str:
     return dist
 
 
+def has_looponfail(arguments: "Sequence[str]") -> bool:
+    for argument in arguments:
+        if argument == "--":
+            return False
+        if argument in ("-f", "--looponfail"):
+            return True
+    return False
+
+
 def _has_coverage_option(arguments: "Sequence[str]") -> bool:
     return any(
         argument == "--no-cov" or argument.startswith("--cov")
@@ -722,7 +731,9 @@ def _requires_single_session(arguments: "Sequence[str]") -> bool:
         "--sw-reset",
         "--sw-skip",
     }
-    return any(argument.split("=", 1)[0] in options for argument in arguments)
+    return has_looponfail(arguments) or any(
+        argument.split("=", 1)[0] in options for argument in arguments
+    )
 
 
 def _has_cache_show(arguments: "Sequence[str]") -> bool:
@@ -762,7 +773,7 @@ def _may_skip_tpc(arguments: "Sequence[str]") -> bool:
 
 
 def is_interactive(arguments: "Sequence[str]") -> bool:
-    return any(
+    return has_looponfail(arguments) or any(
         argument in ("--pdb", "--trace") or argument.startswith("--pdbcls")
         for argument in arguments
     )

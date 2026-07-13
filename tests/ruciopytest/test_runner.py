@@ -362,6 +362,21 @@ def test_integration_last_failed_uses_one_pytest_session(
     assert all(selector in commands[0] for selector in case.test_paths)
 
 
+def test_integration_looponfail_uses_one_pytest_session(
+    tmp_path: "Path",
+    monkeypatch,
+) -> None:
+    _reset_manager(monkeypatch)
+    case = get_case("integration-py39-postgres14")
+
+    result = runner.run_container_case(case, tmp_path, ("--looponfail",))
+
+    assert result == 0
+    commands = [command for command in _Manager.commands if "pytest" in command]
+    assert len(commands) == 1
+    assert all(selector in commands[0] for selector in case.test_paths)
+
+
 def test_integration_cache_clear_requires_tpc_artifact(
     tmp_path: "Path",
     monkeypatch,

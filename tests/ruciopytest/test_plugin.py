@@ -608,7 +608,7 @@ def test_suite_combines_coverage(monkeypatch) -> None:
     )
 
 
-@pytest.mark.parametrize("argument", ("--cov=lib/rucio", "--pdb"))
+@pytest.mark.parametrize("argument", ("--cov=lib/rucio", "--pdb", "-f"))
 def test_parallel_suite_rejects_shared_output(argument, monkeypatch) -> None:
     config = _Config(suite="client", case_workers=2)
     config.invocation_params = SimpleNamespace(args=(
