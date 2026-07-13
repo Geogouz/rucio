@@ -308,10 +308,19 @@ Apache inside the Rucio container::
 
     echo 'flush_all' | nc localhost 11211 && httpd -k graceful
 
-Database access
-~~~~~~~~~~~~~~~
+Database access from the host
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The default database is PostgreSQL, and `docker-compose` is configured to open its port to the host machine. Using your favourite SQL navigator, e.g., `DBeaver <https://dbeaver.io/>`_, you can connect to the database using the default access on `localhost:5432` to database name `rucio`, schema name `dev`, with username `rucio` and password `secret`.
+The PostgreSQL port is published only by the ports overlay. Start or update the
+base project with that overlay::
+
+    docker compose --project-name dev \
+        --file etc/docker/dev/docker-compose.yml \
+        --file etc/docker/dev/docker-compose.ports.yml \
+        up --detach --wait
+
+After catalogue initialization, connect to ``localhost:5432`` using database
+``rucio``, schema ``dev``, user ``rucio``, and password ``secret``.
 
 Docker is eating my disk space
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
