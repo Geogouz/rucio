@@ -510,6 +510,22 @@ def test_shared_pytest_paths_are_qualified() -> None:
     assert "log_file=ini-case.log" in arguments
 
 
+def test_pytest_device_paths_are_preserved() -> None:
+    arguments = runner.qualify_paths(
+        (
+            "--junitxml=/dev/stdout",
+            "--log-file=/dev/stderr",
+            "-o",
+            "log_file=/dev/null",
+        ),
+        "case",
+    )
+
+    assert "--junitxml=/dev/stdout" in arguments
+    assert "--log-file=/dev/stderr" in arguments
+    assert "log_file=/dev/null" in arguments
+
+
 def test_unit_case_builds_and_runs_requested_python(tmp_path: "Path", monkeypatch) -> None:
     commands = []
     timeouts = []

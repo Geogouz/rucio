@@ -539,7 +539,7 @@ def _qualify_path_option(
 
 
 def _qualify_path(value: str, qualifier: str, *, directory: bool) -> str:
-    if value == "/dev/null":
+    if value in ("/dev/null", "/dev/stderr", "/dev/stdout"):
         return value
     path = Path(value)
     if directory or not path.name:
