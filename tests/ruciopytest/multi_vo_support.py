@@ -27,7 +27,7 @@ def generate_multi_vo_configs(
 ) -> dict[str, "Path"]:
     config_dir = repo_root / "etc/docker/test/extra"
     common = config_dir / "rucio_autotests_common.cfg"
-    alembic = config_dir / "alembic_postgres14.ini"
+    alembic = config_dir / "alembic_default.ini"
     generated = {}
 
     for vo, source_name in (
