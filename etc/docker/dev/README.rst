@@ -167,7 +167,8 @@ Add ``-x`` to stop scheduling cases after the first failure. Cases already in
 progress finish so their containers can be cleaned up. ``--case-workers``
 controls independent matrix cases; ``--xdist-workers`` controls pytest workers
 inside cases which support xdist. Coverage and interactive debugging require a
-single case worker.
+single case worker. Concurrent case output is written to one ``case.log`` per
+case under ``.test-logs/``.
 
 The complete integration case is::
 
