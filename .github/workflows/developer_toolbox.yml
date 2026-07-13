@@ -1,0 +1,111 @@
+name: Developer Toolbox
+
+on:
+  pull_request:
+    paths:
+      - .github/upstream-ci-contract.json
+      - .github/workflows/developer_toolbox.yml
+      - .dockerignore
+      - .run/**
+      - .vscode/**
+      - etc/docker/dev/**
+      - etc/docker/test/runtime.Dockerfile
+      - etc/docker/test/unit.Dockerfile
+      - etc/docker/test/extra/**
+      - pyproject.toml
+      - requirements/requirements.devenv-control.txt
+      - requirements/requirements.devenv.txt
+      - requirements/requirements.dev.txt
+      - requirements/requirements.server.txt
+      - tests/ruciopytest/**
+      - tools/dev
+      - tools/devenv/**
+      - tools/test/run_test_performance_report.py
+  push:
+    branches:
+      - developer-toolbox-squashed
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "true"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 2
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements/requirements.devenv-control.txt
+      - name: Install validation dependencies
+        run: python -m pip install --constraint requirements/requirements.dev.txt --requirement requirements/requirements.devenv-control.txt defusedxml==0.7.1 docutils==0.23 pygments==2.20.0 ruff==0.15.20
+      - name: Validate upstream CI contract
+        run: python tools/devenv/validate_upstream_ci_contract.py
+      - name: Validate toolbox sources
+        run: |
+          python -m ruff check tools/devenv tests/ruciopytest tools/test/run_test_performance_report.py
+          python -bb -m pytest -p no:cacheprovider tests/ruciopytest \
+            --deselect=tests/ruciopytest/test_infra_manager.py::test_initialized_database_uses_configured_schema
+      - name: Validate developer documentation
+        run: python tools/devenv/validate_documentation.py
+      - name: Validate public command discovery
+        run: |
+          ./tools/dev --help
+          ./tools/dev test --list
+      - name: Validate IDE configuration syntax
+        run: |
+          for file in .vscode/*.json; do
+            python -m json.tool "$file" > /dev/null
+          done
+          for file in .run/*.xml; do
+            python -c 'import sys; import xml.etree.ElementTree as ET; ET.parse(sys.argv[1])' "$file"
+          done
+      - name: Validate Compose models
+        env:
+          RUCIO_TEST_IMAGE: rucio-dev-runtime:validation
+        run: |
+          docker compose \
+            --file etc/docker/dev/docker-compose.yml \
+            config --quiet
+          docker compose \
+            --file etc/docker/dev/docker-compose.yml \
+            --file etc/docker/dev/docker-compose.instrumentation.yml \
+            --file etc/docker/dev/docker-compose.debug.yml \
+            config --quiet
+          docker compose \
+            --file etc/docker/dev/docker-compose.yml \
+            --file etc/docker/dev/docker-compose.api.yml \
+            config --quiet
+          docker compose \
+            --file etc/docker/dev/docker-compose.yml \
+            --file etc/docker/dev/docker-compose.ports.yml \
+            config --quiet
+          docker compose \
+            --file etc/docker/dev/docker-compose.yml \
+            --file etc/docker/dev/docker-compose.observe.yml \
+            --profile observe \
+            config --quiet
+          docker compose \
+            --file etc/docker/dev/docker-compose.yml \
+            --file etc/docker/dev/docker-compose.test.yml \
+            --profile postgres14 \
+            config --quiet
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+      - name: Run toolbox Docker smoke test
+        run: >-
+          ./tools/dev test unit-py310 --
+          tests/ruciopytest/test_infra_manager.py::test_initialized_database_uses_configured_schema

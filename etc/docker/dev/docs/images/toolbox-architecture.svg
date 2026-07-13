@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080" role="img" aria-labelledby="title description">
+  <title id="title">Rucio developer toolbox architecture</title>
+  <desc id="description">VS Code, PyCharm, and the terminal use the tools dev interface. CI uses the pytest runner contract. Both resolve checkout-scoped execution with either a Compose project or the unit-container path and produce test, debug, profile, telemetry, and performance-report evidence.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0 0 L12 6 L0 12 Z" fill="#24736b"/>
+    </marker>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#102a26" flood-opacity="0.14"/>
+    </filter>
+  </defs>
+  <rect width="1920" height="1080" fill="#f4f7f6"/>
+  <text x="96" y="92" fill="#102a26" font-family="Arial, sans-serif" font-size="46" font-weight="700">One toolbox, independent of the editor</text>
+  <text x="96" y="142" fill="#506762" font-family="Arial, sans-serif" font-size="25">The IDE is a control surface. Each target selects its verified container runtime and execution path.</text>
+
+  <g filter="url(#shadow)">
+    <rect x="96" y="226" width="340" height="178" rx="22" fill="#ffffff" stroke="#cbd8d5" stroke-width="3"/>
+    <text x="132" y="278" fill="#24736b" font-family="Arial, sans-serif" font-size="20" font-weight="700" letter-spacing="2">ENTRY POINTS</text>
+    <text x="132" y="330" fill="#102a26" font-family="Arial, sans-serif" font-size="30" font-weight="700">VS Code · PyCharm</text>
+    <text x="132" y="374" fill="#506762" font-family="Arial, sans-serif" font-size="25">Terminal · CI workflows</text>
+
+    <rect x="588" y="210" width="438" height="210" rx="22" fill="#163d37"/>
+    <text x="632" y="269" fill="#aee6dc" font-family="Arial, sans-serif" font-size="20" font-weight="700" letter-spacing="2">TOOLBOX CONTRACTS</text>
+    <text x="632" y="333" fill="#ffffff" font-family="monospace" font-size="42" font-weight="700">./tools/dev</text>
+    <text x="632" y="374" fill="#dcebe8" font-family="Arial, sans-serif" font-size="22">developer interface</text>
+    <text x="632" y="405" fill="#dcebe8" font-family="Arial, sans-serif" font-size="22">pytest runner · CI matrix</text>
+
+    <rect x="1190" y="192" width="634" height="246" rx="22" fill="#ffffff" stroke="#cbd8d5" stroke-width="3"/>
+    <text x="1234" y="247" fill="#24736b" font-family="Arial, sans-serif" font-size="20" font-weight="700" letter-spacing="2">CHECKOUT-SCOPED ORCHESTRATION</text>
+    <text x="1234" y="302" fill="#102a26" font-family="Arial, sans-serif" font-size="29" font-weight="700">Runtime + Compose / unit path</text>
+    <text x="1234" y="350" fill="#506762" font-family="Arial, sans-serif" font-size="24">Current source mounted read-write at /rucio_source</text>
+    <text x="1234" y="392" fill="#506762" font-family="Arial, sans-serif" font-size="24">Project lock prevents conflicting workspace mutations</text>
+  </g>
+
+  <path d="M436 315 H568" stroke="#24736b" stroke-width="6" fill="none" marker-end="url(#arrow)"/>
+  <path d="M1026 315 H1170" stroke="#24736b" stroke-width="6" fill="none" marker-end="url(#arrow)"/>
+
+  <g filter="url(#shadow)">
+    <rect x="96" y="544" width="1728" height="236" rx="28" fill="#ffffff" stroke="#cbd8d5" stroke-width="3"/>
+    <text x="140" y="601" fill="#24736b" font-family="Arial, sans-serif" font-size="20" font-weight="700" letter-spacing="2">DOCKER EXECUTION PLANE</text>
+
+    <rect x="140" y="635" width="340" height="102" rx="16" fill="#e2f1ee"/>
+    <text x="174" y="679" fill="#102a26" font-family="Arial, sans-serif" font-size="27" font-weight="700">Rucio workspace</text>
+    <text x="174" y="714" fill="#506762" font-family="Arial, sans-serif" font-size="20">Shells · daemons · tooling</text>
+
+    <rect x="514" y="635" width="340" height="102" rx="16" fill="#eaf0f7"/>
+    <text x="548" y="679" fill="#102a26" font-family="Arial, sans-serif" font-size="27" font-weight="700">Rucio HTTPD</text>
+    <text x="548" y="714" fill="#506762" font-family="Arial, sans-serif" font-size="20">Persistent API service</text>
+
+    <rect x="888" y="635" width="340" height="102" rx="16" fill="#f1ece2"/>
+    <text x="922" y="679" fill="#102a26" font-family="Arial, sans-serif" font-size="27" font-weight="700">PostgreSQL</text>
+    <text x="922" y="714" fill="#506762" font-family="Arial, sans-serif" font-size="20">Fresh or reusable catalogue</text>
+
+    <rect x="1262" y="635" width="518" height="102" rx="16" fill="#f3eaf4"/>
+    <text x="1296" y="679" fill="#102a26" font-family="Arial, sans-serif" font-size="27" font-weight="700">Optional capabilities</text>
+    <text x="1296" y="714" fill="#506762" font-family="Arial, sans-serif" font-size="20">Storage · messaging · IAM · telemetry</text>
+  </g>
+
+  <path d="M1507 438 V522" stroke="#24736b" stroke-width="6" fill="none" marker-end="url(#arrow)"/>
+
+  <text x="96" y="874" fill="#102a26" font-family="Arial, sans-serif" font-size="31" font-weight="700">Evidence, not editor-specific state</text>
+  <g font-family="Arial, sans-serif">
+    <rect x="96" y="914" width="282" height="94" rx="18" fill="#163d37"/>
+    <text x="130" y="955" fill="#ffffff" font-size="25" font-weight="700">Isolated test runs</text>
+    <text x="130" y="986" fill="#cfe4df" font-size="18">logs + cleanup status</text>
+    <rect x="408" y="914" width="282" height="94" rx="18" fill="#245e58"/>
+    <text x="442" y="955" fill="#ffffff" font-size="25" font-weight="700">DAP debugging</text>
+    <text x="442" y="986" fill="#d8ebe7" font-size="18">same path mapping</text>
+    <rect x="720" y="914" width="282" height="94" rx="18" fill="#2f716a"/>
+    <text x="754" y="955" fill="#ffffff" font-size="25" font-weight="700">Profiles</text>
+    <text x="754" y="986" fill="#d8ebe7" font-size="18">CPU · memory · calls</text>
+    <rect x="1032" y="914" width="282" height="94" rx="18" fill="#3c8079"/>
+    <text x="1066" y="955" fill="#ffffff" font-size="25" font-weight="700">Telemetry</text>
+    <text x="1066" y="986" fill="#e2f0ed" font-size="18">traces + logs + metrics</text>
+    <rect x="1344" y="914" width="480" height="94" rx="18" fill="#4c8f87"/>
+    <text x="1378" y="955" fill="#ffffff" font-size="25" font-weight="700">Performance reports</text>
+    <text x="1378" y="986" fill="#e7f2f0" font-size="18">comparability + provenance</text>
+  </g>
+</svg>

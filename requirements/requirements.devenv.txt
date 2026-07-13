@@ -1,0 +1,13 @@
+# Tools installed only in the development and test runtimes.
+debugpy==1.8.21
+memray==1.19.3
+opentelemetry-distro==0.62b1
+opentelemetry-exporter-otlp-proto-http==1.41.1
+opentelemetry-instrumentation-flask==0.62b1
+opentelemetry-instrumentation-logging==0.62b1
+opentelemetry-instrumentation-requests==0.62b1
+opentelemetry-instrumentation-sqlalchemy==0.62b1
+opentelemetry-instrumentation-threading==0.62b1
+py-spy==0.4.2
+pytest-rerunfailures==16.0.1
+yappi==1.7.6

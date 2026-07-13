@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" role="img" aria-labelledby="title desc">
+  <title id="title">Container resources · one PostgreSQL REST test</title>
+  <desc id="desc">Static vector rendering of genuine Docker resource samples for Rucio and PostgreSQL, including CPU, memory, network and process trends.</desc>
+  <style>
+    .bg{fill:#0b1916}.title{font:700 48px system-ui,sans-serif;fill:#f5faf8}.subtitle{font:26px system-ui,sans-serif;fill:#a9bbb5}.outcome{font:600 22px system-ui,sans-serif;fill:#70d4c1}.card{fill:#122723;stroke:#28564d;stroke-width:2}.card-label{font:20px system-ui,sans-serif;fill:#94aaa3}.card-value{font:700 31px system-ui,sans-serif;fill:#f4faf7}.card-detail{font:19px system-ui,sans-serif;fill:#b8c8c3}.panel rect{fill:#10231f;stroke:#28564d;stroke-width:2}.panel-title{font:700 27px system-ui,sans-serif;fill:#eef7f4}.unit,.legend,.axis{font:18px system-ui,sans-serif;fill:#9fb3ac}.grid{stroke:#29423c;stroke-width:1}.series{fill:none;stroke-width:4;stroke-linecap:round;stroke-linejoin:round}.legend-line{stroke-width:5;stroke-linecap:round}.footer{font:20px system-ui,sans-serif;fill:#90a59e}
+  </style>
+  <rect class="bg" width="1920" height="1080"/>
+  <text class="title" x="48" y="62">Container resources · one PostgreSQL REST test</text>
+  <text class="subtitle" x="48" y="108">Actual per-container Docker samples · relative time · no host identity</text>
+  <text class="outcome" x="1872" y="108" text-anchor="end">Focused test completed · 7 service containers sampled</text>
+  <g><rect class="card" x="48" y="142" width="426" height="116" rx="17"/><text class="card-label" x="72" y="174">Sampling window</text><text class="card-value" x="72" y="214">14s</text><text class="card-detail" x="72" y="242">8 Rucio samples</text></g>
+<g><rect class="card" x="510" y="142" width="426" height="116" rx="17"/><text class="card-label" x="534" y="174">Rucio CPU</text><text class="card-value" x="534" y="214">68.77% avg</text><text class="card-detail" x="534" y="242">97.24% peak</text></g>
+<g><rect class="card" x="972" y="142" width="426" height="116" rx="17"/><text class="card-label" x="996" y="174">Rucio memory</text><text class="card-value" x="996" y="214">585 MiB peak</text><text class="card-detail" x="996" y="242">272 PIDs peak</text></g>
+<g><rect class="card" x="1434" y="142" width="426" height="116" rx="17"/><text class="card-label" x="1458" y="174">Rucio network change</text><text class="card-value" x="1458" y="214">0.29 MiB received</text><text class="card-detail" x="1458" y="242">0.52 MiB sent</text></g>
+  <g class="panel"><rect x="48" y="286" width="882" height="310" rx="20"/>
+<text class="panel-title" x="76" y="328">CPU utilization</text>
+<text class="unit" x="902" y="328" text-anchor="end">% of one logical CPU</text>
+<line class="grid" x1="140" y1="384" x2="890" y2="384"/>
+<text class="axis" x="126" y="389" text-anchor="end">105.0</text>
+<line class="grid" x1="140" y1="424.5" x2="890" y2="424.5"/>
+<text class="axis" x="126" y="429.5" text-anchor="end">78.8</text>
+<line class="grid" x1="140" y1="465" x2="890" y2="465"/>
+<text class="axis" x="126" y="470" text-anchor="end">52.5</text>
+<line class="grid" x1="140" y1="505.5" x2="890" y2="505.5"/>
+<text class="axis" x="126" y="510.5" text-anchor="end">26.3</text>
+<line class="grid" x1="140" y1="546" x2="890" y2="546"/>
+<text class="axis" x="126" y="551" text-anchor="end">0.0</text>
+<text class="axis" x="140" y="574">0s</text>
+<text class="axis" x="890" y="574" text-anchor="end">14s</text>
+<path class="series" stroke="#5ee0c1" d="M140.0,545.7 L247.4,434.4 L354.1,402.3 L461.2,398.3 L568.0,397.5 L674.8,396.0 L781.8,399.6 L890.0,545.5"/>
+<line class="legend-line" stroke="#5ee0c1" x1="140" y1="356" x2="176" y2="356"/>
+<text class="legend" x="186" y="362">Rucio</text>
+<path class="series" stroke="#f3bf5b" d="M140.0,541.1 L247.4,545.2 L354.1,538.4 L461.2,544.5 L568.0,544.7 L674.8,542.0 L781.8,541.9 L890.0,545.9"/>
+<line class="legend-line" stroke="#f3bf5b" x1="375" y1="356" x2="411" y2="356"/>
+<text class="legend" x="421" y="362">PostgreSQL</text>
+</g>
+  <g class="panel"><rect x="990" y="286" width="882" height="310" rx="20"/>
+<text class="panel-title" x="1018" y="328">Memory usage</text>
+<text class="unit" x="1844" y="328" text-anchor="end">MiB</text>
+<line class="grid" x1="1082" y1="384" x2="1832" y2="384"/>
+<text class="axis" x="1068" y="389" text-anchor="end">632</text>
+<line class="grid" x1="1082" y1="424.5" x2="1832" y2="424.5"/>
+<text class="axis" x="1068" y="429.5" text-anchor="end">474</text>
+<line class="grid" x1="1082" y1="465" x2="1832" y2="465"/>
+<text class="axis" x="1068" y="470" text-anchor="end">316</text>
+<line class="grid" x1="1082" y1="505.5" x2="1832" y2="505.5"/>
+<text class="axis" x="1068" y="510.5" text-anchor="end">158</text>
+<line class="grid" x1="1082" y1="546" x2="1832" y2="546"/>
+<text class="axis" x="1068" y="551" text-anchor="end">0</text>
+<text class="axis" x="1082" y="574">0s</text>
+<text class="axis" x="1832" y="574" text-anchor="end">14s</text>
+<path class="series" stroke="#80aaff" d="M1082.0,509.2 L1189.4,474.5 L1296.1,480.5 L1403.2,478.3 L1510.0,461.8 L1616.8,396.0 L1723.8,407.6 L1832.0,424.3"/>
+<line class="legend-line" stroke="#80aaff" x1="1082" y1="356" x2="1118" y2="356"/>
+<text class="legend" x="1128" y="362">Rucio</text>
+<path class="series" stroke="#d89cff" d="M1082.0,540.1 L1189.4,539.3 L1296.1,538.0 L1403.2,537.9 L1510.0,537.5 L1616.8,536.5 L1723.8,536.1 L1832.0,536.5"/>
+<line class="legend-line" stroke="#d89cff" x1="1317" y1="356" x2="1353" y2="356"/>
+<text class="legend" x="1363" y="362">PostgreSQL</text>
+</g>
+  <g class="panel"><rect x="48" y="626" width="882" height="310" rx="20"/>
+<text class="panel-title" x="76" y="668">Rucio network change since first sample</text>
+<text class="unit" x="902" y="668" text-anchor="end">MiB</text>
+<line class="grid" x1="140" y1="724" x2="890" y2="724"/>
+<text class="axis" x="126" y="729" text-anchor="end">1</text>
+<line class="grid" x1="140" y1="764.5" x2="890" y2="764.5"/>
+<text class="axis" x="126" y="769.5" text-anchor="end">1</text>
+<line class="grid" x1="140" y1="805" x2="890" y2="805"/>
+<text class="axis" x="126" y="810" text-anchor="end">1</text>
+<line class="grid" x1="140" y1="845.5" x2="890" y2="845.5"/>
+<text class="axis" x="126" y="850.5" text-anchor="end">0</text>
+<line class="grid" x1="140" y1="886" x2="890" y2="886"/>
+<text class="axis" x="126" y="891" text-anchor="end">0</text>
+<text class="axis" x="140" y="914">0s</text>
+<text class="axis" x="890" y="914" text-anchor="end">14s</text>
+<path class="series" stroke="#59d67a" d="M140.0,886.0 L247.4,885.2 L354.1,869.0 L461.2,859.4 L568.0,855.7 L674.8,854.0 L781.8,844.0 L890.0,842.5"/>
+<line class="legend-line" stroke="#59d67a" x1="140" y1="696" x2="176" y2="696"/>
+<text class="legend" x="186" y="702">Received</text>
+<path class="series" stroke="#ff9b58" d="M140.0,886.0 L247.4,885.3 L354.1,853.4 L461.2,835.7 L568.0,831.1 L674.8,828.8 L781.8,810.5 L890.0,808.2"/>
+<line class="legend-line" stroke="#ff9b58" x1="375" y1="696" x2="411" y2="696"/>
+<text class="legend" x="421" y="702">Transmitted</text>
+</g>
+  <g class="panel"><rect x="990" y="626" width="882" height="310" rx="20"/>
+<text class="panel-title" x="1018" y="668">Processes and kernel tasks</text>
+<text class="unit" x="1844" y="668" text-anchor="end">Docker PIDs</text>
+<line class="grid" x1="1082" y1="724" x2="1832" y2="724"/>
+<text class="axis" x="1068" y="729" text-anchor="end">293.8</text>
+<line class="grid" x1="1082" y1="764.5" x2="1832" y2="764.5"/>
+<text class="axis" x="1068" y="769.5" text-anchor="end">220.3</text>
+<line class="grid" x1="1082" y1="805" x2="1832" y2="805"/>
+<text class="axis" x="1068" y="810" text-anchor="end">146.9</text>
+<line class="grid" x1="1082" y1="845.5" x2="1832" y2="845.5"/>
+<text class="axis" x="1068" y="850.5" text-anchor="end">73.4</text>
+<line class="grid" x1="1082" y1="886" x2="1832" y2="886"/>
+<text class="axis" x="1068" y="891" text-anchor="end">0.0</text>
+<text class="axis" x="1082" y="914">0s</text>
+<text class="axis" x="1832" y="914" text-anchor="end">14s</text>
+<path class="series" stroke="#55c7ef" d="M1082.0,772.4 L1189.4,765.2 L1296.1,764.7 L1403.2,764.7 L1510.0,736.0 L1616.8,736.0 L1723.8,736.6 L1832.0,737.7"/>
+<line class="legend-line" stroke="#55c7ef" x1="1082" y1="696" x2="1118" y2="696"/>
+<text class="legend" x="1128" y="702">Rucio</text>
+<path class="series" stroke="#ef75a7" d="M1082.0,881.6 L1189.4,880.5 L1296.1,880.5 L1403.2,881.0 L1510.0,880.5 L1616.8,879.4 L1723.8,879.4 L1832.0,879.9"/>
+<line class="legend-line" stroke="#ef75a7" x1="1317" y1="696" x2="1353" y2="696"/>
+<text class="legend" x="1363" y="702">PostgreSQL</text>
+</g>
+  <text class="footer" x="48" y="1014">Static vector from the genuine resources.html sample payload · generated report remains interactive · diagnostic example, not a capacity baseline</text>
+</svg>

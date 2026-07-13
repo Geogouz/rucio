@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080" role="img" aria-labelledby="title description">
+  <title id="title">Rucio profiling and observability signal map</title>
+  <desc id="description">A comparison of CPU sampling, peak allocation, call statistics, Docker resources, and OpenTelemetry. Each view answers a different question and none attributes CPU, memory, and network usage to every method at once.</desc>
+  <rect width="1920" height="1080" fill="#f4f7f6"/>
+  <text x="86" y="84" fill="#102a26" font-family="Arial, sans-serif" font-size="46" font-weight="700">Choose the signal that matches the question</text>
+  <text x="86" y="133" fill="#506762" font-family="Arial, sans-serif" font-size="25">Correlate views by workload and time; do not treat one profiler as complete attribution.</text>
+
+  <g font-family="Arial, sans-serif">
+    <rect x="86" y="200" width="340" height="706" rx="24" fill="#163d37"/>
+    <text x="126" y="260" fill="#aee6dc" font-size="20" font-weight="700" letter-spacing="2">VIEW</text>
+    <text x="126" y="350" fill="#ffffff" font-size="27" font-weight="700">CPU samples</text>
+    <text x="126" y="472" fill="#ffffff" font-size="27" font-weight="700">Peak allocation</text>
+    <text x="126" y="594" fill="#ffffff" font-size="27" font-weight="700">Call statistics</text>
+    <text x="126" y="716" fill="#ffffff" font-size="27" font-weight="700">Container resources</text>
+    <text x="126" y="838" fill="#ffffff" font-size="27" font-weight="700">Traces + logs</text>
+
+    <rect x="426" y="200" width="566" height="706" fill="#ffffff" stroke="#cbd8d5" stroke-width="3"/>
+    <text x="466" y="260" fill="#24736b" font-size="20" font-weight="700" letter-spacing="2">BEST QUESTION</text>
+    <text x="466" y="342" fill="#102a26" font-size="24" font-weight="700">Which Python stacks are on CPU?</text>
+    <text x="466" y="378" fill="#506762" font-size="20">Width is sample share, not chronology.</text>
+    <text x="466" y="464" fill="#102a26" font-size="24" font-weight="700">Which stacks contribute at high-water?</text>
+    <text x="466" y="500" fill="#506762" font-size="20">Allocation contribution is not retained memory.</text>
+    <text x="466" y="586" fill="#102a26" font-size="24" font-weight="700">Where is Python own/cumulative CPU time?</text>
+    <text x="466" y="622" fill="#506762" font-size="20">Deterministic instrumentation adds overhead.</text>
+    <text x="466" y="708" fill="#102a26" font-size="24" font-weight="700">When do containers use CPU, RAM, or I/O?</text>
+    <text x="466" y="744" fill="#506762" font-size="20">Panels auto-scale independently.</text>
+    <text x="466" y="830" fill="#102a26" font-size="24" font-weight="700">Where is elapsed latency across boundaries?</text>
+    <text x="466" y="866" fill="#506762" font-size="20">Spans show latency only where instrumented.</text>
+
+    <rect x="992" y="200" width="842" height="706" rx="0" fill="#f8faf9" stroke="#cbd8d5" stroke-width="3"/>
+    <text x="1032" y="260" fill="#24736b" font-size="20" font-weight="700" letter-spacing="2">BOUNDARY / COMPLEMENT</text>
+    <text x="1032" y="342" fill="#102a26" font-size="22">No network bytes; native work can appear at its Python boundary.</text>
+    <text x="1032" y="378" fill="#506762" font-size="20">Correlate with Docker CPU and a repeatable workload.</text>
+    <text x="1032" y="464" fill="#102a26" font-size="22">Not total container, PostgreSQL, or leak attribution.</text>
+    <text x="1032" y="500" fill="#506762" font-size="20">Use child reports for forked processes and the memory timeline.</text>
+    <text x="1032" y="586" fill="#102a26" font-size="22">One process; threads included, spawned processes separate.</text>
+    <text x="1032" y="622" fill="#506762" font-size="20">Confirm hotspots with statistical CPU sampling.</text>
+    <text x="1032" y="708" fill="#102a26" font-size="22">Whole-container counters; no per-method attribution.</text>
+    <text x="1032" y="744" fill="#506762" font-size="20">Use JSONL deltas for exact sampled intervals.</text>
+    <text x="1032" y="830" fill="#102a26" font-size="22">Not CPU time; absence of a span is not absence of work.</text>
+    <text x="1032" y="866" fill="#506762" font-size="20">Use trace IDs to move between Tempo and Loki.</text>
+  </g>
+
+  <g stroke="#d8e2df" stroke-width="2">
+    <line x1="426" y1="408" x2="1834" y2="408"/><line x1="426" y1="530" x2="1834" y2="530"/><line x1="426" y1="652" x2="1834" y2="652"/><line x1="426" y1="774" x2="1834" y2="774"/>
+  </g>
+  <rect x="86" y="948" width="1748" height="84" rx="18" fill="#fff6dc" stroke="#e4c55c" stroke-width="2"/>
+  <text x="126" y="1001" fill="#5a4611" font-family="Arial, sans-serif" font-size="23" font-weight="700">No supported view meters exact CPU, RAM, and network consumption for every Python method. Build a causal case from multiple signals.</text>
+</svg>
