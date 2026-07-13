@@ -21,6 +21,7 @@ COMPOSE_DIR = Path(__file__).resolve().parents[2] / "etc/docker/dev"
 RUNTIME_DOCKERFILE = COMPOSE_DIR.parent / "test/runtime.Dockerfile"
 UNIT_DOCKERFILE = COMPOSE_DIR.parent / "test/unit.Dockerfile"
 DEFAULT_CONFIG = COMPOSE_DIR.parent / "test/extra/rucio_default.cfg"
+DOCKERIGNORE = COMPOSE_DIR.parents[2] / ".dockerignore"
 
 
 def test_compose_services_do_not_use_global_container_names() -> None:
@@ -159,3 +160,9 @@ def test_runtime_dependency_stage_only_copies_requirements() -> None:
 
     assert marker
     assert local_copies == ["COPY requirements /tmp/requirements"]
+
+
+def test_build_context_omits_local_state() -> None:
+    ignored = set(DOCKERIGNORE.read_text().splitlines())
+
+    assert {".git", ".venv", ".test-logs", ".pytest_cache"} <= ignored
