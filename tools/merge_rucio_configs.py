@@ -134,11 +134,15 @@ def merge_configs(source_file_paths, dest_file_path, use_env=True, logger=loggin
         parser.write(sys.stdout)
 
 
-logging.getLogger().setLevel(logging.INFO)
-parser = argparse.ArgumentParser(description="Merge multiple rucio configuration sources into one rucio.cfg")
-parser.add_argument("--use-env", action="store_true", default=False, help='Also source config from RUCIO_CFG_* env variables')
-parser.add_argument('-s', '--source', type=str, nargs='*', help='Source config file paths (in .json, .yaml or .ini format)')
-parser.add_argument('-d', '--destination', default=None, help='Destination file path')
-args = parser.parse_args()
+def main(argv=None):
+    logging.getLogger().setLevel(logging.INFO)
+    parser = argparse.ArgumentParser(description="Merge multiple rucio configuration sources into one rucio.cfg")
+    parser.add_argument("--use-env", action="store_true", default=False, help='Also source config from RUCIO_CFG_* env variables')
+    parser.add_argument('-s', '--source', type=str, nargs='*', help='Source config file paths (in .json, .yaml or .ini format)')
+    parser.add_argument('-d', '--destination', default=None, help='Destination file path')
+    args = parser.parse_args(argv)
+    merge_configs(args.source or [], args.destination, use_env=args.use_env)
 
-merge_configs(args.source or [], args.destination, use_env=args.use_env)
+
+if __name__ == '__main__':
+    main()
