@@ -445,6 +445,7 @@ def test_unit_case_builds_and_runs_requested_python(tmp_path: "Path", monkeypatc
     assert commands[0][commands[0].index("--tag") + 1] in commands[1]
     assert f"{tmp_path.resolve()}:/rucio_source:z" in commands[1]
     assert "PYTHONPATH=/rucio_source/lib" in commands[1]
+    assert "PYTEST_DISABLE_PLUGIN_AUTOLOAD=true" in commands[1]
     assert "RUCIO_LOGGING_FORMAT=json" in commands[1]
     assert commands[1][-4:] == ["-k", "config", "tests/rucio", "tests/ruciopytest"]
 

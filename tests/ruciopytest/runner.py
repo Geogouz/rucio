@@ -165,6 +165,7 @@ def run_unit_case(
     inner_environment.update(container_environment or {})
     inner_environment.update({
         "PYTHONPATH": "/rucio_source/lib",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "true",
         "RUCIO_PYTEST_INNER": "1",
         "RUCIO_SKIP_TEST_SETUP": "1",
         "RUCIO_TEST_CASE": case.id,
