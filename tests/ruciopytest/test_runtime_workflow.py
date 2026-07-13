@@ -60,3 +60,9 @@ def test_runtime_cleanup_is_limited_to_upstream() -> None:
     workflow = CLEANUP_WORKFLOW.read_text()
 
     assert "github.repository_owner == 'rucio'" in workflow
+
+
+def test_runtime_cleanup_paginates_package_versions() -> None:
+    workflow = CLEANUP_WORKFLOW.read_text()
+
+    assert "gh api --paginate --slurp" in workflow

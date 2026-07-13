@@ -26,6 +26,8 @@ jobs:
   cleanup-untagged:
     name: Delete untagged images older than 7 days
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     if: |
       github.repository_owner == 'rucio' && (
         (github.event.schedule == '0 2 * * 0') ||
@@ -42,11 +44,13 @@ jobs:
           echo "Cutoff date: $CUTOFF_DATE"
 
           # Get all package versions
-          VERSIONS=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/orgs/${{ github.repository_owner }}/packages/container/rucio%2Frucio-dev-runtime/versions?per_page=100")
+          VERSIONS=$(gh api --paginate --slurp \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2026-03-10" \
+            "/orgs/${{ github.repository_owner }}/packages/container/rucio%2Frucio-dev-runtime/versions?per_page=100")
 
           # Process each version
-          echo "$VERSIONS" | jq -c '.[]' | while read -r VERSION; do
+          echo "$VERSIONS" | jq -c '.[][]' | while read -r VERSION; do
             VERSION_ID=$(echo "$VERSION" | jq -r '.id')
             UPDATED_AT=$(echo "$VERSION" | jq -r '.updated_at')
             TAGS=$(echo "$VERSION" | jq -r '.metadata.container.tags | length')
@@ -70,6 +74,8 @@ jobs:
   cleanup-tagged:
     name: Delete tagged images older than 30 days
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     if: |
       github.repository_owner == 'rucio' && (
         (github.event.schedule == '0 3 1 * *') ||
@@ -85,10 +91,12 @@ jobs:
           CUTOFF_DATE=$(date -d '30 days ago' --iso-8601=seconds)
           echo "Cutoff date: $CUTOFF_DATE"
 
-          VERSIONS=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/orgs/${{ github.repository_owner }}/packages/container/rucio%2Frucio-dev-runtime/versions?per_page=100")
+          VERSIONS=$(gh api --paginate --slurp \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2026-03-10" \
+            "/orgs/${{ github.repository_owner }}/packages/container/rucio%2Frucio-dev-runtime/versions?per_page=100")
 
-          echo "$VERSIONS" | jq -c '.[]' | while read -r VERSION; do
+          echo "$VERSIONS" | jq -c '.[][]' | while read -r VERSION; do
             VERSION_ID=$(echo "$VERSION" | jq -r '.id')
             UPDATED_AT=$(echo "$VERSION" | jq -r '.updated_at')
             TAGS=$(echo "$VERSION" | jq -r '.metadata.container.tags')
