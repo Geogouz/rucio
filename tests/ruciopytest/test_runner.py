@@ -81,6 +81,7 @@ def _reset_manager(monkeypatch, results=()):
 def test_forwarded_args_remove_only_runner_options() -> None:
     assert runner.forwarded_pytest_args([
         "--suite=remote_dbs",
+        "--case-workers=2",
         "--keep-db",
         "-k",
         "rule",

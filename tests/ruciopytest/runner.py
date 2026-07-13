@@ -37,6 +37,7 @@ _RUNNER_FLAGS = {
 }
 _RUNNER_OPTIONS = {
     "--case",
+    "--case-workers",
     "--container-env",
     "--policy",
     "--suite",
@@ -151,7 +152,7 @@ def run_unit_case(
     )
 
     command = ["docker", "run"]
-    if _is_interactive(pytest_args):
+    if is_interactive(pytest_args):
         command.extend(("--interactive", "--tty"))
     command.extend((
         "--rm",
@@ -362,7 +363,7 @@ def _run_inner_pytest(
         *command,
         environment=inner_environment,
         check=False,
-        interactive=_is_interactive(pytest_args),
+        interactive=is_interactive(pytest_args),
     ).returncode
 
 
@@ -383,7 +384,7 @@ def qualify_junit(arguments: "Sequence[str]", qualifier: str) -> list[str]:
 
 def append_coverage(arguments: "Sequence[str]") -> list[str]:
     updated = list(arguments)
-    if _coverage_enabled(updated) and "--cov-append" not in updated:
+    if coverage_enabled(updated) and "--cov-append" not in updated:
         updated.append("--cov-append")
     return updated
 
@@ -396,7 +397,7 @@ def defer_coverage_threshold(arguments: "Sequence[str]") -> list[str]:
         and updated[index + 1] == "0"
         for index, argument in enumerate(updated)
     )
-    if _coverage_enabled(updated) and not zero_threshold:
+    if coverage_enabled(updated) and not zero_threshold:
         updated.append("--cov-fail-under=0")
     return updated
 
@@ -418,7 +419,7 @@ def _has_coverage_option(arguments: "Sequence[str]") -> bool:
     )
 
 
-def _coverage_enabled(arguments: "Sequence[str]") -> bool:
+def coverage_enabled(arguments: "Sequence[str]") -> bool:
     return "--no-cov" not in arguments and any(
         argument == "--cov" or argument.startswith("--cov=")
         for argument in arguments
@@ -437,7 +438,7 @@ def _executes_tests(arguments: "Sequence[str]") -> bool:
     return info_options.isdisjoint(arguments)
 
 
-def _is_interactive(arguments: "Sequence[str]") -> bool:
+def is_interactive(arguments: "Sequence[str]") -> bool:
     return any(
         argument in ("--pdb", "--trace") or argument.startswith("--pdbcls")
         for argument in arguments

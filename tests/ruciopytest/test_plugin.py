@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import json
+import threading
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -34,6 +35,7 @@ class _Config:
             "dry_run": False,
             "dry_run_json": False,
             "xdist_workers": None,
+            "case_workers": None,
             "container_env": [],
             "keep_db": False,
         }
@@ -126,6 +128,7 @@ def test_dry_run_does_not_start_containers(monkeypatch, capsys) -> None:
         {"dry_run_json": True},
         {"container_env": ["DEBUG=1"]},
         {"xdist_workers": 2},
+        {"case_workers": 2},
         {"policy": "atlas"},
     ),
 )
@@ -238,6 +241,76 @@ def test_suite_runs_every_matching_case(monkeypatch) -> None:
     ]
 
 
+def test_suite_runs_cases_concurrently(monkeypatch) -> None:
+    config = _Config(suite="client", case_workers=2)
+    barrier = threading.Barrier(2)
+    cases = []
+
+    def run(case, *args, **kwargs):
+        cases.append(case.id)
+        barrier.wait(timeout=5)
+        return 0
+
+    monkeypatch.setattr(plugin.runner, "run_container_case", run)
+
+    assert plugin.pytest_cmdline_main(config) == 0
+    assert set(cases) == {
+        "client-py39-postgres14",
+        "client-py310-postgres14",
+    }
+
+
+def test_parallel_exitfirst_does_not_submit_pending_cases(monkeypatch) -> None:
+    config = _Config(suite="remote_dbs", case_workers=2, maxfail=1)
+    config.invocation_params = SimpleNamespace(args=("--suite=remote_dbs", "-x"))
+    cases = []
+
+    class Future:
+        def __init__(self, result):
+            self.result_value = result
+            self.was_cancelled = False
+
+        def cancel(self):
+            self.was_cancelled = True
+
+        def cancelled(self):
+            return self.was_cancelled
+
+        def result(self):
+            return self.result_value
+
+    class Executor:
+        def __init__(self, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        def submit(self, function, *args):
+            return Future(function(*args))
+
+    def run(case, *args, **kwargs):
+        cases.append(case.id)
+        return int(len(cases) == 1)
+
+    monkeypatch.setattr(plugin, "ThreadPoolExecutor", Executor)
+    monkeypatch.setattr(
+        plugin,
+        "wait",
+        lambda pending, **kwargs: ({next(iter(pending))}, set()),
+    )
+    monkeypatch.setattr(plugin.runner, "run_container_case", run)
+
+    assert plugin.pytest_cmdline_main(config) == 1
+    assert cases == [
+        "remote-dbs-py39-oracle",
+        "remote-dbs-py39-postgres14",
+    ]
+
+
 def test_suite_continues_after_infrastructure_failure(monkeypatch, capsys) -> None:
     config = _Config(suite="client")
     cases = []
@@ -298,6 +371,33 @@ def test_suite_combines_coverage(monkeypatch) -> None:
         "--cov-report=xml:test-results/coverage.xml" in case_args
         for case_args in arguments
     )
+
+
+@pytest.mark.parametrize("argument", ("--cov=lib/rucio", "--pdb"))
+def test_parallel_suite_rejects_shared_output(argument, monkeypatch) -> None:
+    config = _Config(suite="client", case_workers=2)
+    config.invocation_params = SimpleNamespace(args=(
+        "--suite=client",
+        "--case-workers=2",
+        argument,
+    ))
+    monkeypatch.setattr(plugin.runner, "run_container_case", pytest.fail)
+
+    with pytest.raises(pytest.UsageError):
+        plugin.pytest_cmdline_main(config)
+
+
+def test_case_workers_require_positive_suite_selection() -> None:
+    with pytest.raises(pytest.UsageError, match="at least 1"):
+        plugin.resolve_requested_cases(
+            _Config(suite="client", case_workers=0),
+            REPO_ROOT,
+        )
+    with pytest.raises(pytest.UsageError, match="requires --suite"):
+        plugin.resolve_requested_cases(
+            _Config(case="unit-py39", case_workers=2),
+            REPO_ROOT,
+        )
 
 
 def test_all_dry_run_json_is_machine_readable(capsys) -> None:

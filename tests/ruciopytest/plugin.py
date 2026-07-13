@@ -15,6 +15,7 @@
 import json
 import os
 import sys
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from dataclasses import replace
 from typing import TYPE_CHECKING
 
@@ -56,6 +57,11 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         "--xdist-workers",
         type=int,
         help="Override the container pytest worker count",
+    )
+    group.addoption(
+        "--case-workers",
+        type=int,
+        help="Run up to this many suite cases concurrently",
     )
     group.addoption(
         "--container-env",
@@ -211,9 +217,17 @@ def _run_cases(
                 "The selected suite cannot use xdist because some cases are serial"
             )
     container_environment = _parse_environment(config.getoption("container_env"))
+    worker_count = min(config.getoption("case_workers") or 1, len(cases))
+    if worker_count > 1 and runner.coverage_enabled(pytest_args):
+        raise pytest.UsageError("Coverage cannot run with multiple case workers")
+    if worker_count > 1 and runner.is_interactive(pytest_args):
+        raise pytest.UsageError(
+            "Interactive debugging cannot run with multiple case workers"
+        )
     fail_fast = config.getoption("maxfail", 0) == 1
-    failures = []
-    for index, case in enumerate(cases):
+    failed_cases = set()
+
+    def run_case(index: int, case: "TestCase") -> bool:
         print(f"\n===== {case.id} =====", flush=True)
         case_args = runner.qualify_junit(pytest_args, case.id)
         if index:
@@ -240,15 +254,40 @@ def _run_cases(
                 )
         except Exception as error:
             print(f"Case {case.id} failed: {error}", file=sys.stderr)
-            failures.append(case.id)
-            if fail_fast:
-                break
-            continue
-        if result:
-            failures.append(case.id)
-            if fail_fast:
-                break
+            return True
+        return bool(result)
 
+    if worker_count == 1:
+        for index, case in enumerate(cases):
+            if run_case(index, case):
+                failed_cases.add(case.id)
+                if fail_fast:
+                    break
+    else:
+        indexed_cases = iter(enumerate(cases))
+        pending = {}
+        stopping = False
+        with ThreadPoolExecutor(max_workers=worker_count) as executor:
+            while True:
+                while not stopping and len(pending) < worker_count:
+                    try:
+                        index, case = next(indexed_cases)
+                    except StopIteration:
+                        break
+                    pending[executor.submit(run_case, index, case)] = case
+                if not pending:
+                    break
+                completed, _ = wait(pending, return_when=FIRST_COMPLETED)
+                for future in completed:
+                    case = pending.pop(future)
+                    if not future.cancelled() and future.result():
+                        failed_cases.add(case.id)
+                        stopping = stopping or fail_fast
+                if stopping:
+                    for future in pending:
+                        future.cancel()
+
+    failures = [case.id for case in cases if case.id in failed_cases]
     if failures:
         print(f"Failed cases: {', '.join(failures)}")
         return 1
@@ -262,14 +301,20 @@ def resolve_requested_cases(
     case_id = config.getoption("case")
     suite = config.getoption("suite")
     policy = config.getoption("policy")
+    case_workers = config.getoption("case_workers")
+    if case_workers is not None and case_workers < 1:
+        raise pytest.UsageError("--case-workers must be at least 1")
     if case_id and suite:
         raise pytest.UsageError("--case and --suite are mutually exclusive")
+    if case_id and case_workers is not None:
+        raise pytest.UsageError("--case-workers requires --suite")
     if not case_id and not suite and any((
         config.getoption("keep_db"),
         config.getoption("dry_run"),
         config.getoption("dry_run_json"),
         config.getoption("container_env"),
         config.getoption("xdist_workers") is not None,
+        case_workers is not None,
         policy,
     )):
         raise pytest.UsageError(
