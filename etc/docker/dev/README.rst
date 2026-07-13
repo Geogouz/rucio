@@ -2,19 +2,23 @@ Setting up a Rucio development environment
 ==========================================
 
 Prerequisites
---------------
+-------------
 
 We provide a containerised version of the Rucio development environment for a
 quick start. Docker Compose v2 (``docker compose``) is the supported container
 runtime.
 
-To install Docker for your platform, please refer to the `Docker installation guide <https://docs.docker.com/install/>`_, for example, for CentOS `follow these instructions for the Docker Community Edition <https://docs.docker.com/install/linux/docker-ce/centos/>`_. Please make sure that you install this recent Docker version especially if you are on CentOS, i.e. its default version is ancient and does not support some features we rely on.
+Install Docker Engine and the Docker Compose plugin by following the
+`Docker installation guide <https://docs.docker.com/engine/install/>`_. Start
+the Docker daemon, then verify both Docker and Compose::
 
-Start the Docker daemon with `systemctl start docker`. You can confirm that Docker is running properly by executing (might need `sudo`)::
+    docker run --rm hello-world
+    docker compose version
 
-    docker run hello-world
+Let Compose select native multi-architecture images. In particular, remove a
+host-wide platform override left by another project::
 
-If successful, this will print an informational message telling you that you are ready to go.  Now, also install the `docker-compose` helper tool with `sudo yum install docker-compose` (might need `EPEL <https://fedoraproject.org/wiki/EPEL>`_ enabled). You are now ready to install the Rucio development environment.
+    unset DOCKER_DEFAULT_PLATFORM
 
 Oracle XE cannot run on Apple Silicon through Docker Desktop. Run Oracle cases
 with an x86_64 Docker daemon, as described in the
