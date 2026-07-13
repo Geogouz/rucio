@@ -62,7 +62,7 @@ Running tests
 
 The test runner creates its own isolated Compose project, so a development stack does not need to be running first. Install only its host-side orchestration dependencies::
 
-    python -m pip install --constraint requirements/requirements.dev.txt pytest pyyaml
+    python -m pip install --constraint requirements/requirements.dev.txt pytest pytest-cov pytest-xdist pyyaml
 
 List the 15 canonical local and CI cases, or run all of them::
 
