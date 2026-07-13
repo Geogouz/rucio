@@ -21,10 +21,6 @@ host-wide platform override left by another project::
 
     unset DOCKER_DEFAULT_PLATFORM
 
-Oracle XE cannot run on Apple Silicon through Docker Desktop. Run Oracle cases
-with an x86_64 Docker daemon, as described in the
-`Oracle XE image documentation <https://github.com/gvenzl/oci-oracle-xe#oracle-xe-on-apple-m-chips>`_.
-
 Preparing the checkout
 ----------------------
 
@@ -184,6 +180,10 @@ Normal pytest arguments such as ``-k``, ``-x``, ``--pdb``, coverage options,
 and JUnit output are forwarded. ``--keep-db`` retains the database volume for
 each selected case. PostgreSQL and Oracle are the supported server test
 databases; MySQL and SQLite are not development test targets.
+
+Oracle XE cannot run on Apple Silicon through Docker Desktop. Run Oracle cases
+with an x86_64 Docker daemon, as described in the
+`Oracle XE image documentation <https://github.com/gvenzl/oci-oracle-xe#oracle-xe-on-apple-m-chips>`_.
 
 Environment including storage
 -----------------------------
