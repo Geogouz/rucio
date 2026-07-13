@@ -130,15 +130,16 @@ def run_unit_case(
     ))
     subprocess.run(build, check=True, cwd=root_dir, env=environment)  # noqa: S603
 
-    command = [
-        runtime,
-        "run",
+    command = [runtime, "run"]
+    if _is_interactive(pytest_args):
+        command.extend(("--interactive", "--tty"))
+    command.extend((
         "--rm",
         "--volume",
         f"{root_dir.resolve()}:/rucio_source",
         "--workdir",
         "/rucio_source",
-    ]
+    ))
     for key, value in (container_environment or {}).items():
         command.extend(("--env", f"{key}={value}"))
     command.extend((

@@ -291,3 +291,17 @@ def test_unit_case_loads_requested_pytest_plugins(tmp_path: "Path", monkeypatch)
 
     assert commands[1].count("xdist") == 1
     assert commands[1].count("pytest_cov") == 1
+
+
+def test_unit_case_allocates_terminal_for_pdb(tmp_path: "Path", monkeypatch) -> None:
+    commands = []
+
+    def run(command, **kwargs):
+        commands.append(list(command))
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(runner.subprocess, "run", run)
+
+    runner.run_unit_case(get_case("unit-py312"), tmp_path, ("--pdb",))
+
+    assert commands[1][:4] == ["docker", "run", "--interactive", "--tty"]
