@@ -86,6 +86,18 @@ def test_forwarded_args_remove_only_runner_options() -> None:
     ]
 
 
+def test_outer_args_include_pytest_addopts(monkeypatch) -> None:
+    monkeypatch.setenv("PYTEST_ADDOPTS", "-k 'rule creation' -q")
+
+    assert runner.outer_pytest_args(("--case=unit-py39", "-x")) == [
+        "-k",
+        "rule creation",
+        "-q",
+        "--case=unit-py39",
+        "-x",
+    ]
+
+
 def test_multi_vo_runs_both_legs_in_order(tmp_path: "Path", monkeypatch) -> None:
     _reset_manager(monkeypatch, (0, 0))
 

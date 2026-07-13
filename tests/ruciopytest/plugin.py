@@ -132,12 +132,13 @@ def pytest_cmdline_main(config: pytest.Config) -> "Optional[int]":
             print(f"Tests: {', '.join(case.test_paths)}")
         return 0
 
+    outer_args = runner.outer_pytest_args(config.invocation_params.args)
     explicit_selectors = tuple(
         selector
         for selector in config.args
-        if selector in config.invocation_params.args
+        if selector in outer_args
     )
-    pytest_args = runner.forwarded_pytest_args(config.invocation_params.args)
+    pytest_args = runner.forwarded_pytest_args(outer_args)
     workers = config.getoption("xdist_workers")
     if workers is not None:
         pytest_args.extend(("-n", str(workers)))
@@ -193,12 +194,13 @@ def _run_cases(
             "variable per Python version instead of RUCIO_TEST_IMAGE"
         )
 
+    outer_args = runner.outer_pytest_args(config.invocation_params.args)
     explicit_selectors = tuple(
         selector
         for selector in config.args
-        if selector in config.invocation_params.args
+        if selector in outer_args
     )
-    pytest_args = runner.forwarded_pytest_args(config.invocation_params.args)
+    pytest_args = runner.forwarded_pytest_args(outer_args)
     workers = config.getoption("xdist_workers")
     if workers is not None:
         pytest_args.extend(("-n", str(workers)))

@@ -162,6 +162,21 @@ def test_container_case_forwards_standard_pytest_args(monkeypatch) -> None:
     )
 
 
+def test_container_case_forwards_pytest_addopts(monkeypatch) -> None:
+    config = _Config(case="remote-dbs-py39-postgres14")
+    monkeypatch.setenv("PYTEST_ADDOPTS", "-k rule -q")
+    captured = {}
+
+    def run(case, root_path, pytest_args, **kwargs):
+        captured["args"] = pytest_args
+        return 0
+
+    monkeypatch.setattr(plugin.runner, "run_container_case", run)
+
+    assert plugin.pytest_cmdline_main(config) == 0
+    assert captured["args"] == ["-k", "rule", "-q"]
+
+
 def test_unit_case_uses_container(monkeypatch) -> None:
     config = _Config(case="unit-py39")
     captured = {}

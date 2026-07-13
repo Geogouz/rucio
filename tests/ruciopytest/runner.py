@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import os
+import shlex
 import subprocess  # noqa: S404
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -44,6 +45,13 @@ _RUNNER_OPTIONS = {
     "-c",
 }
 _UNIT_DOCKERFILE = "etc/docker/test/unit.Dockerfile"
+
+
+def outer_pytest_args(arguments: "Sequence[str]") -> list[str]:
+    return [
+        *shlex.split(os.environ.get("PYTEST_ADDOPTS", "")),
+        *arguments,
+    ]
 
 
 def forwarded_pytest_args(arguments: "Sequence[str]") -> list[str]:
