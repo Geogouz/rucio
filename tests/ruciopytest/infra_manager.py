@@ -98,9 +98,16 @@ class InfraManager:
         try:
             from sqlalchemy import inspect
 
+            from rucio.common.config import config_get
             from rucio.db.sqla.session import get_engine
 
-            return "accounts" in inspect(get_engine()).get_table_names()
+            schema = config_get(
+                "database",
+                "schema",
+                raise_exception=False,
+                check_config_table=False,
+            )
+            return inspect(get_engine()).has_table("accounts", schema=schema)
         except Exception:
             return False
 

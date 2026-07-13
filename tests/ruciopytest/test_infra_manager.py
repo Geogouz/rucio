@@ -101,6 +101,21 @@ def test_keep_db_initializes_an_empty_database(tmp_path: "Path", monkeypatch) ->
     calls._reset_database.assert_called_once()
 
 
+def test_initialized_database_uses_configured_schema(
+    tmp_path: "Path",
+    monkeypatch,
+) -> None:
+    manager = _manager(tmp_path, keep_db=True)
+    inspector = Mock()
+    inspector.has_table.return_value = True
+    monkeypatch.setattr("sqlalchemy.inspect", Mock(return_value=inspector))
+    monkeypatch.setattr("rucio.common.config.config_get", Mock(return_value="dev"))
+    monkeypatch.setattr("rucio.db.sqla.session.get_engine", Mock())
+
+    assert manager._database_initialized()
+    inspector.has_table.assert_called_once_with("accounts", schema="dev")
+
+
 def test_second_multi_vo_leg_reuses_shared_database(tmp_path: "Path", monkeypatch) -> None:
     manager = _manager(
         tmp_path,
