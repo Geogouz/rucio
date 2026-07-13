@@ -43,6 +43,16 @@ def test_pull_requests_never_publish_missing_images() -> None:
     assert 'if [[ "${{ github.event_name }}" == "pull_request" ]]' in workflow
 
 
+def test_runtime_images_are_exposed_by_case_key() -> None:
+    workflow = WORKFLOW.read_text()
+
+    assert "images: ${{ steps.build_images.outputs.images }}" in workflow
+    assert 'IMAGES=\'{}\'' in workflow
+    assert 'IMAGE_KEY="py${PYVER//.}"' in workflow
+    assert "py39_image" not in workflow
+    assert "py310_image" not in workflow
+
+
 def test_runtime_cleanup_has_package_write_permission() -> None:
     workflow = CLEANUP_WORKFLOW.read_text()
 

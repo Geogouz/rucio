@@ -42,3 +42,7 @@ def test_ci_matrices_use_canonical_cases(
     assert "tools/test/run_tests.py" not in workflow
     assert "matrix_parser.py" not in workflow
     assert "votest_helper.py" not in workflow
+    if group != "unit":
+        assert "{id, python, runtime}" in workflow
+        assert "fromJSON(needs.runtime_images.outputs.images)" in workflow
+        assert "Select runtime image" not in workflow
