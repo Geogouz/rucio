@@ -2,50 +2,42 @@ name: Build Runtime Images
 
 on:
   workflow_call:
+    inputs:
+      publish:
+        description: "Publish missing runtime images"
+        type: boolean
+        default: false
     outputs:
       images:
         description: "Runtime image tags keyed by case runtime"
-        value: ${{ jobs.build_runtime_images.outputs.images }}
-      build_locally:
-        description: "Whether images should be built locally in autotests"
-        value: ${{ jobs.build_runtime_images.outputs.build_locally }}
-  schedule:
-    - cron: '0 3 * * *'
-  push:
-    branches:
-      - master
-    paths:
-      - '.dockerignore'
-      - 'etc/docker/test/runtime.Dockerfile'
-      - 'etc/docker/dev/rucio/entrypoint.sh'
-      - 'etc/docker/test/extra/00-mpm.conf'
-      - 'etc/docker/test/extra/httpd.conf'
-      - 'etc/docker/test/extra/rucio.conf'
-      - 'etc/certs/hostcert_rucio.key.pem'
-      - 'etc/certs/hostcert_rucio.pem'
-      - 'etc/certs/rucio_ca.pem'
-      - 'etc/certs/ruciouser.key.pem'
-      - 'etc/certs/ruciouser.pem'
-      - 'requirements/**'
-  workflow_dispatch:
+        value: ${{ jobs.resolve_runtime_images.outputs.images }}
+      builds:
+        description: "Local-build requirements keyed by case runtime"
+        value: ${{ jobs.resolve_runtime_images.outputs.builds }}
 
 jobs:
-  build_runtime_images:
-    name: Build Runtime Images
+  resolve_runtime_images:
+    name: Resolve Runtime Images
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write
+      packages: read
     outputs:
-      images: ${{ steps.build_images.outputs.images }}
-      build_locally: ${{ steps.build_images.outputs.build_locally }}
+      images: ${{ steps.resolve.outputs.images }}
+      builds: ${{ steps.resolve.outputs.builds }}
+      missing: ${{ steps.resolve.outputs.missing }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+      - name: Set up Python
+        uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
+        with:
+          python-version: "3.11"
+
+      - name: Install test registry dependencies
+        run: python -m pip install --constraint requirements/requirements.dev.txt pytest pyyaml
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
@@ -55,17 +47,8 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
         continue-on-error: true
 
-      - name: Prepare metadata
-        id: metadata
-        run: |
-          {
-            echo "build_date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
-            echo "commit_sha=${{ github.sha }}"
-            echo "commit_ref=${{ github.ref }}"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Build Runtime Images
-        id: build_images
+      - name: Resolve runtime images
+        id: resolve
         run: |
           BUILD_INPUTS=(
             .dockerignore
@@ -81,34 +64,90 @@ jobs:
             etc/certs/ruciouser.pem
             requirements
           )
-          BUILD_LOCALLY=false
+          RUNTIMES=$(
+            python -bb -m pytest --list-cases |
+              jq -ce '[.[] | select(.group != "unit") | {key: .runtime, python: .python}] | unique_by(.key)'
+          )
           IMAGES='{}'
+          BUILDS='{}'
+          MISSING='[]'
+          REPO=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+
+          while IFS=$'\t' read -r IMAGE_KEY PYVER; do
+            HASH=$(
+              { echo "PYTHON=${PYVER}"; git ls-files -s -- "${BUILD_INPUTS[@]}"; } |
+                sha256sum | cut -d' ' -f1 | head -c 12
+            )
+            IMAGE="ghcr.io/${REPO}/rucio-dev-runtime:${IMAGE_KEY}-${HASH}"
+            BUILD=false
+            echo "Python ${PYVER} image tag: $IMAGE"
+
+            if ! docker manifest inspect "$IMAGE" > /dev/null 2>&1; then
+              if [[ "${{ inputs.publish }}" == "true" ]]; then
+                MISSING=$(jq -c \
+                  --arg key "$IMAGE_KEY" \
+                  --arg python "$PYVER" \
+                  --arg image "$IMAGE" \
+                  '. + [{key: $key, python: $python, image: $image}]' <<< "$MISSING")
+              else
+                BUILD=true
+              fi
+            fi
+
+            IMAGES=$(jq -c --arg key "$IMAGE_KEY" --arg image "$IMAGE" \
+              '. + {($key): $image}' <<< "$IMAGES")
+            BUILDS=$(jq -c --arg key "$IMAGE_KEY" --argjson build "$BUILD" \
+              '. + {($key): $build}' <<< "$BUILDS")
+          done < <(jq -r '.[] | [.key, .python] | @tsv' <<< "$RUNTIMES")
+
+          {
+            echo "images=$IMAGES"
+            echo "builds=$BUILDS"
+            echo "missing=$MISSING"
+          } >> "$GITHUB_OUTPUT"
+
+  publish_runtime_images:
+    name: Publish Runtime Images
+    needs: resolve_runtime_images
+    if: inputs.publish && needs.resolve_runtime_images.outputs.missing != '[]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare metadata
+        id: metadata
+        run: |
+          {
+            echo "build_date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            echo "commit_sha=${{ github.sha }}"
+            echo "commit_ref=${{ github.ref }}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Publish runtime images
+        run: |
           BUILD_DATE="${{ steps.metadata.outputs.build_date }}"
           COMMIT_SHA="${{ steps.metadata.outputs.commit_sha }}"
           COMMIT_REF="${{ steps.metadata.outputs.commit_ref }}"
           REPO=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
 
-          for PYVER in 3.9 3.10; do
-            HASH=$(
-              { echo "PYTHON=${PYVER}"; git ls-files -s -- "${BUILD_INPUTS[@]}"; } |
-                sha256sum | cut -d' ' -f1 | head -c 12
-            )
-            IMAGE="ghcr.io/${REPO}/rucio-dev-runtime:py${PYVER//.}-${HASH}"
-            IMAGE_KEY="py${PYVER//.}"
-            echo "Python ${PYVER} image tag: $IMAGE"
-            IMAGES=$(jq -c --arg key "$IMAGE_KEY" --arg image "$IMAGE" \
-              '. + {($key): $image}' <<< "$IMAGES")
-
-            # Skip build if image exists
+          while IFS=$'\t' read -r IMAGE_KEY PYVER IMAGE; do
             if docker manifest inspect "$IMAGE" > /dev/null 2>&1; then
               echo "Python ${PYVER} image already exists, skipping build"
-              continue
-            fi
-
-            # Pull requests, including forks, cannot safely publish packages.
-            if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-              echo "Python ${PYVER} image missing, will build locally"
-              BUILD_LOCALLY=true
               continue
             fi
 
@@ -121,7 +160,7 @@ jobs:
               --tag "$IMAGE" \
               --label "org.opencontainers.image.title=Rucio Runtime Image Python ${PYVER}" \
               --label "org.opencontainers.image.description=Runtime image for Rucio autotests with Python ${PYVER}" \
-              --label "org.opencontainers.image.version=py${PYVER//.}-${HASH}" \
+              --label "org.opencontainers.image.version=${IMAGE##*:}" \
               --label "org.opencontainers.image.created=${BUILD_DATE}" \
               --label "org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}" \
               --label "org.opencontainers.image.revision=${COMMIT_SHA}" \
@@ -130,12 +169,7 @@ jobs:
               --label "rucio.image.build.date=${BUILD_DATE}" \
               --label "rucio.image.build.workflow=${{ github.workflow }}" \
               --label "rucio.image.build.run_id=${{ github.run_id }}" \
-              --cache-from "type=registry,ref=ghcr.io/${REPO}/rucio-dev-runtime:py${PYVER//.}-buildcache" \
-              --cache-to "type=registry,ref=ghcr.io/${REPO}/rucio-dev-runtime:py${PYVER//.}-buildcache,mode=max" \
+              --cache-from "type=registry,ref=ghcr.io/${REPO}/rucio-dev-runtime:${IMAGE_KEY}-buildcache" \
+              --cache-to "type=registry,ref=ghcr.io/${REPO}/rucio-dev-runtime:${IMAGE_KEY}-buildcache,mode=max" \
               .
-          done
-
-          {
-            echo "images=$IMAGES"
-            echo "build_locally=$BUILD_LOCALLY"
-          } >> "$GITHUB_OUTPUT"
+          done < <(jq -r '.[] | [.key, .python, .image] | @tsv' <<< '${{ needs.resolve_runtime_images.outputs.missing }}')

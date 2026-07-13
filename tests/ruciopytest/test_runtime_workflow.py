@@ -15,6 +15,7 @@
 from pathlib import Path
 
 WORKFLOW = Path(__file__).resolve().parents[2] / ".github/workflows/runtime_images.yml"
+PUBLISH_WORKFLOW = WORKFLOW.with_name("publish_runtime_images.yml")
 CLEANUP_WORKFLOW = WORKFLOW.with_name("cleanup_runtime_images.yml")
 
 
@@ -37,18 +38,27 @@ def test_runtime_hash_covers_every_local_dockerfile_copy() -> None:
         assert path in workflow
 
 
-def test_pull_requests_never_publish_missing_images() -> None:
+def test_test_workflows_cannot_publish_images() -> None:
     workflow = WORKFLOW.read_text()
+    publisher = PUBLISH_WORKFLOW.read_text()
 
-    assert 'if [[ "${{ github.event_name }}" == "pull_request" ]]' in workflow
+    assert "default: false" in workflow
+    assert "if: inputs.publish" in workflow
+    assert "packages: read" in workflow
+    assert "packages: write" in publisher
+    assert "publish: true" in publisher
 
 
 def test_runtime_images_are_exposed_by_case_key() -> None:
     workflow = WORKFLOW.read_text()
 
-    assert "images: ${{ steps.build_images.outputs.images }}" in workflow
+    assert "images: ${{ steps.resolve.outputs.images }}" in workflow
+    assert "builds: ${{ steps.resolve.outputs.builds }}" in workflow
     assert 'IMAGES=\'{}\'' in workflow
-    assert 'IMAGE_KEY="py${PYVER//.}"' in workflow
+    assert 'BUILDS=\'{}\'' in workflow
+    assert 'select(.group != "unit")' in workflow
+    assert "unique_by(.key)" in workflow
+    assert "for PYVER in 3.9 3.10" not in workflow
     assert "py39_image" not in workflow
     assert "py310_image" not in workflow
 

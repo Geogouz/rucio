@@ -1,0 +1,33 @@
+name: Publish Runtime Images
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'etc/docker/test/runtime.Dockerfile'
+      - 'etc/docker/dev/rucio/entrypoint.sh'
+      - 'etc/docker/test/extra/00-mpm.conf'
+      - 'etc/docker/test/extra/httpd.conf'
+      - 'etc/docker/test/extra/rucio.conf'
+      - 'etc/certs/hostcert_rucio.key.pem'
+      - 'etc/certs/hostcert_rucio.pem'
+      - 'etc/certs/rucio_ca.pem'
+      - 'etc/certs/ruciouser.key.pem'
+      - 'etc/certs/ruciouser.pem'
+      - 'requirements/**'
+      - 'tests/ruciopytest/profiles.py'
+  workflow_dispatch:
+
+concurrency:
+  group: publish-runtime-images-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    uses: ./.github/workflows/runtime_images.yml
+    with:
+      publish: true
+    permissions:
+      contents: read
+      packages: write

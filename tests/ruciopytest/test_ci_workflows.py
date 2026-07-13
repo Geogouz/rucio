@@ -45,4 +45,7 @@ def test_ci_matrices_use_canonical_cases(
     if group != "unit":
         assert "{id, python, runtime}" in workflow
         assert "fromJSON(needs.runtime_images.outputs.images)" in workflow
+        assert "fromJSON(needs.runtime_images.outputs.builds)" in workflow
+        assert "packages: read" in workflow
+        assert "packages: write" not in workflow
         assert "Select runtime image" not in workflow
