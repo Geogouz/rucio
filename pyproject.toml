@@ -86,6 +86,7 @@ dev = [
     'pytest',
     'pytest-xdist',
     'pytest-cov',
+    'pytest-rerunfailures',
     'pyflakes',
     'pylint',
     'isort',
