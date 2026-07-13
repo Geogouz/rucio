@@ -357,6 +357,33 @@ def test_suite_continues_after_infrastructure_failure(monkeypatch, capsys) -> No
     assert "compose failed" in capsys.readouterr().err
 
 
+def test_suite_skips_cases_without_matching_tests(monkeypatch) -> None:
+    config = _Config(suite="client")
+    results = iter((pytest.ExitCode.NO_TESTS_COLLECTED, pytest.ExitCode.OK))
+
+    monkeypatch.setattr(
+        plugin.runner,
+        "run_container_case",
+        lambda *args, **kwargs: next(results),
+    )
+
+    assert plugin.pytest_cmdline_main(config) == pytest.ExitCode.OK
+
+
+def test_suite_reports_when_no_case_matches(monkeypatch) -> None:
+    config = _Config(suite="client")
+    monkeypatch.setattr(
+        plugin.runner,
+        "run_container_case",
+        lambda *args, **kwargs: pytest.ExitCode.NO_TESTS_COLLECTED,
+    )
+
+    assert (
+        plugin.pytest_cmdline_main(config)
+        == pytest.ExitCode.NO_TESTS_COLLECTED
+    )
+
+
 def test_suite_exitfirst_stops_after_failed_case(monkeypatch) -> None:
     config = _Config(suite="client", maxfail=1)
     config.invocation_params = SimpleNamespace(args=("--suite=client", "-x"))

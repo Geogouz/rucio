@@ -218,8 +218,9 @@ def _run_cases(
         )
     fail_fast = config.getoption("maxfail", 0) == 1
     failed_cases = set()
+    empty_cases = set()
 
-    def run_case(index: int, case: "TestCase") -> bool:
+    def run_case(index: int, case: "TestCase") -> int:
         print(f"\n===== {case.id} =====", flush=True)
         case_args = runner.qualify_junit(pytest_args, case.id)
         if index:
@@ -246,12 +247,15 @@ def _run_cases(
                 )
         except Exception as error:
             print(f"Case {case.id} failed: {error}", file=sys.stderr)
-            return True
-        return bool(result)
+            return pytest.ExitCode.TESTS_FAILED
+        return result
 
     if worker_count == 1:
         for index, case in enumerate(cases):
-            if run_case(index, case):
+            result = run_case(index, case)
+            if result == pytest.ExitCode.NO_TESTS_COLLECTED:
+                empty_cases.add(case.id)
+            elif result:
                 failed_cases.add(case.id)
                 if fail_fast:
                     break
@@ -272,7 +276,12 @@ def _run_cases(
                 completed, _ = wait(pending, return_when=FIRST_COMPLETED)
                 for future in completed:
                     case = pending.pop(future)
-                    if not future.cancelled() and future.result():
+                    if future.cancelled():
+                        continue
+                    result = future.result()
+                    if result == pytest.ExitCode.NO_TESTS_COLLECTED:
+                        empty_cases.add(case.id)
+                    elif result:
                         failed_cases.add(case.id)
                         stopping = stopping or fail_fast
                 if stopping:
@@ -283,6 +292,8 @@ def _run_cases(
     if failures:
         print(f"Failed cases: {', '.join(failures)}")
         return 1
+    if len(empty_cases) == len(cases):
+        return pytest.ExitCode.NO_TESTS_COLLECTED
     return 0
 
 
