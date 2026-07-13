@@ -32,6 +32,7 @@ def _manager(
     keep_db: bool = False,
     image: Optional[str] = "runtime:test",
     environ: Optional[dict[str, str]] = None,
+    log_output: bool = False,
 ) -> ContainerManager:
     environment = {"RUCIO_TEST_NATIVE_PLATFORM": "linux/amd64"}
     environment.update(environ or {})
@@ -41,6 +42,7 @@ def _manager(
         keep_db=keep_db,
         image=image,
         environ=environment,
+        log_output=log_output,
     )
 
 
@@ -242,6 +244,32 @@ def test_capture_logs_includes_httpd_errors(tmp_path: "Path", monkeypatch) -> No
 
     assert (manager.log_dir / "compose.log").read_text() == "compose log"
     assert (manager.log_dir / "httpd_error.log").read_text() == "httpd error"
+
+
+def test_case_output_is_written_to_one_log(tmp_path: "Path", monkeypatch) -> None:
+    manager = _manager(tmp_path, log_output=True)
+
+    def run(command, **kwargs):
+        if kwargs.get("capture_output"):
+            return subprocess.CompletedProcess(
+                command,
+                0,
+                stdout="captured output\n",
+                stderr="captured error\n",
+            )
+        kwargs["stdout"].write("streamed output\n")
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(subprocess, "run", run)
+
+    manager._run(("stream",))
+    manager._run(("capture",), capture_output=True)
+
+    assert manager.output_log.read_text() == (
+        "streamed output\n"
+        "captured output\n"
+        "captured error\n"
+    )
 
 
 def test_keep_db_preserves_compose_volumes(tmp_path: "Path", monkeypatch) -> None:

@@ -70,6 +70,7 @@ class ContainerManager:
         keep_db: bool = False,
         image: "Optional[str]" = None,
         environ: "Optional[Mapping[str, str]]" = None,
+        log_output: bool = False,
     ) -> None:
         self.case = case
         self.root_dir = root_dir.resolve()
@@ -91,6 +92,7 @@ class ContainerManager:
             reusable=keep_db,
         )
         self.log_dir = self.root_dir / ".test-logs" / self.project_name
+        self.output_log = self.log_dir / "case.log" if log_output else None
         self._stopped = False
         self._lock_handle = None
 
@@ -136,6 +138,10 @@ class ContainerManager:
         self.stop(check=exc_type is None)
 
     def start(self) -> None:
+        if self.output_log:
+            self.log_dir.mkdir(parents=True, exist_ok=True)
+            self.output_log.write_text("")
+            print(f"Case output: {self.output_log}", flush=True)
         self._acquire_project_lock()
         try:
             self._set_native_platform()
@@ -365,6 +371,36 @@ class ContainerManager:
         capture_output: bool = False,
         timeout: "Optional[int]" = None,
     ) -> subprocess.CompletedProcess:
+        if self.output_log:
+            self.output_log.parent.mkdir(parents=True, exist_ok=True)
+            if capture_output:
+                result = subprocess.run(  # noqa: S603
+                    command,
+                    check=False,
+                    capture_output=True,
+                    cwd=self.root_dir,
+                    env=self.environment,
+                    text=True,
+                    timeout=timeout,
+                )
+                with self.output_log.open("a") as output:
+                    output.write(result.stdout or "")
+                    output.write(result.stderr or "")
+            else:
+                with self.output_log.open("a") as output:
+                    result = subprocess.run(  # noqa: S603
+                        command,
+                        check=False,
+                        cwd=self.root_dir,
+                        env=self.environment,
+                        stdout=output,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        timeout=timeout,
+                    )
+            if check:
+                result.check_returncode()
+            return result
         return subprocess.run(  # noqa: S603
             command,
             check=check,
