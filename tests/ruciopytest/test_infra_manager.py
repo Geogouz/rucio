@@ -15,6 +15,8 @@
 from typing import TYPE_CHECKING, Optional
 from unittest.mock import Mock, call
 
+import pytest
+
 from tests.ruciopytest import infra_manager
 from tests.ruciopytest.infra_manager import InfraManager
 from tests.ruciopytest.profiles import get_case
@@ -126,6 +128,13 @@ def test_exec_environment_overrides_case_defaults(tmp_path: "Path") -> None:
     )
 
     assert manager.rucio_home.as_posix() == "/opt/rucio/etc/multi_vo/ts2"
+
+
+def test_setup_rejects_mismatched_database(tmp_path: "Path") -> None:
+    manager = _manager(tmp_path, environment={"RDBMS": "oracle"})
+
+    with pytest.raises(RuntimeError, match="requires postgres14"):
+        manager.setup()
 
 
 def test_integration_setup_activates_storage_rses(tmp_path: "Path", monkeypatch) -> None:

@@ -50,6 +50,7 @@ class InfraManager:
         )
 
     def setup(self) -> None:
+        self._validate_database()
         self._ensure_memcached()
         self._cleanup_temporary_state()
 
@@ -83,6 +84,14 @@ class InfraManager:
             shutil.copyfile(
                 self.repo_root / "etc/docker/test/extra/rucio_client.cfg",
                 self.rucio_home / "etc/rucio.cfg",
+            )
+
+    def _validate_database(self) -> None:
+        configured = self.environment.get("RDBMS") or "postgres14"
+        if self.case.rdbms and configured != self.case.rdbms:
+            raise RuntimeError(
+                f"Case {self.case.id} requires {self.case.rdbms}, "
+                f"but the container uses {configured}"
             )
 
     def _database_initialized(self) -> bool:
