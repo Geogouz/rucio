@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import json
-import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -123,9 +122,8 @@ def test_container_case_forwards_standard_pytest_args(monkeypatch) -> None:
     )
 
 
-def test_unit_case_uses_container_for_other_interpreter(monkeypatch) -> None:
+def test_unit_case_uses_container(monkeypatch) -> None:
     config = _Config(case="unit-py39")
-    monkeypatch.setattr(sys, "version_info", SimpleNamespace(major=3, minor=12))
     captured = {}
 
     def run(case, root_path, pytest_args, **kwargs):

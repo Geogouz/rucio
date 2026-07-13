@@ -14,7 +14,6 @@
 
 import json
 import os
-import sys
 from dataclasses import replace
 from typing import TYPE_CHECKING
 
@@ -140,12 +139,6 @@ def pytest_cmdline_main(config: pytest.Config) -> "Optional[int]":
         pytest_args.extend(("-n", str(workers)))
     container_environment = _parse_environment(config.getoption("container_env"))
     if case.suite == "unit":
-        current_python = f"{sys.version_info.major}.{sys.version_info.minor}"
-        if case.python == current_python:
-            config.stash[case_key] = case
-            if not explicit_selectors:
-                config.args = list(case.test_paths)
-            return None
         return runner.run_unit_case(
             case,
             config.rootpath,
@@ -256,10 +249,6 @@ def resolve_requested_case(
     candidates = [case for case in iter_cases() if case.suite == suite]
     python = os.environ.get("PYTHON")
     rdbms = os.environ.get("RDBMS")
-    if suite == "unit":
-        current_python = f"{sys.version_info.major}.{sys.version_info.minor}"
-        if any(case.python == current_python for case in candidates):
-            python = current_python
     if python:
         candidates = [case for case in candidates if case.python == python]
     if rdbms:
