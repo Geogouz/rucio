@@ -42,8 +42,8 @@ class InfraManager:
         self.case = case
         self.repo_root = repo_root
         self.keep_db = keep_db
-        self.environment = dict(os.environ if environ is None else environ)
-        self.environment.update(case.env_vars)
+        self.environment = dict(case.env_vars)
+        self.environment.update(os.environ if environ is None else environ)
         self.rucio_home = Path(
             self.environment.get("RUCIO_HOME", "/opt/rucio")
         )

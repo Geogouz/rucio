@@ -37,6 +37,7 @@ def test_test_overlay_consumes_prebuilt_image() -> None:
 
     assert "image" in rucio
     assert "build" not in rucio
+    assert rucio["environment"]["RUCIO_HOME"] == "${RUCIO_HOME:-/opt/rucio}"
 
 
 def test_runtime_dockerfile_has_parameterized_unit_target() -> None:

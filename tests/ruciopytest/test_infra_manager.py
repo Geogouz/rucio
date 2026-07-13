@@ -115,6 +115,16 @@ def test_second_multi_vo_leg_reuses_shared_database(tmp_path: "Path", monkeypatc
     assert calls._run_tool.call_count == 3
 
 
+def test_exec_environment_overrides_case_defaults(tmp_path: "Path") -> None:
+    manager = _manager(
+        tmp_path,
+        "multi-vo-py39-postgres14",
+        environment={"RUCIO_HOME": "/opt/rucio/etc/multi_vo/ts2"},
+    )
+
+    assert manager.rucio_home.as_posix() == "/opt/rucio/etc/multi_vo/ts2"
+
+
 def test_integration_setup_activates_storage_rses(tmp_path: "Path", monkeypatch) -> None:
     manager = _manager(tmp_path, "integration-py39-postgres14")
     calls = _mock_setup_steps(manager, monkeypatch)
