@@ -104,6 +104,23 @@ def test_test_overlay_consumes_prebuilt_image() -> None:
     )
 
 
+def test_auxiliary_services_use_test_dependency_profile() -> None:
+    compose = yaml.safe_load(
+        (COMPOSE_DIR / "docker-compose.test.yml").read_text()
+    )
+
+    assert all(
+        compose["services"][service]["profiles"] == ["test-dependencies"]
+        for service in (
+            "graphite",
+            "influxdb",
+            "elasticsearch",
+            "activemq",
+            "web1",
+        )
+    )
+
+
 def test_unit_dockerfile_has_parameterized_runtime() -> None:
     dockerfile = UNIT_DOCKERFILE.read_text()
 

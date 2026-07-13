@@ -63,9 +63,16 @@ def test_cases_export_the_suite_name() -> None:
 
 
 def test_cases_derive_compose_profiles() -> None:
-    assert get_case("remote-dbs-py39-oracle").compose_profiles == ("oracle",)
+    assert get_case("client-py39-postgres14").compose_profiles == (
+        "postgres14",
+    )
+    assert get_case("remote-dbs-py39-oracle").compose_profiles == (
+        "oracle",
+        "test-dependencies",
+    )
     assert get_case("integration-py39-postgres14").compose_profiles == (
         "postgres14",
+        "test-dependencies",
         "storage",
         "externalmetadata",
         "iam",

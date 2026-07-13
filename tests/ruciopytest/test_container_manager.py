@@ -135,8 +135,9 @@ def test_compose_commands_use_project_and_service_profiles(tmp_path: "Path") -> 
     command = manager.compose_command("exec", "rucio", "pytest")
 
     assert command[:4] == ["docker", "compose", "-p", manager.project_name]
-    assert command.count("--profile") == 1
+    assert command.count("--profile") == 2
     assert "postgres14" in command
+    assert "test-dependencies" in command
     assert command[-3:] == ["exec", "rucio", "pytest"]
 
 
