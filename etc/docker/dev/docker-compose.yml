@@ -70,9 +70,6 @@ services:
       postgres14:
         condition: service_healthy
         required: false
-      mysql8:
-        condition: service_healthy
-        required: false
       elasticsearch:
         condition: service_healthy
         required: false
@@ -167,28 +164,6 @@ services:
       - vol-postgres14-data:/var/lib/postgresql/data
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB || exit 1" ]
-      interval: 10s
-      timeout: 5s
-      start_period: 30s
-      retries: 10
-
-  mysql8:
-    image: docker.io/mysql:8.3
-    profiles:
-      - mysql8
-    environment:
-      - MYSQL_USER=rucio
-      - MYSQL_PASSWORD=rucio
-      - MYSQL_ROOT_PASSWORD=rucio
-      - MYSQL_DATABASE=rucio
-      - MYSQL_TCP_PORT=3308
-    command:
-      - "--default-authentication-plugin=mysql_native_password"
-      - "--character-set-server=latin1"
-    volumes:
-      - vol-mysql8-mysql:/var/lib/mysql
-    healthcheck:
-      test: [ "CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -P 3308 -urucio -prucio" ]
       interval: 10s
       timeout: 5s
       start_period: 30s
@@ -564,9 +539,6 @@ volumes:
   vol-mongo-configdb:
   vol-mongo-db:
   vol-iam-db-mysql:
-  vol-mysql8-mysql:
-    labels:
-      rucio.test.database: mysql8
   vol-oracle-data:
     labels:
       rucio.test.database: oracle

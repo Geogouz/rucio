@@ -48,14 +48,6 @@ elif [ "$RDBMS" == "oracle" ]; then
     generate_rucio_cfg "$CFG_PATH/rucio_oracle.cfg" $RUCIO_HOME/etc/rucio.cfg
     cp "$CFG_PATH/alembic_oracle.ini" $RUCIO_HOME/etc/alembic.ini
 
-elif [ "$RDBMS" == "mysql8" ]; then
-    generate_rucio_cfg "$CFG_PATH/rucio_mysql8.cfg" $RUCIO_HOME/etc/rucio.cfg
-    cp "$CFG_PATH/alembic_mysql8.ini" $RUCIO_HOME/etc/alembic.ini
-
-elif [ "$RDBMS" == "sqlite" ]; then
-    generate_rucio_cfg "$CFG_PATH/rucio_sqlite.cfg" $RUCIO_HOME/etc/rucio.cfg
-    cp "$CFG_PATH/alembic_sqlite.ini" $RUCIO_HOME/etc/alembic.ini
-
 elif [ "$RDBMS" == "postgres14" ]; then
     generate_rucio_cfg "$CFG_PATH/rucio_postgres14.cfg" $RUCIO_HOME/etc/rucio.cfg
     cp "$CFG_PATH/alembic_postgres14.ini" $RUCIO_HOME/etc/alembic.ini

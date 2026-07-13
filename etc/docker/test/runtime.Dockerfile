@@ -105,7 +105,6 @@ FROM python AS rucio-runtime
         libnsl libaio \
         memcached \
         gridsite \
-        sqlite \
         gfal2-devel gfal2-all python3-gfal2-util python3-gfal2 \
         nodejs npm \
         glibc-langpack-en \

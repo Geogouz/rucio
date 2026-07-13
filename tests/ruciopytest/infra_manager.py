@@ -101,11 +101,7 @@ class InfraManager:
         wait_for_database()
 
     def _reset_database(self) -> None:
-        sqlite_database = Path("/tmp/rucio.db")
-        sqlite_database.unlink(missing_ok=True)
         self._run_tool("tools/reset_database.py")
-        if sqlite_database.exists():
-            sqlite_database.chmod(0o666)
 
     def _run_alembic_migration(self) -> None:
         environment = dict(self.environment)

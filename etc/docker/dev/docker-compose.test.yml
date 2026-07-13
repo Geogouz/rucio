@@ -13,13 +13,7 @@ services:
       - ../../../etc/automatix.json:/opt/rucio/etc/automatix.json:ro
       - ../../../etc/google-cloud-storage-test.json:/opt/rucio/etc/google-cloud-storage-test.json:ro
       - ../../../etc/rse_repository.json:/opt/rucio/etc/rse_repository.json:ro
-      - vol-test-tmp:/tmp
 
   ruciodb:
     profiles:
       - donotstart
-
-volumes:
-  vol-test-tmp:
-    labels:
-      rucio.test.database: sqlite
