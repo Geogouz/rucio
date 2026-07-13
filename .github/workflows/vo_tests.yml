@@ -69,7 +69,27 @@ jobs:
       - name: Set repository variable
         id: repo
         run: echo "repo=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
-      - name: Build Python 3.9 image locally
+      - name: Select runtime image
+        id: runtime
+        env:
+          PY39_IMAGE: ${{ needs.runtime_images.outputs.py39_image }}
+          PY310_IMAGE: ${{ needs.runtime_images.outputs.py310_image }}
+        run: |
+          case "${{ matrix.case.python }}" in
+            3.9)
+              echo "image=$PY39_IMAGE" >> "$GITHUB_OUTPUT"
+              echo "cache=py39" >> "$GITHUB_OUTPUT"
+              ;;
+            3.10)
+              echo "image=$PY310_IMAGE" >> "$GITHUB_OUTPUT"
+              echo "cache=py310" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "Unsupported container Python ${{ matrix.case.python }}" >&2
+              exit 1
+              ;;
+          esac
+      - name: Build runtime image locally
         if: needs.runtime_images.outputs.build_locally == 'true'
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
@@ -77,15 +97,15 @@ jobs:
           file: etc/docker/test/runtime.Dockerfile
           target: final
           build-args: |
-            PYTHON=3.9
+            PYTHON=${{ matrix.case.python }}
           push: false
-          tags: ${{ needs.runtime_images.outputs.py39_image }}
+          tags: ${{ steps.runtime.outputs.image }}
           outputs: type=docker
-          cache-from: type=registry,ref=ghcr.io/${{ steps.repo.outputs.repo }}/rucio-dev-runtime:py39-buildcache
+          cache-from: type=registry,ref=ghcr.io/${{ steps.repo.outputs.repo }}/rucio-dev-runtime:${{ steps.runtime.outputs.cache }}-buildcache
 
       - name: Run ${{ matrix.case.id }}
         env:
-          RUCIO_TEST_IMAGE: ${{ needs.runtime_images.outputs.py39_image }}
+          RUCIO_TEST_IMAGE: ${{ steps.runtime.outputs.image }}
         run: |
           mkdir -p test-results
           python -bb -m pytest \
