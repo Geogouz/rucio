@@ -129,7 +129,6 @@ jobs:
             ${{ env.PYRIGHT_CURRENT_REPORT }}
   # Build runtime images for tests
   runtime_images:
-    if: github.event_name != 'schedule'
     name: Build Runtime Images
     uses: ./.github/workflows/runtime_images.yml
     permissions:
@@ -140,34 +139,42 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      - name: Update pip
-        run: python3 -m pip install -U pip setuptools
-      - name: Install python requirements for matrix_parser.py
-        run: python3 -m pip install -U PyYAML
-      - name: Identify branch
-        id: branch
-        run: python3 tools/github/workflow/set_branch_output_env.py
-      - name: Identify Matrix
-        id: matrix
+      - name: Set up Python
+        uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
+        with:
+          python-version: "3.11"
+      - name: Install test runner
+        run: python -m pip install --constraint requirements/requirements.dev.txt pytest pyyaml
+      - name: Generate autotest matrix
+        id: cases
         run: |
-          EVENT="${{ github.event_name }}"
-          if [ $EVENT != 'schedule' ]; then
-            echo "matrix=$(./tools/test/matrix_parser.py < ./etc/docker/test/matrix.yml)" >> $GITHUB_OUTPUT
-          else
-            echo "matrix=$(./tools/test/matrix_parser.py < ./etc/docker/test/matrix_nightly.yml)" >> $GITHUB_OUTPUT
-          fi
+          cases=$(
+            python -bb -m pytest --list-cases |
+              jq -ce '[.[] | select(.group == "autotest") | {id, python}]
+                | if length == 8 then . else error("expected eight autotest cases") end'
+          )
+          echo "cases=$cases" >> "$GITHUB_OUTPUT"
     outputs:
-      branch: ${{ steps.branch.outputs.branch }}
-      matrix: ${{ steps.matrix.outputs.matrix }}
+      cases: ${{ steps.cases.outputs.cases }}
   test:
     needs: [runtime_images, setup]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        cfg: ${{ fromJson(needs.setup.outputs.matrix) }}
+        case: ${{ fromJSON(needs.setup.outputs.cases) }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Set up Python
+        uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install test runner
+        run: python -m pip install --constraint requirements/requirements.dev.txt pytest pyyaml
+      - name: Set up Docker Buildx
+        if: needs.runtime_images.outputs.build_locally == 'true'
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
       - name: Login to GitHub Container Registry
         uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
         with:
@@ -178,38 +185,54 @@ jobs:
       - name: Set repository variable
         id: repo
         run: echo "repo=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
-      - name: Build Python 3.9 image locally
-        if: needs.runtime_images.outputs.build_locally == 'true' && matrix.cfg.PYTHON == '3.9'
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
-        with:
-          context: .
-          file: etc/docker/test/runtime.Dockerfile
-          target: final
-          build-args: |
-            PYTHON=3.9
-          push: false
-          tags: ${{ needs.runtime_images.outputs.py39_image }}
-          outputs: type=docker
-          cache-from: type=registry,ref=ghcr.io/${{ steps.repo.outputs.repo }}/rucio-dev-runtime:py39-buildcache
-        continue-on-error: false
-      - name: Build Python 3.10 image locally
-        if: needs.runtime_images.outputs.build_locally == 'true' && matrix.cfg.PYTHON == '3.10'
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
-        with:
-          context: .
-          file: etc/docker/test/runtime.Dockerfile
-          target: final
-          build-args: |
-            PYTHON=3.10
-          push: false
-          tags: ${{ needs.runtime_images.outputs.py310_image }}
-          outputs: type=docker
-          cache-from: type=registry,ref=ghcr.io/${{ steps.repo.outputs.repo }}/rucio-dev-runtime:py310-buildcache
-        continue-on-error: false
-      - name: Run test with cfg
+      - name: Select runtime image
+        id: runtime
         env:
-          PY39_RUNTIME_IMAGE: ${{ needs.runtime_images.outputs.py39_image }}
-          PY310_RUNTIME_IMAGE: ${{ needs.runtime_images.outputs.py310_image }}
-          BUILD_LOCALLY: ${{ needs.runtime_images.outputs.build_locally }}
+          PY39_IMAGE: ${{ needs.runtime_images.outputs.py39_image }}
+          PY310_IMAGE: ${{ needs.runtime_images.outputs.py310_image }}
         run: |
-          echo '{"matrix": ${{ toJson(matrix.cfg) }}, "runtime_images": {"3.9": "${{ needs.runtime_images.outputs.py39_image }}", "3.10": "${{ needs.runtime_images.outputs.py310_image }}"}, "build_locally": "${{ needs.runtime_images.outputs.build_locally }}" }' | ./tools/test/run_tests.py
+          case "${{ matrix.case.python }}" in
+            3.9)
+              echo "image=$PY39_IMAGE" >> "$GITHUB_OUTPUT"
+              echo "cache=py39" >> "$GITHUB_OUTPUT"
+              ;;
+            3.10)
+              echo "image=$PY310_IMAGE" >> "$GITHUB_OUTPUT"
+              echo "cache=py310" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "Unsupported container Python ${{ matrix.case.python }}" >&2
+              exit 1
+              ;;
+          esac
+      - name: Build runtime image locally
+        if: needs.runtime_images.outputs.build_locally == 'true'
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: etc/docker/test/runtime.Dockerfile
+          target: final
+          build-args: |
+            PYTHON=${{ matrix.case.python }}
+          push: false
+          tags: ${{ steps.runtime.outputs.image }}
+          outputs: type=docker
+          cache-from: type=registry,ref=ghcr.io/${{ steps.repo.outputs.repo }}/rucio-dev-runtime:${{ steps.runtime.outputs.cache }}-buildcache
+      - name: Run ${{ matrix.case.id }}
+        env:
+          RUCIO_TEST_IMAGE: ${{ steps.runtime.outputs.image }}
+        run: |
+          mkdir -p test-results
+          python -bb -m pytest \
+            --case="${{ matrix.case.id }}" \
+            -v --tb=short \
+            --junitxml="test-results/${{ matrix.case.id }}.xml"
+      - name: Upload test output
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: tests-${{ matrix.case.id }}
+          path: |
+            test-results/
+            .test-logs/
+          if-no-files-found: ignore
