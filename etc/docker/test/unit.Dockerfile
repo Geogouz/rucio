@@ -14,7 +14,7 @@ FROM python:${PYTHON}-slim-bookworm
         rm -rf /var/lib/apt/lists/*
 
     COPY requirements/requirements.dev.txt /tmp/requirements.dev.txt
-    RUN python -m pip --no-cache-dir install --upgrade pip setuptools wheel xmlsec==1.3.13 && \
+    RUN python -m pip --no-cache-dir install --upgrade pip setuptools wheel && \
         python -m pip --no-cache-dir install -r /tmp/requirements.dev.txt
 
     ENV PYTEST_DISABLE_PLUGIN_AUTOLOAD=true
