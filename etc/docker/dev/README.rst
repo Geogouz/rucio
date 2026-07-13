@@ -133,7 +133,7 @@ virtual environment for the orchestration dependencies::
     python3 -m venv .venv
     .venv/bin/python -m pip install \
         --constraint requirements/requirements.dev.txt \
-        pytest pytest-cov pytest-xdist pyyaml
+        pytest pytest-cov pytest-rerunfailures pytest-xdist pyyaml
 
 List the 15 canonical local and CI cases::
 
