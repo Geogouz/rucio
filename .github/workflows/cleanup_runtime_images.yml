@@ -2,8 +2,8 @@ name: Cleanup Runtime Images
 
 on:
   schedule:
-    - cron: '0 2 * * 0'
-    - cron: '0 3 1 * *'
+    - cron: '30 0 * * 0'
+    - cron: '0 0 1 * *'
   workflow_dispatch:
     inputs:
       cleanup_type:
@@ -32,9 +32,9 @@ jobs:
       - name: Delete expired package versions
         run: |
           CLEANUP_TYPE="${{ inputs.cleanup_type }}"
-          if [[ "${{ github.event.schedule }}" == "0 2 * * 0" ]]; then
+          if [[ "${{ github.event.schedule }}" == "30 0 * * 0" ]]; then
             CLEANUP_TYPE=untagged
-          elif [[ "${{ github.event.schedule }}" == "0 3 1 * *" ]]; then
+          elif [[ "${{ github.event.schedule }}" == "0 0 1 * *" ]]; then
             CLEANUP_TYPE=tagged
           fi
 

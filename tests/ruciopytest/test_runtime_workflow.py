@@ -49,6 +49,14 @@ def test_test_workflows_cannot_publish_images() -> None:
     assert "publish: true" in publisher
 
 
+def test_publisher_covers_trusted_branches_and_repairs_images() -> None:
+    publisher = PUBLISH_WORKFLOW.read_text()
+
+    assert "- 'release-*'" in publisher
+    assert "cron: '0 1 * * *'" in publisher
+    assert "paths:" not in publisher
+
+
 def test_runtime_images_are_exposed_by_case_key() -> None:
     workflow = WORKFLOW.read_text()
 
@@ -98,3 +106,10 @@ def test_runtime_cleanup_compares_age_as_epoch() -> None:
     workflow = CLEANUP_WORKFLOW.read_text()
 
     assert "updated_epoch=$(date -u -d" in workflow
+
+
+def test_runtime_cleanup_schedule_follows_publication() -> None:
+    workflow = CLEANUP_WORKFLOW.read_text()
+
+    assert "cron: '0 0 1 * *'" in workflow
+    assert "cron: '0 3 1 * *'" not in workflow
