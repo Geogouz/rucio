@@ -113,7 +113,11 @@ def test_multi_vo_runs_both_legs_in_order(tmp_path: "Path", monkeypatch) -> None
     result = runner.run_container_case(
         get_case("multi-vo-py39-postgres14"),
         tmp_path,
-        ("--junitxml=results.xml",),
+        (
+            "--junitxml=results.xml",
+            "--log-file=pytest.log",
+            "--basetemp=tmp",
+        ),
     )
 
     assert result == 0
@@ -123,6 +127,10 @@ def test_multi_vo_runs_both_legs_in_order(tmp_path: "Path", monkeypatch) -> None
     ]
     assert "--junitxml=results-tst.xml" in _Manager.commands[0]
     assert "--junitxml=results-ts2.xml" in _Manager.commands[1]
+    assert "--log-file=pytest-tst.log" in _Manager.commands[0]
+    assert "--log-file=pytest-ts2.log" in _Manager.commands[1]
+    assert "--basetemp=tmp/tst" in _Manager.commands[0]
+    assert "--basetemp=tmp/ts2" in _Manager.commands[1]
     assert (
         "cache_dir=/rucio_source/.pytest_cache/"
         "rucio-cases/multi-vo-py39-postgres14/tst"
@@ -205,7 +213,7 @@ def test_integration_preserves_tpc_postcheck_order(tmp_path: "Path", monkeypatch
     result = runner.run_container_case(
         get_case("integration-py39-postgres14"),
         tmp_path,
-        (),
+        ("--log-file=pytest.log", "--basetemp=tmp"),
     )
 
     assert result == 0
@@ -213,6 +221,10 @@ def test_integration_preserves_tpc_postcheck_order(tmp_path: "Path", monkeypatch
     cat_index = next(index for index, command in enumerate(_Manager.commands) if command[1:3] == ("cat", "/tmp/test_tpc.artifact"))
     verify_index = next(index for index, command in enumerate(_Manager.commands) if command[1:3] == ("bash", "-c"))
     assert len(pytest_commands) == 15
+    assert "--log-file=pytest-01.log" in pytest_commands[0]
+    assert "--log-file=pytest-02.log" in pytest_commands[1]
+    assert "--basetemp=tmp/01" in pytest_commands[0]
+    assert "--basetemp=tmp/02" in pytest_commands[1]
     assert _Manager.commands.index(pytest_commands[0]) < cat_index < verify_index
     assert _Manager.commands.index(pytest_commands[9]) < cat_index
     assert verify_index < _Manager.commands.index(pytest_commands[10])

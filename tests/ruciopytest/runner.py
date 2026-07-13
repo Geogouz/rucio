@@ -214,7 +214,7 @@ def _run_multi_vo(
             "RUCIO_HOME": f"/opt/rucio/etc/multi_vo/{leg}",
             "RUCIO_MULTI_VO_LEG": leg,
         })
-        arguments = qualify_cache_dir(qualify_junit(pytest_args, leg), leg)
+        arguments = qualify_cache_dir(qualify_paths(pytest_args, leg), leg)
         if index:
             arguments = append_coverage(arguments)
         if index < len(legs) - 1:
@@ -261,7 +261,7 @@ def _run_integration(
 
     matched = False
     for index, selector in enumerate(case.test_paths):
-        arguments = qualify_junit(pytest_args, f"{index + 1:02d}")
+        arguments = qualify_paths(pytest_args, f"{index + 1:02d}")
         if index:
             arguments = append_coverage(arguments)
         if index < len(case.test_paths) - 1:

@@ -222,7 +222,7 @@ def _run_cases(
 
     def run_case(index: int, case: "TestCase") -> int:
         print(f"\n===== {case.id} =====", flush=True)
-        case_args = runner.qualify_junit(pytest_args, case.id)
+        case_args = runner.qualify_paths(pytest_args, case.id)
         if index:
             case_args = runner.append_coverage(case_args)
         if index < len(cases) - 1:
