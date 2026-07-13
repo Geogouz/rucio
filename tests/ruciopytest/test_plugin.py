@@ -61,6 +61,8 @@ def test_list_cases_is_machine_readable(capsys) -> None:
         "votest-py39-postgres14-atlas",
         "integration-py39-postgres14",
     }
+    atlas = next(case for case in cases if case["policy"] == "atlas")
+    assert len(atlas["tests"]) == 36
 
 
 def test_suite_resolves_every_matrix_case() -> None:
