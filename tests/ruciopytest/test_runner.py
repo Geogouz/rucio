@@ -258,6 +258,7 @@ def test_integration_last_failed_uses_one_pytest_session(
     monkeypatch,
 ) -> None:
     _reset_manager(monkeypatch)
+    _Manager.artifact = None
     case = get_case("integration-py39-postgres14")
 
     result = runner.run_container_case(case, tmp_path, ("--lf",))
@@ -266,6 +267,36 @@ def test_integration_last_failed_uses_one_pytest_session(
     commands = [command for command in _Manager.commands if "pytest" in command]
     assert len(commands) == 1
     assert all(selector in commands[0] for selector in case.test_paths)
+
+
+def test_integration_cache_clear_requires_tpc_artifact(
+    tmp_path: "Path",
+    monkeypatch,
+) -> None:
+    _reset_manager(monkeypatch)
+    _Manager.artifact = None
+
+    with pytest.raises(RuntimeError, match="did not export"):
+        runner.run_container_case(
+            get_case("integration-py39-postgres14"),
+            tmp_path,
+            ("--cache-clear",),
+        )
+
+
+def test_integration_cache_show_does_not_consume_test_path(
+    tmp_path: "Path",
+    monkeypatch,
+) -> None:
+    _reset_manager(monkeypatch)
+    case = get_case("integration-py39-postgres14")
+
+    result = runner.run_container_case(case, tmp_path, ("--cache-show",))
+
+    assert result == 0
+    commands = [command for command in _Manager.commands if "pytest" in command]
+    assert len(commands) == 1
+    assert all(selector not in commands[0] for selector in case.test_paths)
 
 
 def test_integration_broad_selector_verifies_exported_tpc(

@@ -242,7 +242,7 @@ def _run_integration(
     if explicit_selectors or _requires_single_session(pytest_args):
         selected_tpc = any("test_tpc.py" in path for path in explicit_selectors)
         selected_args = list(pytest_args)
-        if not explicit_selectors:
+        if not explicit_selectors and not _has_cache_show(pytest_args):
             selected_args.extend(case.test_paths)
         selected_args.append("--export-artifacts-from=test_tpc")
         result = _run_inner_pytest(
@@ -255,7 +255,13 @@ def _run_integration(
         if result == 0:
             _verify_tpc_transfer(
                 manager,
-                required=selected_tpc and _executes_tests(pytest_args),
+                required=(
+                    _executes_tests(pytest_args)
+                    and (
+                        selected_tpc
+                        or (not explicit_selectors and not _may_skip_tpc(pytest_args))
+                    )
+                ),
             )
         return result
 
@@ -570,6 +576,42 @@ def _requires_single_session(arguments: "Sequence[str]") -> bool:
         "--sw-skip",
     }
     return any(argument.split("=", 1)[0] in options for argument in arguments)
+
+
+def _has_cache_show(arguments: "Sequence[str]") -> bool:
+    return any(
+        argument == "--cache-show" or argument.startswith("--cache-show=")
+        for argument in arguments
+    )
+
+
+def _may_skip_tpc(arguments: "Sequence[str]") -> bool:
+    exact_options = {
+        "--deselect",
+        "--ignore",
+        "--ignore-glob",
+        "--last-failed",
+        "--lf",
+        "--stepwise",
+        "--stepwise-reset",
+        "--stepwise-skip",
+        "--sw",
+        "--sw-reset",
+        "--sw-skip",
+        "-k",
+        "-m",
+    }
+    return any(
+        argument in exact_options
+        or argument.startswith((
+            "--deselect=",
+            "--ignore=",
+            "--ignore-glob=",
+            "-k",
+            "-m",
+        ))
+        for argument in arguments
+    )
 
 
 def is_interactive(arguments: "Sequence[str]") -> bool:
