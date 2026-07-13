@@ -20,7 +20,7 @@ import yaml
 if TYPE_CHECKING:
     from collections.abc import Mapping
     from pathlib import Path
-    from typing import Any, Optional
+    from typing import Any
 
 
 def load_matrix(matrix_path: "Path") -> dict:
@@ -62,7 +62,3 @@ def rewrite_policy_section(rucio_cfg: str, config_overrides: "Mapping[str, Any]"
         config["policy"][key] = str(value)
     with open(rucio_cfg, "w") as stream:
         config.write(stream)
-
-
-def resolve_policy(config, env: "Mapping[str, str]") -> "Optional[str]":
-    return config.getoption("policy", default=None) or env.get("POLICY")

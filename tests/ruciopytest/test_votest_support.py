@@ -14,7 +14,6 @@
 
 import configparser
 from pathlib import Path
-from typing import Optional
 
 import pytest
 
@@ -22,7 +21,6 @@ from tests.ruciopytest.profiles import iter_cases
 from tests.ruciopytest.votest_support import (
     collect_votest_paths,
     load_matrix,
-    resolve_policy,
     rewrite_policy_section,
 )
 
@@ -103,23 +101,3 @@ def test_rewrite_policy_section_creates_section(tmp_path: Path) -> None:
     actual = configparser.ConfigParser()
     actual.read(config_path)
     assert dict(actual["policy"]) == {"permission": "belleii"}
-
-
-class _Config:
-    def __init__(self, policy: Optional[str]) -> None:
-        self.policy = policy
-
-    def getoption(self, name: str, default=None):
-        return self.policy if name == "policy" else default
-
-
-def test_policy_option_precedes_environment() -> None:
-    assert resolve_policy(_Config("atlas"), {"POLICY": "belleii"}) == "atlas"
-
-
-def test_policy_uses_environment_fallback() -> None:
-    assert resolve_policy(_Config(None), {"POLICY": "belleii"}) == "belleii"
-
-
-def test_policy_can_be_unset() -> None:
-    assert resolve_policy(_Config(None), {}) is None
