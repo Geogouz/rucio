@@ -99,6 +99,7 @@ class ContainerManager:
             "RUCIO_TEST_IMAGE": self.image,
             "RUCIO_NETWORK_NAME": f"{self.project_name}-network",
             "DEV_PROFILES": ",".join(case.compose_profiles),
+            "RUCIO_HOME": case.env_vars.get("RUCIO_HOME", "/opt/rucio"),
         })
 
     @staticmethod

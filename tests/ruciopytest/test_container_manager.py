@@ -107,6 +107,15 @@ def test_manager_ignores_inherited_default_platform(tmp_path: "Path") -> None:
     assert "DOCKER_DEFAULT_PLATFORM" not in manager.environment
 
 
+def test_manager_ignores_inherited_rucio_home(tmp_path: "Path") -> None:
+    manager = _manager(
+        tmp_path,
+        environ={"RUCIO_HOME": "/host/config"},
+    )
+
+    assert manager.environment["RUCIO_HOME"] == "/opt/rucio"
+
+
 def test_manager_uses_docker_server_platform(tmp_path: "Path", monkeypatch) -> None:
     manager = ContainerManager(
         get_case("remote-dbs-py39-postgres14"),
