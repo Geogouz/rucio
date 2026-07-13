@@ -374,40 +374,41 @@ def _run_inner_pytest(
 
 
 def qualify_junit(arguments: "Sequence[str]", qualifier: str) -> list[str]:
-    qualified = list(arguments)
-    for index, argument in enumerate(qualified):
-        if argument.startswith("--junitxml=") or argument.startswith("--junit-xml="):
-            option, value = argument.split("=", 1)
-            path = Path(value)
-            qualified[index] = f"{option}={path.with_stem(f'{path.stem}-{qualifier}')}"
-            break
-        if argument in ("--junitxml", "--junit-xml") and index + 1 < len(qualified):
-            path = Path(qualified[index + 1])
-            qualified[index + 1] = str(path.with_stem(f"{path.stem}-{qualifier}"))
-            break
+    return _qualify_path_option(
+        arguments,
+        ("--junitxml", "--junit-xml"),
+        qualifier,
+    )
+
+
+def qualify_paths(arguments: "Sequence[str]", qualifier: str) -> list[str]:
+    qualified = qualify_junit(arguments, qualifier)
+    qualified = _qualify_path_option(
+        qualified,
+        ("--log-file",),
+        qualifier,
+    )
+    qualified = _qualify_path_option(
+        qualified,
+        ("--basetemp",),
+        qualifier,
+        directory=True,
+    )
+    qualified, _ = _qualify_ini_path(
+        qualified,
+        "log_file",
+        qualifier,
+    )
     return qualified
 
 
 def qualify_cache_dir(arguments: "Sequence[str]", qualifier: str) -> list[str]:
-    qualified = list(arguments)
-    found = False
-    for index, argument in enumerate(qualified):
-        if argument in ("-o", "--override-ini") and index + 1 < len(qualified):
-            setting, matches = _qualify_cache_setting(
-                qualified[index + 1], qualifier
-            )
-            qualified[index + 1] = setting
-            found = found or matches
-            continue
-        for prefix in ("-o=", "--override-ini=", "-o"):
-            if argument.startswith(prefix):
-                setting, matches = _qualify_cache_setting(
-                    argument[len(prefix):], qualifier
-                )
-                if matches:
-                    qualified[index] = f"{prefix}{setting}"
-                    found = True
-                break
+    qualified, found = _qualify_ini_path(
+        arguments,
+        "cache_dir",
+        qualifier,
+        directory=True,
+    )
     if not found:
         qualified.extend((
             "-o",
@@ -416,11 +417,79 @@ def qualify_cache_dir(arguments: "Sequence[str]", qualifier: str) -> list[str]:
     return qualified
 
 
-def _qualify_cache_setting(setting: str, qualifier: str) -> tuple[str, bool]:
-    key, separator, value = setting.partition("=")
-    if key != "cache_dir" or not separator:
+def _qualify_ini_path(
+    arguments: "Sequence[str]",
+    key: str,
+    qualifier: str,
+    *,
+    directory: bool = False,
+) -> tuple[list[str], bool]:
+    qualified = list(arguments)
+    found = False
+    for index, argument in enumerate(qualified):
+        if argument in ("-o", "--override-ini") and index + 1 < len(qualified):
+            setting, matches = _qualify_ini_setting(
+                qualified[index + 1], key, qualifier, directory=directory
+            )
+            qualified[index + 1] = setting
+            found = found or matches
+            continue
+        for prefix in ("-o=", "--override-ini=", "-o"):
+            if argument.startswith(prefix):
+                setting, matches = _qualify_ini_setting(
+                    argument[len(prefix):], key, qualifier, directory=directory
+                )
+                if matches:
+                    qualified[index] = f"{prefix}{setting}"
+                    found = True
+                break
+    return qualified, found
+
+
+def _qualify_ini_setting(
+    setting: str,
+    key: str,
+    qualifier: str,
+    *,
+    directory: bool,
+) -> tuple[str, bool]:
+    setting_key, separator, value = setting.partition("=")
+    if setting_key != key or not separator:
         return setting, False
-    return f"cache_dir={Path(value) / qualifier}", True
+    return f"{key}={_qualify_path(value, qualifier, directory=directory)}", True
+
+
+def _qualify_path_option(
+    arguments: "Sequence[str]",
+    options: "Sequence[str]",
+    qualifier: str,
+    *,
+    directory: bool = False,
+) -> list[str]:
+    qualified = list(arguments)
+    for index, argument in enumerate(qualified):
+        for option in options:
+            if argument.startswith(f"{option}="):
+                value = argument.split("=", 1)[1]
+                qualified[index] = (
+                    f"{option}={_qualify_path(value, qualifier, directory=directory)}"
+                )
+                break
+            if argument == option and index + 1 < len(qualified):
+                qualified[index + 1] = _qualify_path(
+                    qualified[index + 1], qualifier, directory=directory
+                )
+                break
+    return qualified
+
+
+def _qualify_path(value: str, qualifier: str, *, directory: bool) -> str:
+    if value == "/dev/null":
+        return value
+    path = Path(value)
+    if directory or not path.name:
+        return str(path / qualifier)
+    return str(path.with_stem(f"{path.stem}-{qualifier}"))
 
 
 def append_coverage(arguments: "Sequence[str]") -> list[str]:

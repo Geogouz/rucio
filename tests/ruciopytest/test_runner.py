@@ -447,6 +447,25 @@ def test_default_cache_is_case_specific() -> None:
     )
 
 
+def test_shared_pytest_paths_are_qualified() -> None:
+    arguments = runner.qualify_paths(
+        (
+            "--junitxml=results.xml",
+            "--log-file",
+            "logs/pytest.log",
+            "--basetemp=tmp",
+            "-o",
+            "log_file=ini.log",
+        ),
+        "case",
+    )
+
+    assert "--junitxml=results-case.xml" in arguments
+    assert "logs/pytest-case.log" in arguments
+    assert "--basetemp=tmp/case" in arguments
+    assert "log_file=ini-case.log" in arguments
+
+
 def test_unit_case_builds_and_runs_requested_python(tmp_path: "Path", monkeypatch) -> None:
     commands = []
     timeouts = []
