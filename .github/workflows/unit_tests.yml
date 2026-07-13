@@ -22,7 +22,7 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install test runner
-        run: python -m pip install --constraint requirements/requirements.dev.txt pytest pyyaml
+        run: python -m pip install --constraint requirements/requirements.dev.txt pytest pytest-cov pytest-xdist pyyaml
       - name: Generate unit matrix
         id: cases
         run: |
@@ -50,7 +50,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
       - name: Install test runner
-        run: python -m pip install --constraint requirements/requirements.dev.txt pytest pyyaml
+        run: python -m pip install --constraint requirements/requirements.dev.txt pytest pytest-cov pytest-xdist pyyaml
       - name: Run ${{ matrix.case.id }}
         run: |
           mkdir -p test-results

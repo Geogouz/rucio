@@ -29,7 +29,7 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install test runner
-        run: python -m pip install --constraint requirements/requirements.dev.txt pytest pyyaml
+        run: python -m pip install --constraint requirements/requirements.dev.txt pytest pytest-cov pytest-xdist pyyaml
       - name: Generate integration matrix
         id: cases
         run: |
@@ -55,7 +55,7 @@ jobs:
           python-version: "3.11"
           cache: pip
       - name: Install test runner
-        run: python -m pip install --constraint requirements/requirements.dev.txt pytest pyyaml
+        run: python -m pip install --constraint requirements/requirements.dev.txt pytest pytest-cov pytest-xdist pyyaml
       - name: Set up Docker Buildx
         if: needs.runtime_images.outputs.build_locally == 'true'
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
