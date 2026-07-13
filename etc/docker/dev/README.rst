@@ -159,6 +159,16 @@ Run the full canonical suite::
 
     .venv/bin/python -m pytest --suite=all
 
+Run up to three independent cases concurrently::
+
+    .venv/bin/python -m pytest --suite=all --case-workers=3
+
+Add ``-x`` to stop scheduling cases after the first failure. Cases already in
+progress finish so their containers can be cleaned up. ``--case-workers``
+controls independent matrix cases; ``--xdist-workers`` controls pytest workers
+inside cases which support xdist. Coverage and interactive debugging require a
+single case worker.
+
 The complete integration case is::
 
     .venv/bin/python -m pytest --case=integration-py39-postgres14
