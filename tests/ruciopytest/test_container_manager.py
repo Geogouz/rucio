@@ -211,6 +211,7 @@ def test_stop_removes_only_owned_project(tmp_path: "Path", monkeypatch) -> None:
 
     down = commands[-1]
     assert manager.project_name in down
+    assert "--remove-orphans" in down
     assert down[-1] == "--volumes"
     assert all("compose ls" not in " ".join(command) for command in commands)
 

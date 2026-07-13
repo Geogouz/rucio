@@ -180,7 +180,12 @@ class ContainerManager:
         cleanup_error = None
         try:
             self.capture_logs()
-            command = [*self.compose_command("down", "--timeout", "30")]
+            command = self.compose_command(
+                "down",
+                "--timeout",
+                "30",
+                "--remove-orphans",
+            )
             if not self.keep_db:
                 command.append("--volumes")
             result = self._run(command, check=False, timeout=120)
