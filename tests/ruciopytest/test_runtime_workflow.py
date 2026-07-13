@@ -72,3 +72,9 @@ def test_runtime_cleanup_propagates_deletion_failures() -> None:
     workflow = CLEANUP_WORKFLOW.read_text()
 
     assert "gh api --method DELETE --silent" in workflow
+
+
+def test_runtime_cleanup_compares_age_as_epoch() -> None:
+    workflow = CLEANUP_WORKFLOW.read_text()
+
+    assert "updated_epoch=$(date -u -d" in workflow

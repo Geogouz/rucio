@@ -40,8 +40,8 @@ jobs:
           echo "Cleaning untagged images older than 7 days..."
 
           # Calculate cutoff date (7 days ago)
-          CUTOFF_DATE=$(date -d '7 days ago' --iso-8601=seconds)
-          echo "Cutoff date: $CUTOFF_DATE"
+          cutoff=$(date -u -d '7 days ago' +%s)
+          echo "Cutoff epoch: $cutoff"
 
           # Get all package versions
           VERSIONS=$(gh api --paginate --slurp \
@@ -53,12 +53,13 @@ jobs:
           echo "$VERSIONS" | jq -c '.[][]' | while read -r VERSION; do
             VERSION_ID=$(echo "$VERSION" | jq -r '.id')
             UPDATED_AT=$(echo "$VERSION" | jq -r '.updated_at')
+            updated_epoch=$(date -u -d "$UPDATED_AT" +%s)
             TAGS=$(echo "$VERSION" | jq -r '.metadata.container.tags | length')
 
             # Check if image has no tags (untagged)
             if [ "$TAGS" = "0" ]; then
               # Check if older than 7 days
-              if [[ "$UPDATED_AT" < "$CUTOFF_DATE" ]]; then
+              if [[ "$updated_epoch" -lt "$cutoff" ]]; then
                 echo "Deleting untagged image ID: $VERSION_ID (updated: $UPDATED_AT)"
                 gh api --method DELETE --silent \
                   -H "Accept: application/vnd.github+json" \
@@ -89,8 +90,8 @@ jobs:
           echo "Cleaning tagged images older than 30 days..."
 
           # Calculate cutoff date (30 days ago)
-          CUTOFF_DATE=$(date -d '30 days ago' --iso-8601=seconds)
-          echo "Cutoff date: $CUTOFF_DATE"
+          cutoff=$(date -u -d '30 days ago' +%s)
+          echo "Cutoff epoch: $cutoff"
 
           VERSIONS=$(gh api --paginate --slurp \
             -H "Accept: application/vnd.github+json" \
@@ -100,6 +101,7 @@ jobs:
           echo "$VERSIONS" | jq -c '.[][]' | while read -r VERSION; do
             VERSION_ID=$(echo "$VERSION" | jq -r '.id')
             UPDATED_AT=$(echo "$VERSION" | jq -r '.updated_at')
+            updated_epoch=$(date -u -d "$UPDATED_AT" +%s)
             TAGS=$(echo "$VERSION" | jq -r '.metadata.container.tags')
             TAG_COUNT=$(echo "$TAGS" | jq -r 'length')
 
@@ -113,7 +115,7 @@ jobs:
                 continue
               fi
 
-              if [[ "$UPDATED_AT" < "$CUTOFF_DATE" ]]; then
+              if [[ "$updated_epoch" -lt "$cutoff" ]]; then
                 echo "Deleting tagged image ID: $VERSION_ID with tags: $TAG_LIST (updated: $UPDATED_AT)"
                 gh api --method DELETE --silent \
                   -H "Accept: application/vnd.github+json" \
