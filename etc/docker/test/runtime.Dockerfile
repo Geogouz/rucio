@@ -9,7 +9,7 @@ FROM almalinux:9.1 AS base
     ENV CPLUS_INCLUDE_PATH="/usr/local/include/python${PYTHON}:/usr/include/python${PYTHON}"
     ENV C_INCLUDE_PATH="/usr/include/python${PYTHON}"
     ENV PYTHON_VENV="/opt/venv"
-    ENV PATH="${PYTHON_VENV}/bin:${PATH}"
+    ENV PATH="/rucio_source/bin:${PYTHON_VENV}/bin:${PATH}"
     ENV PYTHON_310_PATCH_VERSION="4"
     ENV RUCIO_HOME="/opt/rucio"
 

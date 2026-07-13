@@ -45,3 +45,9 @@ def test_runtime_dockerfile_has_parameterized_unit_target() -> None:
 
     assert "FROM python:${PYTHON}-slim-bookworm AS unit" in dockerfile
     assert 'ENTRYPOINT ["python", "-bb", "-m", "pytest"]' in dockerfile
+
+
+def test_runtime_dockerfile_exposes_source_commands() -> None:
+    dockerfile = RUNTIME_DOCKERFILE.read_text()
+
+    assert 'ENV PATH="/rucio_source/bin:${PYTHON_VENV}/bin:${PATH}"' in dockerfile
