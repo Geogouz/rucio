@@ -17,6 +17,7 @@ from pathlib import Path
 import yaml
 
 COMPOSE_DIR = Path(__file__).resolve().parents[2] / "etc/docker/dev"
+RUNTIME_DOCKERFILE = COMPOSE_DIR.parent / "test/runtime.Dockerfile"
 
 
 def test_compose_services_do_not_use_global_container_names() -> None:
@@ -36,3 +37,10 @@ def test_test_overlay_consumes_prebuilt_image() -> None:
 
     assert "image" in rucio
     assert "build" not in rucio
+
+
+def test_runtime_dockerfile_has_parameterized_unit_target() -> None:
+    dockerfile = RUNTIME_DOCKERFILE.read_text()
+
+    assert "FROM python:${PYTHON}-slim-bookworm AS unit" in dockerfile
+    assert 'ENTRYPOINT ["python", "-bb", "-m", "pytest"]' in dockerfile
