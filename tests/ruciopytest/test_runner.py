@@ -122,9 +122,16 @@ def test_integration_preserves_tpc_postcheck_order(tmp_path: "Path", monkeypatch
     pytest_commands = [command for command in _Manager.commands if "pytest" in command]
     cat_index = next(index for index, command in enumerate(_Manager.commands) if command[1:3] == ("cat", "/tmp/test_tpc.artifact"))
     grep_index = next(index for index, command in enumerate(_Manager.commands) if command[1:3] == ("grep", "-Fq"))
-    assert len(pytest_commands) == 2
+    assert len(pytest_commands) == 15
     assert _Manager.commands.index(pytest_commands[0]) < cat_index < grep_index
-    assert grep_index < _Manager.commands.index(pytest_commands[1])
+    assert _Manager.commands.index(pytest_commands[9]) < cat_index
+    assert grep_index < _Manager.commands.index(pytest_commands[10])
+    assert "RUCIO_SKIP_TEST_SETUP" not in _Manager.environments[0]
+    assert all(
+        environment["RUCIO_SKIP_TEST_SETUP"] == "1"
+        for environment in _Manager.environments[1:]
+        if environment
+    )
 
 
 def test_postgres_uses_ci_worker_count(tmp_path: "Path", monkeypatch) -> None:

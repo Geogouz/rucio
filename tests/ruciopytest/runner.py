@@ -207,33 +207,28 @@ def _run_integration(
             _verify_tpc_transfer(manager)
         return result
 
-    first_phase = case.test_paths[:10]
-    second_phase = case.test_paths[10:]
-    first_args = [
-        *qualify_junit(pytest_args, "storage"),
-        "--export-artifacts-from=test_tpc",
-        *first_phase,
-    ]
-    result = _run_inner_pytest(
-        manager,
-        case,
-        first_args,
-        keep_db=keep_db,
-        environment=container_environment,
-    )
-    if result:
-        return result
-    _verify_tpc_transfer(manager)
-
-    environment = dict(container_environment)
-    environment["RUCIO_SKIP_TEST_SETUP"] = "1"
-    return _run_inner_pytest(
-        manager,
-        case,
-        [*qualify_junit(pytest_args, "metadata"), *second_phase],
-        keep_db=True,
-        environment=environment,
-    )
+    for index, selector in enumerate(case.test_paths):
+        arguments = [
+            *qualify_junit(pytest_args, f"{index + 1:02d}"),
+            selector,
+        ]
+        if "test_tpc.py" in selector:
+            arguments.insert(-1, "--export-artifacts-from=test_tpc")
+        environment = dict(container_environment)
+        if index:
+            environment["RUCIO_SKIP_TEST_SETUP"] = "1"
+        result = _run_inner_pytest(
+            manager,
+            case,
+            arguments,
+            keep_db=keep_db or index > 0,
+            environment=environment,
+        )
+        if result:
+            return result
+        if "test_tpc.py" in selector:
+            _verify_tpc_transfer(manager)
+    return 0
 
 
 def _verify_tpc_transfer(manager: ContainerManager) -> None:
