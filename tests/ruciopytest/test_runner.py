@@ -325,6 +325,36 @@ def test_explicit_selector_replaces_case_paths(tmp_path: "Path", monkeypatch) ->
     assert "tests/test_bin_rucio.py" not in _Manager.commands[0]
 
 
+def test_container_command_keeps_options_before_separator(
+    tmp_path: "Path",
+    monkeypatch,
+) -> None:
+    _reset_manager(monkeypatch)
+    selector = "tests/test_clients.py"
+    arguments = runner.container_pytest_config(
+        runner.forwarded_pytest_args(("--", selector)),
+        tmp_path,
+        tmp_path,
+        tmp_path / "pyproject.toml",
+    )
+
+    result = runner.run_container_case(
+        get_case("client-py39-postgres14"),
+        tmp_path,
+        arguments,
+        explicit_selectors=(selector,),
+    )
+
+    assert result == 0
+    command = _Manager.commands[0]
+    marker = command.index("--")
+    assert command[marker + 1:] == (selector,)
+    assert command.index("-c") < marker
+    assert next(
+        index for index, value in enumerate(command) if value.startswith("cache_dir=")
+    ) < marker
+
+
 def test_multi_vo_stops_after_first_failure(tmp_path: "Path", monkeypatch) -> None:
     _reset_manager(monkeypatch, (1, 0))
 
@@ -466,6 +496,27 @@ def test_integration_broad_selector_verifies_exported_tpc(
         if command[1:3] == ("bash", "-c")
     )
     assert verify[-1] == "/fts/log/*__transfer-id"
+
+
+def test_integration_artifact_option_precedes_separator(
+    tmp_path: "Path",
+    monkeypatch,
+) -> None:
+    _reset_manager(monkeypatch)
+    selector = "tests/test_tpc.py"
+
+    result = runner.run_container_case(
+        get_case("integration-py39-postgres14"),
+        tmp_path,
+        ("--", selector),
+        explicit_selectors=(selector,),
+    )
+
+    assert result == 0
+    command = _Manager.commands[0]
+    marker = command.index("--")
+    assert command.index("--export-artifacts-from=test_tpc") < marker
+    assert command[marker + 1:] == (selector,)
 
 
 def test_integration_collect_only_skips_missing_tpc_artifact(
@@ -752,6 +803,15 @@ def test_default_cache_is_case_specific() -> None:
     )
 
 
+def test_generated_cache_option_precedes_separator() -> None:
+    assert runner.qualify_cache_dir(("--", "test-name"), "case") == [
+        "-o",
+        "cache_dir=/rucio_source/.pytest_cache/rucio-cases/case",
+        "--",
+        "test-name",
+    ]
+
+
 def test_shared_pytest_paths_are_qualified() -> None:
     arguments = runner.qualify_paths(
         (
@@ -769,6 +829,40 @@ def test_shared_pytest_paths_are_qualified() -> None:
     assert "logs/pytest-case.log" in arguments
     assert "--basetemp=tmp/case" in arguments
     assert "log_file=ini-case.log" in arguments
+
+
+def test_pytest_literals_after_separator_are_unchanged() -> None:
+    arguments = (
+        "--",
+        "--junitxml=literal.xml",
+        "--log-file=literal.log",
+        "--basetemp=literal",
+        "-o",
+        "log_file=literal.log",
+        "--cov=literal",
+        "--pdb",
+    )
+
+    assert runner.qualify_paths(arguments, "case") == list(arguments)
+    assert not runner.coverage_enabled(arguments)
+    assert not runner.is_interactive(arguments)
+
+
+def test_generated_coverage_options_precede_separator() -> None:
+    arguments = ("--cov=lib/rucio", "--", "test-name")
+
+    assert runner.append_coverage(arguments) == [
+        "--cov=lib/rucio",
+        "--cov-append",
+        "--",
+        "test-name",
+    ]
+    assert runner.defer_coverage_threshold(arguments) == [
+        "--cov=lib/rucio",
+        "--cov-fail-under=0",
+        "--",
+        "test-name",
+    ]
 
 
 def test_pytest_device_paths_are_preserved() -> None:
@@ -890,6 +984,42 @@ def test_unit_case_preserves_explicit_selector(tmp_path: "Path", monkeypatch) ->
     assert result == 5
     assert commands[1].count("tests/rucio/test_common.py") == 1
     assert "tests/ruciopytest" not in commands[1]
+
+
+def test_unit_command_keeps_options_before_separator(
+    tmp_path: "Path",
+    monkeypatch,
+) -> None:
+    commands = []
+
+    def run(command, **kwargs):
+        commands.append(list(command))
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(runner.subprocess, "run", run)
+    selector = "tests/rucio/test_common.py"
+    arguments = runner.container_pytest_config(
+        runner.forwarded_pytest_args(("--", selector)),
+        tmp_path,
+        tmp_path,
+        tmp_path / "pyproject.toml",
+    )
+
+    runner.run_unit_case(
+        get_case("unit-py39"),
+        tmp_path,
+        arguments,
+        explicit_selectors=(selector,),
+    )
+
+    marker = commands[1].index("--")
+    assert commands[1][marker + 1:] == [selector]
+    assert commands[1].index("-c") < marker
+    assert next(
+        index
+        for index, value in enumerate(commands[1])
+        if value.startswith("cache_dir=")
+    ) < marker
 
 
 def test_unit_case_applies_canonical_collection(tmp_path: "Path", monkeypatch) -> None:

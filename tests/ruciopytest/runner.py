@@ -61,6 +61,17 @@ def outer_pytest_args(
     ]
 
 
+def _separator_index(arguments: "Sequence[str]") -> int:
+    for index, argument in enumerate(arguments):
+        if argument == "--":
+            return index
+    return len(arguments)
+
+
+def _options_before_separator(arguments: "Sequence[str]") -> "Sequence[str]":
+    return arguments[:_separator_index(arguments)]
+
+
 def forwarded_pytest_args(arguments: "Sequence[str]") -> list[str]:
     forwarded = []
     skip_next = False
@@ -81,7 +92,7 @@ def forwarded_pytest_args(arguments: "Sequence[str]") -> list[str]:
         if argument.startswith("-c") and argument != "-c":
             continue
         forwarded.append(argument)
-    marker = forwarded.index("--") if "--" in forwarded else len(forwarded)
+    marker = _separator_index(forwarded)
     forwarded[marker:marker] = ("-o", "addopts=")
     return forwarded
 
@@ -108,7 +119,7 @@ def container_pytest_config(
         return _CONTAINER_SOURCE_ROOT / relative
 
     updated = list(arguments)
-    marker = updated.index("--") if "--" in updated else len(updated)
+    marker = _separator_index(updated)
     updated[marker:marker] = (
         f"--rootdir={map_path(pytest_root, 'root directory')}",
         "-c",
@@ -122,7 +133,7 @@ def add_pytest_options(
     *options: str,
 ) -> list[str]:
     updated = list(arguments)
-    marker = updated.index("--") if "--" in updated else len(updated)
+    marker = _separator_index(updated)
     updated[marker:marker] = options
     return updated
 
@@ -346,7 +357,10 @@ def _run_integration(
         selected_args = list(pytest_args)
         if not explicit_selectors and not _has_cache_show(pytest_args):
             selected_args.extend(case.test_paths)
-        selected_args.append("--export-artifacts-from=test_tpc")
+        selected_args = add_pytest_options(
+            selected_args,
+            "--export-artifacts-from=test_tpc",
+        )
         result = _run_inner_pytest(
             manager,
             case,
@@ -375,7 +389,10 @@ def _run_integration(
         if index < len(case.test_paths) - 1:
             arguments = defer_coverage_threshold(arguments)
         if "test_tpc.py" in selector:
-            arguments.append("--export-artifacts-from=test_tpc")
+            arguments = add_pytest_options(
+                arguments,
+                "--export-artifacts-from=test_tpc",
+            )
         arguments.append(selector)
         environment = dict(container_environment)
         if index:
@@ -514,6 +531,8 @@ def qualify_paths(arguments: "Sequence[str]", qualifier: str) -> list[str]:
 def _qualify_debug(arguments: "Sequence[str]", qualifier: str) -> list[str]:
     qualified = list(arguments)
     for index, argument in enumerate(qualified):
+        if argument == "--":
+            break
         if argument.startswith("--debug="):
             value = argument.split("=", 1)[1]
             if value:
@@ -536,10 +555,11 @@ def qualify_cache_dir(arguments: "Sequence[str]", qualifier: str) -> list[str]:
         directory=True,
     )
     if not found:
-        qualified.extend((
+        qualified = add_pytest_options(
+            qualified,
             "-o",
             f"cache_dir=/rucio_source/.pytest_cache/rucio-cases/{qualifier}",
-        ))
+        )
     return qualified
 
 
@@ -553,6 +573,8 @@ def _qualify_ini_path(
     qualified = list(arguments)
     found = False
     for index, argument in enumerate(qualified):
+        if argument == "--":
+            break
         if argument in ("-o", "--override-ini") and index + 1 < len(qualified):
             setting, matches = _qualify_ini_setting(
                 qualified[index + 1], key, qualifier, directory=directory
@@ -594,6 +616,8 @@ def _qualify_path_option(
 ) -> list[str]:
     qualified = list(arguments)
     for index, argument in enumerate(qualified):
+        if argument == "--":
+            break
         for option in options:
             if argument.startswith(f"{option}="):
                 value = argument.split("=", 1)[1]
@@ -620,21 +644,25 @@ def _qualify_path(value: str, qualifier: str, *, directory: bool) -> str:
 
 def append_coverage(arguments: "Sequence[str]") -> list[str]:
     updated = list(arguments)
-    if coverage_enabled(updated) and "--cov-append" not in updated:
-        updated.append("--cov-append")
+    if (
+        coverage_enabled(updated)
+        and "--cov-append" not in _options_before_separator(updated)
+    ):
+        updated = add_pytest_options(updated, "--cov-append")
     return updated
 
 
 def defer_coverage_threshold(arguments: "Sequence[str]") -> list[str]:
     updated = list(arguments)
-    zero_threshold = "--cov-fail-under=0" in updated or any(
+    options = _options_before_separator(updated)
+    zero_threshold = "--cov-fail-under=0" in options or any(
         argument == "--cov-fail-under"
-        and index + 1 < len(updated)
-        and updated[index + 1] == "0"
-        for index, argument in enumerate(updated)
+        and index + 1 < len(options)
+        and options[index + 1] == "0"
+        for index, argument in enumerate(options)
     )
     if coverage_enabled(updated) and not zero_threshold:
-        updated.append("--cov-fail-under=0")
+        updated = add_pytest_options(updated, "--cov-fail-under=0")
     return updated
 
 
@@ -693,14 +721,15 @@ def has_looponfail(arguments: "Sequence[str]") -> bool:
 def _has_coverage_option(arguments: "Sequence[str]") -> bool:
     return any(
         argument == "--no-cov" or argument.startswith("--cov")
-        for argument in arguments
+        for argument in _options_before_separator(arguments)
     )
 
 
 def coverage_enabled(arguments: "Sequence[str]") -> bool:
-    return "--no-cov" not in arguments and any(
+    options = _options_before_separator(arguments)
+    return "--no-cov" not in options and any(
         argument == "--cov" or argument.startswith("--cov=")
-        for argument in arguments
+        for argument in options
     )
 
 
@@ -714,9 +743,10 @@ def _executes_tests(arguments: "Sequence[str]") -> bool:
         "--setup-only",
         "--setup-plan",
     }
-    return info_options.isdisjoint(arguments) and not any(
+    options = _options_before_separator(arguments)
+    return info_options.isdisjoint(options) and not any(
         argument == "--cache-show" or argument.startswith("--cache-show=")
-        for argument in arguments
+        for argument in options
     )
 
 
@@ -738,14 +768,15 @@ def _requires_single_session(arguments: "Sequence[str]") -> bool:
         "--sw-skip",
     }
     return has_looponfail(arguments) or any(
-        argument.split("=", 1)[0] in options for argument in arguments
+        argument.split("=", 1)[0] in options
+        for argument in _options_before_separator(arguments)
     )
 
 
 def _has_cache_show(arguments: "Sequence[str]") -> bool:
     return any(
         argument == "--cache-show" or argument.startswith("--cache-show=")
-        for argument in arguments
+        for argument in _options_before_separator(arguments)
     )
 
 
@@ -774,12 +805,12 @@ def _may_skip_tpc(arguments: "Sequence[str]") -> bool:
             "-k",
             "-m",
         ))
-        for argument in arguments
+        for argument in _options_before_separator(arguments)
     )
 
 
 def is_interactive(arguments: "Sequence[str]") -> bool:
     return has_looponfail(arguments) or any(
         argument in ("--pdb", "--trace") or argument.startswith("--pdbcls")
-        for argument in arguments
+        for argument in _options_before_separator(arguments)
     )

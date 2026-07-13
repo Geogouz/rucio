@@ -368,6 +368,30 @@ def test_custom_zero_workers_override_direct_workers(monkeypatch) -> None:
     assert captured["args"][-2:] == ["-n", "0"]
 
 
+def test_custom_workers_precede_separator(monkeypatch) -> None:
+    config = _Config(case="unit-py39", xdist_workers=2)
+    config.args = ["-literal"]
+    config.args_source = config.ArgsSource.ARGS
+    config.invocation_params = SimpleNamespace(args=(
+        "--case=unit-py39",
+        "--xdist-workers=2",
+        "--",
+        "-literal",
+    ))
+    captured = {}
+
+    def run(case, root_path, pytest_args, **kwargs):
+        captured["args"] = pytest_args
+        return 0
+
+    monkeypatch.setattr(plugin.runner, "run_unit_case", run)
+
+    assert plugin.pytest_cmdline_main(config) == 0
+    marker = captured["args"].index("--")
+    assert captured["args"][marker + 1:] == ["-literal"]
+    assert captured["args"].index("-n") < marker
+
+
 def test_custom_zero_workers_preserve_explicit_transaction(monkeypatch) -> None:
     config = _Config(
         case="remote-dbs-py39-oracle",
