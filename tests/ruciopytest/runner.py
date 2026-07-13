@@ -48,8 +48,12 @@ _RUNNER_OPTIONS = {
 _UNIT_DOCKERFILE = "etc/docker/test/unit.Dockerfile"
 
 
-def outer_pytest_args(arguments: "Sequence[str]") -> list[str]:
+def outer_pytest_args(
+    arguments: "Sequence[str]",
+    configured_addopts: "Sequence[str]" = (),
+) -> list[str]:
     return [
+        *configured_addopts,
         *shlex.split(os.environ.get("PYTEST_ADDOPTS", "")),
         *arguments,
     ]
@@ -70,6 +74,8 @@ def forwarded_pytest_args(arguments: "Sequence[str]") -> list[str]:
         if any(argument.startswith(f"{option}=") for option in _RUNNER_OPTIONS):
             continue
         forwarded.append(argument)
+    marker = forwarded.index("--") if "--" in forwarded else len(forwarded)
+    forwarded[marker:marker] = ("-o", "addopts=")
     return forwarded
 
 

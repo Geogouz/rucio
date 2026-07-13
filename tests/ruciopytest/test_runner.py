@@ -93,18 +93,34 @@ def test_forwarded_args_remove_only_runner_options() -> None:
         "-k",
         "rule",
         "tests/test_rule.py::test_add_rule",
+        "-o",
+        "addopts=",
     ]
 
 
 def test_outer_args_include_pytest_addopts(monkeypatch) -> None:
     monkeypatch.setenv("PYTEST_ADDOPTS", "-k 'rule creation' -q")
 
-    assert runner.outer_pytest_args(("--case=unit-py39", "-x")) == [
+    assert runner.outer_pytest_args(
+        ("--case=unit-py39", "-x"),
+        ("--strict-markers",),
+    ) == [
+        "--strict-markers",
         "-k",
         "rule creation",
         "-q",
         "--case=unit-py39",
         "-x",
+    ]
+
+
+def test_addopts_override_precedes_pytest_separator() -> None:
+    assert runner.forwarded_pytest_args(("-q", "--", "-literal")) == [
+        "-q",
+        "-o",
+        "addopts=",
+        "--",
+        "-literal",
     ]
 
 

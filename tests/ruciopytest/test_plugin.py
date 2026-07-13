@@ -45,6 +45,7 @@ class _Config:
         }
         defaults.update(options)
         self.options = defaults
+        self.ini_options = self.options.pop("ini_options", {})
         self.rootpath = REPO_ROOT
         self.args = ["tests"]
         self.args_source = self.ArgsSource.TESTPATHS
@@ -53,6 +54,9 @@ class _Config:
 
     def getoption(self, name, default=None):
         return self.options.get(name.lstrip("-"), default)
+
+    def getini(self, name):
+        return self.ini_options.get(name, [])
 
 
 def test_list_cases_is_machine_readable(capsys) -> None:
@@ -165,6 +169,8 @@ def test_container_case_forwards_standard_pytest_args(monkeypatch) -> None:
         "-k",
         "rule",
         "tests/test_rule.py::test_rule",
+        "-o",
+        "addopts=",
     ]
     assert captured["kwargs"]["explicit_selectors"] == (
         "tests/test_rule.py::test_rule",
@@ -187,7 +193,7 @@ def test_implicit_testpaths_are_not_explicit_selectors(monkeypatch) -> None:
     monkeypatch.setattr(plugin.runner, "run_container_case", run)
 
     assert plugin.pytest_cmdline_main(config) == 0
-    assert captured["args"] == ["-k", "tests"]
+    assert captured["args"] == ["-k", "tests", "-o", "addopts="]
     assert captured["kwargs"]["explicit_selectors"] == ()
 
 
@@ -203,7 +209,29 @@ def test_container_case_forwards_pytest_addopts(monkeypatch) -> None:
     monkeypatch.setattr(plugin.runner, "run_container_case", run)
 
     assert plugin.pytest_cmdline_main(config) == 0
-    assert captured["args"] == ["-k", "rule", "-q"]
+    assert captured["args"] == ["-k", "rule", "-q", "-o", "addopts="]
+
+
+def test_container_case_forwards_configured_addopts(monkeypatch) -> None:
+    config = _Config(
+        case="remote-dbs-py39-postgres14",
+        ini_options={"addopts": ["--strict-markers", "-q"]},
+    )
+    captured = {}
+
+    def run(case, root_path, pytest_args, **kwargs):
+        captured["args"] = pytest_args
+        return 0
+
+    monkeypatch.setattr(plugin.runner, "run_container_case", run)
+
+    assert plugin.pytest_cmdline_main(config) == 0
+    assert captured["args"] == [
+        "--strict-markers",
+        "-q",
+        "-o",
+        "addopts=",
+    ]
 
 
 def test_unit_case_uses_container(monkeypatch) -> None:
