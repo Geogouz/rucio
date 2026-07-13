@@ -15,6 +15,7 @@
 from pathlib import Path
 
 WORKFLOW = Path(__file__).resolve().parents[2] / ".github/workflows/runtime_images.yml"
+CLEANUP_WORKFLOW = WORKFLOW.with_name("cleanup_runtime_images.yml")
 
 
 def test_runtime_hash_covers_every_local_dockerfile_copy() -> None:
@@ -40,3 +41,9 @@ def test_pull_requests_never_publish_missing_images() -> None:
     workflow = WORKFLOW.read_text()
 
     assert 'if [[ "${{ github.event_name }}" == "pull_request" ]]' in workflow
+
+
+def test_runtime_cleanup_has_package_write_permission() -> None:
+    workflow = CLEANUP_WORKFLOW.read_text()
+
+    assert "packages: write" in workflow

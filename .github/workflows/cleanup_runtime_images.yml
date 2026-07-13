@@ -18,6 +18,10 @@ on:
         - tagged
         - both
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   cleanup-untagged:
     name: Delete untagged images older than 7 days
