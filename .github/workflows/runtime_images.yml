@@ -110,8 +110,8 @@ jobs:
               continue
             fi
 
-            # Build locally if PR to master (can't push)
-            if [[ "${{ github.event_name }}" == "pull_request" && "${{ github.base_ref }}" == "master" ]]; then
+            # Pull requests, including forks, cannot safely publish packages.
+            if [[ "${{ github.event_name }}" == "pull_request" ]]; then
               echo "Python ${PYVER} image missing, will build locally"
               BUILD_LOCALLY=true
               continue

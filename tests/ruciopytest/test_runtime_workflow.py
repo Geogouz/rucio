@@ -34,3 +34,9 @@ def test_runtime_hash_covers_every_local_dockerfile_copy() -> None:
         "requirements",
     ):
         assert path in workflow
+
+
+def test_pull_requests_never_publish_missing_images() -> None:
+    workflow = WORKFLOW.read_text()
+
+    assert 'if [[ "${{ github.event_name }}" == "pull_request" ]]' in workflow
