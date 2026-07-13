@@ -108,12 +108,12 @@ def pytest_cmdline_main(config: pytest.Config) -> "Optional[int]":
         print(json.dumps([_case_data(case) for case in iter_cases()]))
         return 0
 
-    if config.getoption("suite") == "all":
-        return _run_all_cases(config)
-
-    case = resolve_requested_case(config, config.rootpath)
-    if case is None:
+    cases = resolve_requested_cases(config, config.rootpath)
+    if not cases:
         return None
+    if config.getoption("suite"):
+        return _run_cases(config, cases)
+    case = cases[0]
 
     if config.getoption("dry_run") or config.getoption("dry_run_json"):
         data = _case_data(case)
@@ -159,16 +159,10 @@ def pytest_cmdline_main(config: pytest.Config) -> "Optional[int]":
     )
 
 
-def _run_all_cases(config: pytest.Config) -> int:
-    if config.getoption("case"):
-        raise pytest.UsageError("--case and --suite are mutually exclusive")
-    if config.getoption("policy"):
-        raise pytest.UsageError("--policy cannot be combined with --suite=all")
-
-    cases = tuple(
-        _resolve_policy_paths(case, config.rootpath)
-        for case in iter_cases()
-    )
+def _run_cases(
+    config: pytest.Config,
+    cases: "Sequence[TestCase]",
+) -> int:
     if config.getoption("dry_run") or config.getoption("dry_run_json"):
         if config.getoption("dry_run_json"):
             print(json.dumps([_case_data(case) for case in cases]))
@@ -177,13 +171,22 @@ def _run_all_cases(config: pytest.Config) -> int:
                 print(case.id)
         return 0
 
-    if os.environ.get("RUCIO_TEST_IMAGE") and not all(
-        os.environ.get(f"RUCIO_TEST_IMAGE_PY{version}")
-        for version in ("39", "310")
+    server_versions = {
+        case.python.replace(".", "")
+        for case in cases
+        if case.suite != "unit"
+    }
+    if (
+        os.environ.get("RUCIO_TEST_IMAGE")
+        and len(server_versions) > 1
+        and not all(
+            os.environ.get(f"RUCIO_TEST_IMAGE_PY{version}")
+            for version in server_versions
+        )
     ):
         raise pytest.UsageError(
-            "--suite=all requires RUCIO_TEST_IMAGE_PY39 and "
-            "RUCIO_TEST_IMAGE_PY310 instead of one RUCIO_TEST_IMAGE"
+            "Multi-version suites require one RUCIO_TEST_IMAGE_PY<version> "
+            "variable per Python version instead of RUCIO_TEST_IMAGE"
         )
 
     explicit_selectors = tuple(
@@ -199,7 +202,7 @@ def _run_all_cases(config: pytest.Config) -> int:
         unsupported = [case.id for case in cases if not case.xdist_enabled]
         if unsupported:
             raise pytest.UsageError(
-                "--suite=all cannot use xdist because some cases are serial"
+                "The selected suite cannot use xdist because some cases are serial"
             )
     container_environment = _parse_environment(config.getoption("container_env"))
     failures = []
@@ -232,10 +235,10 @@ def _run_all_cases(config: pytest.Config) -> int:
     return 0
 
 
-def resolve_requested_case(
+def resolve_requested_cases(
     config: pytest.Config,
     root_path: "Path",
-) -> "Optional[TestCase]":
+) -> "tuple[TestCase, ...]":
     case_id = config.getoption("case")
     suite = config.getoption("suite")
     policy = config.getoption("policy") or os.environ.get("POLICY")
@@ -250,9 +253,17 @@ def resolve_requested_case(
             raise pytest.UsageError(
                 f"Case {case.id} uses policy {case.policy or 'none'}, not {policy}"
             )
-        return _resolve_policy_paths(case, root_path)
+        return (_resolve_policy_paths(case, root_path),)
     if not suite:
-        return None
+        return ()
+
+    if suite == "all":
+        if policy:
+            raise pytest.UsageError("--policy cannot be combined with --suite=all")
+        return tuple(
+            _resolve_policy_paths(case, root_path)
+            for case in iter_cases()
+        )
 
     candidates = [case for case in iter_cases() if case.suite == suite]
     python = os.environ.get("PYTHON")
@@ -263,19 +274,16 @@ def resolve_requested_case(
         candidates = [case for case in candidates if case.rdbms == rdbms]
     if policy:
         candidates = [case for case in candidates if case.policy == policy]
-    elif suite == "votest":
-        raise pytest.UsageError("--suite=votest requires --policy")
     if not candidates:
         raise pytest.UsageError(
             f"No canonical case matches suite={suite!r}, "
             f"python={python!r}, rdbms={rdbms!r}, policy={policy!r}"
         )
 
-    case = next(
-        (candidate for candidate in candidates if candidate.rdbms == "postgres14"),
-        candidates[0],
+    return tuple(
+        _resolve_policy_paths(case, root_path)
+        for case in candidates
     )
-    return _resolve_policy_paths(case, root_path)
 
 
 def _resolve_policy_paths(case: "TestCase", root_path: "Path") -> "TestCase":
