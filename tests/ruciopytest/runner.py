@@ -17,7 +17,7 @@ import subprocess  # noqa: S404
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from .container_manager import ContainerManager
+from .container_manager import ContainerManager, checkout_id
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -107,7 +107,9 @@ def run_unit_case(
 ) -> int:
     environment = dict(os.environ)
     runtime = "podman" if environment.get("USE_PODMAN") == "1" else "docker"
-    image = f"rucio-test-unit:py{case.python.replace('.', '')}"
+    image = (
+        f"rucio-test-unit:{checkout_id(root_dir)}-py{case.python.replace('.', '')}"
+    )
     if runtime == "docker":
         build = ["docker", "buildx", "build", "--load"]
     else:
