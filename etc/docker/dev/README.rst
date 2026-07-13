@@ -10,10 +10,11 @@ runtime.
 
 Install Docker Engine and the Docker Compose plugin by following the
 `Docker installation guide <https://docs.docker.com/engine/install/>`_. Start
-the Docker daemon, then verify both Docker and Compose::
+the Docker daemon, then verify Docker, Compose, and Buildx::
 
     docker run --rm hello-world
     docker compose version
+    docker buildx version
 
 Let Compose select native multi-architecture images. In particular, remove a
 host-wide platform override left by another project::
