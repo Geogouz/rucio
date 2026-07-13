@@ -46,6 +46,7 @@ class _Config:
             "dist": "no",
             "distload": False,
             "tx": [],
+            "looponfail": False,
         }
         defaults.update(options)
         self.options = defaults
@@ -382,6 +383,27 @@ def test_custom_zero_workers_preserve_explicit_transaction(monkeypatch) -> None:
     monkeypatch.setattr(plugin.runner, "run_container_case", pytest.fail)
 
     with pytest.raises(pytest.UsageError, match="does not support xdist"):
+        plugin.pytest_cmdline_main(config)
+
+
+def test_multi_vo_case_rejects_looponfail(monkeypatch) -> None:
+    config = _Config(case="multi-vo-py39-postgres14", looponfail=True)
+    config.invocation_params = SimpleNamespace(args=(
+        "--case=multi-vo-py39-postgres14",
+        "-f",
+    ))
+    monkeypatch.setattr(plugin.runner, "run_container_case", pytest.fail)
+
+    with pytest.raises(pytest.UsageError, match="multiple legs"):
+        plugin.pytest_cmdline_main(config)
+
+
+def test_multi_case_suite_rejects_looponfail(monkeypatch) -> None:
+    config = _Config(suite="client", looponfail=True)
+    config.invocation_params = SimpleNamespace(args=("--suite=client", "-f"))
+    monkeypatch.setattr(plugin.runner, "run_container_case", pytest.fail)
+
+    with pytest.raises(pytest.UsageError, match="single-session test case"):
         plugin.pytest_cmdline_main(config)
 
 

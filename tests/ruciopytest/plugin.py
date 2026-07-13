@@ -155,6 +155,10 @@ def pytest_cmdline_main(config: pytest.Config) -> "Optional[int]":
     )
     workers = config.getoption("xdist_workers")
     pytest_args = _normalize_xdist_args(config, pytest_args, workers)
+    if config.getoption("looponfail") and case.suite == "multi_vo":
+        raise pytest.UsageError(
+            "Loop-on-fail cannot run a multi-VO case with multiple legs"
+        )
     if _xdist_is_active(config, workers, pytest_args) and not case.xdist_enabled:
         raise pytest.UsageError(f"Case {case.id} does not support xdist")
     container_environment = _parse_environment(config.getoption("container_env"))
@@ -221,6 +225,10 @@ def _run_cases(
     )
     workers = config.getoption("xdist_workers")
     pytest_args = _normalize_xdist_args(config, pytest_args, workers)
+    if config.getoption("looponfail") and (
+        len(cases) > 1 or cases[0].suite == "multi_vo"
+    ):
+        raise pytest.UsageError("Loop-on-fail requires a single-session test case")
     if _xdist_is_active(config, workers, pytest_args):
         unsupported = [case.id for case in cases if not case.xdist_enabled]
         if unsupported:
