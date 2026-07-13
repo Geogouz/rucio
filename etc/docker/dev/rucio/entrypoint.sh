@@ -60,6 +60,9 @@ elif [ "$RDBMS" == "postgres14" ]; then
     generate_rucio_cfg "$CFG_PATH/rucio_postgres14.cfg" $RUCIO_HOME/etc/rucio.cfg
     cp "$CFG_PATH/alembic_postgres14.ini" $RUCIO_HOME/etc/alembic.ini
 
+else
+    echo "Unsupported RDBMS: $RDBMS" >&2
+    exit 1
 fi
 
 update-ca-trust
