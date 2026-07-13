@@ -16,15 +16,23 @@ from pathlib import Path
 
 import yaml
 
+COMPOSE_DIR = Path(__file__).resolve().parents[2] / "etc/docker/dev"
+
 
 def test_compose_services_do_not_use_global_container_names() -> None:
-    compose_path = (
-        Path(__file__).resolve().parents[2]
-        / "etc/docker/dev/docker-compose.yml"
-    )
-    compose = yaml.safe_load(compose_path.read_text())
+    compose = yaml.safe_load((COMPOSE_DIR / "docker-compose.yml").read_text())
 
     assert all(
         "container_name" not in service
         for service in compose["services"].values()
     )
+
+
+def test_test_overlay_consumes_prebuilt_image() -> None:
+    compose = yaml.safe_load(
+        (COMPOSE_DIR / "docker-compose.test.yml").read_text()
+    )
+    rucio = compose["services"]["rucio"]
+
+    assert "image" in rucio
+    assert "build" not in rucio
