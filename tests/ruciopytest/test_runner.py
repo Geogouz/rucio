@@ -538,6 +538,85 @@ def test_user_xdist_setting_is_preserved(tmp_path: "Path", monkeypatch) -> None:
     assert "--numprocesses=auto" not in _Manager.commands[0]
 
 
+@pytest.mark.parametrize(
+    "arguments",
+    (
+        ("-n0",),
+        ("--numprocesses=0",),
+        ("--tx", "popen//python=python3"),
+        ("--dist=no",),
+    ),
+)
+def test_xdist_options_override_default_workers(
+    tmp_path: "Path",
+    monkeypatch,
+    arguments,
+) -> None:
+    _reset_manager(monkeypatch)
+    manager = _Manager(get_case("remote-dbs-py39-postgres14"), tmp_path)
+
+    runner._run_inner_pytest(manager, manager.case, arguments, keep_db=False)
+
+    assert "--numprocesses=auto" not in _Manager.commands[0]
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    ((), ("-d",), ("--dist=loadscope",), ("--maxprocesses=2",)),
+)
+def test_xdist_tuning_preserves_default_workers(
+    tmp_path: "Path",
+    monkeypatch,
+    arguments,
+) -> None:
+    _reset_manager(monkeypatch)
+    manager = _Manager(get_case("remote-dbs-py39-postgres14"), tmp_path)
+
+    runner._run_inner_pytest(manager, manager.case, arguments, keep_db=False)
+
+    assert "--numprocesses=auto" in _Manager.commands[0]
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    (("--dist=no", "-d"), ("-d", "--dist=no")),
+)
+def test_distload_preserves_default_workers(
+    tmp_path: "Path",
+    monkeypatch,
+    arguments,
+) -> None:
+    _reset_manager(monkeypatch)
+    manager = _Manager(get_case("remote-dbs-py39-postgres14"), tmp_path)
+
+    runner._run_inner_pytest(
+        manager,
+        manager.case,
+        arguments,
+        keep_db=False,
+    )
+
+    assert "--numprocesses=auto" in _Manager.commands[0]
+
+
+def test_xdist_transaction_is_preserved(tmp_path: "Path", monkeypatch) -> None:
+    _reset_manager(monkeypatch)
+    manager = _Manager(get_case("remote-dbs-py39-postgres14"), tmp_path)
+    transaction = "popen//python=python3"
+
+    runner._run_inner_pytest(
+        manager,
+        manager.case,
+        ("--tx", transaction, "--dist=loadscope"),
+        keep_db=False,
+    )
+
+    command = _Manager.commands[0]
+    assert command[command.index("--tx") + 1] == transaction
+    assert command.count("--tx") == 1
+    assert "--numprocesses=auto" not in command
+
+
 def test_serial_case_loads_xdist_parser(tmp_path: "Path", monkeypatch) -> None:
     _reset_manager(monkeypatch)
     manager = _Manager(get_case("remote-dbs-py39-oracle"), tmp_path)

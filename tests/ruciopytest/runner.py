@@ -460,7 +460,7 @@ def _run_inner_pytest(
         "xdist",
     ]
     if case.xdist_enabled:
-        if not has_xdist_option(pytest_args):
+        if not overrides_default_xdist_workers(pytest_args):
             workers = "3" if manager.environment.get("GITHUB_ACTIONS") == "true" else "auto"
             command.append(f"--numprocesses={workers}")
     if _has_coverage_option(pytest_args):
@@ -632,14 +632,26 @@ def defer_coverage_threshold(arguments: "Sequence[str]") -> list[str]:
     return updated
 
 
-def has_xdist_option(arguments: "Sequence[str]") -> bool:
-    return any(
-        argument == "-n"
-        or argument.startswith("-n")
-        or argument == "--numprocesses"
-        or argument.startswith("--numprocesses=")
-        for argument in arguments
-    )
+def overrides_default_xdist_workers(arguments: "Sequence[str]") -> bool:
+    dist = None
+    distload = False
+    for index, argument in enumerate(arguments):
+        if argument == "--":
+            break
+        if (
+            argument in ("-n", "--numprocesses", "--tx")
+            or (argument.startswith("-n") and argument != "-n")
+            or argument.startswith("--numprocesses=")
+            or argument.startswith("--tx=")
+        ):
+            return True
+        if argument == "--dist" and index + 1 < len(arguments):
+            dist = arguments[index + 1]
+        elif argument.startswith("--dist="):
+            dist = argument.split("=", 1)[1]
+        elif argument == "-d":
+            distload = True
+    return not distload and dist == "no"
 
 
 def has_xdist_transaction(arguments: "Sequence[str]") -> bool:
