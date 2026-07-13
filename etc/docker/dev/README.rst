@@ -185,22 +185,37 @@ Storage adds FTS and its internal MySQL database, five XRootD servers, MinIO,
 and an SSH server. The FTS database is not a Rucio catalogue test target. This
 environment supports uploads, downloads, and transfer submission.
 
-Run the complete storage and external-metadata integration case in an isolated environment with::
+Complete interactive integration environment
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    python -m pytest --case=integration-py39-postgres14
+For an interactive equivalent of the integration service topology, activate
+``storage``, ``externalmetadata``, and ``iam``. The main PostgreSQL database is
+already part of the base environment::
 
-This creates a few random files and uploads them, creates a few datasets and containers, and requests a replication rule for the container, which starts in state REPLICATING. To demonstrate the transfer capability, the daemons can be run in single-execution mode in order:::
+    DEV_PROFILES=storage,externalmetadata,iam \
+    docker compose --project-name dev \
+        --file etc/docker/dev/docker-compose.yml \
+        --profile storage \
+        --profile externalmetadata \
+        --profile iam \
+        up --detach --wait
 
-    rucio rule-info <rule-id>
+The external-metadata profile adds MongoDB with and without authentication, a
+metadata PostgreSQL service, and a metadata Elasticsearch service. The IAM
+profile adds its MariaDB service, INDIGO IAM, its login service, and Keycloak.
 
-    rucio-conveyor-submitter --run-once
-    rucio-conveyor-poller --run-once --older-than 0
-    rucio-conveyor-finisher --run-once
+Initialize the catalogue and integration RSEs::
 
-    rucio rule-info <rule-id>
+    docker compose --project-name dev \
+        --file etc/docker/dev/docker-compose.yml \
+        --profile storage \
+        --profile externalmetadata \
+        --profile iam \
+        exec rucio python -m tests.ruciopytest.infra_manager \
+        --case integration-py39-postgres14
 
-
-On the second display of the rule, its state has cleared to OK.
+Use the canonical pytest command rather than this long-lived environment when
+the result must match CI exactly.
 
 Using the environment including monitoring
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
