@@ -154,9 +154,8 @@ def pytest_cmdline_main(config: pytest.Config) -> "Optional[int]":
         config.inipath,
     )
     workers = config.getoption("xdist_workers")
-    if workers is not None:
-        pytest_args.extend(("-n", str(workers)))
-    if runner.has_xdist_option(pytest_args) and not case.xdist_enabled:
+    pytest_args = _normalize_xdist_args(config, pytest_args, workers)
+    if _xdist_is_active(config, workers, pytest_args) and not case.xdist_enabled:
         raise pytest.UsageError(f"Case {case.id} does not support xdist")
     container_environment = _parse_environment(config.getoption("container_env"))
     if case.suite == "unit":
@@ -221,9 +220,8 @@ def _run_cases(
         config.inipath,
     )
     workers = config.getoption("xdist_workers")
-    if workers is not None:
-        pytest_args.extend(("-n", str(workers)))
-    if runner.has_xdist_option(pytest_args):
+    pytest_args = _normalize_xdist_args(config, pytest_args, workers)
+    if _xdist_is_active(config, workers, pytest_args):
         unsupported = [case.id for case in cases if not case.xdist_enabled]
         if unsupported:
             raise pytest.UsageError(
@@ -412,6 +410,37 @@ def _explicit_selectors(config: pytest.Config) -> tuple[str, ...]:
     if config.args_source is config.ArgsSource.ARGS:
         return tuple(config.args)
     return ()
+
+
+def _normalize_xdist_args(
+    config: pytest.Config,
+    pytest_args: "Sequence[str]",
+    workers: "Optional[int]",
+) -> list[str]:
+    options = []
+    if workers is not None:
+        options.extend(("-n", str(workers)))
+    return runner.add_pytest_options(pytest_args, *options)
+
+
+def _xdist_is_active(
+    config: pytest.Config,
+    workers: "Optional[int]",
+    pytest_args: "Sequence[str]",
+) -> bool:
+    if config.getoption("collectonly", False):
+        return False
+    if workers is None:
+        return (
+            config.getoption("dist", "no") != "no"
+            and bool(config.getoption("tx", ()))
+        )
+    if workers > 0:
+        return True
+    return runner.has_xdist_transaction(pytest_args) and (
+        config.getoption("distload", False)
+        or runner.explicit_xdist_mode(pytest_args) != "no"
+    )
 
 
 def _case_data(case: "TestCase") -> dict:

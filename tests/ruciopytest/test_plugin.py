@@ -42,6 +42,10 @@ class _Config:
             "case_workers": None,
             "container_env": [],
             "keep_db": False,
+            "collectonly": False,
+            "dist": "no",
+            "distload": False,
+            "tx": [],
         }
         defaults.update(options)
         self.options = defaults
@@ -292,6 +296,89 @@ def test_unit_case_uses_container(monkeypatch) -> None:
 
 def test_serial_case_rejects_xdist(monkeypatch) -> None:
     config = _Config(case="remote-dbs-py39-oracle", xdist_workers=2)
+    monkeypatch.setattr(plugin.runner, "run_container_case", pytest.fail)
+
+    with pytest.raises(pytest.UsageError, match="does not support xdist"):
+        plugin.pytest_cmdline_main(config)
+
+
+@pytest.mark.parametrize(
+    "options",
+    (
+        {"dist": "load", "tx": ["popen"]},
+    ),
+)
+def test_serial_case_rejects_resolved_xdist(monkeypatch, options) -> None:
+    config = _Config(case="remote-dbs-py39-oracle", **options)
+    monkeypatch.setattr(plugin.runner, "run_container_case", pytest.fail)
+
+    with pytest.raises(pytest.UsageError, match="does not support xdist"):
+        plugin.pytest_cmdline_main(config)
+
+
+@pytest.mark.parametrize(
+    "options",
+    (
+        {"xdist_workers": 0},
+        {"dist": "no", "tx": ["popen"]},
+        {"collectonly": True, "dist": "load", "tx": ["popen"]},
+    ),
+)
+def test_serial_case_allows_inactive_xdist(monkeypatch, options) -> None:
+    config = _Config(case="remote-dbs-py39-oracle", **options)
+    monkeypatch.setattr(plugin.runner, "run_container_case", lambda *args, **kwargs: 0)
+
+    assert plugin.pytest_cmdline_main(config) == 0
+
+
+def test_collect_only_allows_custom_xdist_workers(monkeypatch) -> None:
+    config = _Config(
+        case="remote-dbs-py39-oracle",
+        collectonly=True,
+        xdist_workers=2,
+    )
+    monkeypatch.setattr(plugin.runner, "run_container_case", lambda *args, **kwargs: 0)
+
+    assert plugin.pytest_cmdline_main(config) == 0
+
+
+def test_custom_zero_workers_override_direct_workers(monkeypatch) -> None:
+    config = _Config(
+        case="remote-dbs-py39-oracle",
+        xdist_workers=0,
+        dist="load",
+        tx=["popen"],
+    )
+    config.invocation_params = SimpleNamespace(args=(
+        "--case=remote-dbs-py39-oracle",
+        "-n2",
+        "--xdist-workers=0",
+    ))
+    captured = {}
+
+    def run(case, root_path, pytest_args, **kwargs):
+        captured["args"] = pytest_args
+        return 0
+
+    monkeypatch.setattr(plugin.runner, "run_container_case", run)
+
+    assert plugin.pytest_cmdline_main(config) == 0
+    assert captured["args"][-2:] == ["-n", "0"]
+
+
+def test_custom_zero_workers_preserve_explicit_transaction(monkeypatch) -> None:
+    config = _Config(
+        case="remote-dbs-py39-oracle",
+        xdist_workers=0,
+        dist="load",
+        tx=["popen"],
+    )
+    config.invocation_params = SimpleNamespace(args=(
+        "--case=remote-dbs-py39-oracle",
+        "--dist=load",
+        "--tx=popen",
+        "--xdist-workers=0",
+    ))
     monkeypatch.setattr(plugin.runner, "run_container_case", pytest.fail)
 
     with pytest.raises(pytest.UsageError, match="does not support xdist"):

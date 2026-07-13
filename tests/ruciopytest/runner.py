@@ -115,6 +115,16 @@ def container_pytest_config(
     return updated
 
 
+def add_pytest_options(
+    arguments: "Sequence[str]",
+    *options: str,
+) -> list[str]:
+    updated = list(arguments)
+    marker = updated.index("--") if "--" in updated else len(updated)
+    updated[marker:marker] = options
+    return updated
+
+
 def run_container_case(
     case: "TestCase",
     root_dir: Path,
@@ -629,6 +639,27 @@ def has_xdist_option(arguments: "Sequence[str]") -> bool:
         or argument.startswith("--numprocesses=")
         for argument in arguments
     )
+
+
+def has_xdist_transaction(arguments: "Sequence[str]") -> bool:
+    for argument in arguments:
+        if argument == "--":
+            return False
+        if argument == "--tx" or argument.startswith("--tx="):
+            return True
+    return False
+
+
+def explicit_xdist_mode(arguments: "Sequence[str]") -> str:
+    dist = "no"
+    for index, argument in enumerate(arguments):
+        if argument == "--":
+            break
+        if argument == "--dist" and index + 1 < len(arguments):
+            dist = arguments[index + 1]
+        elif argument.startswith("--dist="):
+            dist = argument.split("=", 1)[1]
+    return dist
 
 
 def _has_coverage_option(arguments: "Sequence[str]") -> bool:
