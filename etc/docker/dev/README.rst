@@ -41,6 +41,46 @@ needed to start the development environment.
 If SELinux is enabled, consult the Docker documentation if bind mounts are
 denied.
 
+Choosing the source version
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The containers bind-mount the current checkout. Stop the development project
+before switching branches or tags so that running processes never see a
+partially changed tree::
+
+    docker compose --project-name dev \
+        --file etc/docker/dev/docker-compose.yml \
+        --file etc/docker/dev/docker-compose.ports.yml \
+        --profile '*' \
+        down --remove-orphans
+
+To use an explicit release, check out its tag and select the matching published
+images::
+
+    git fetch upstream --tags
+    git switch --detach 37.4.0
+    export RUCIO_TAG=37.4.0
+    export RUCIO_DEV_PREFIX=release-
+
+This recreates that release's interactive environment. The canonical test
+runner documented below is part of the current checkout; use the selected
+release's documentation for its version-specific test commands.
+
+To use current ``master``::
+
+    git fetch upstream master
+    git switch --detach upstream/master
+    unset RUCIO_TAG RUCIO_DEV_PREFIX
+
+To use the current local checkout, make no Git change and use the default
+development image::
+
+    unset RUCIO_TAG RUCIO_DEV_PREFIX
+
+Use an explicit release when source and published images must match. This guide
+does not infer a Git tag from the mutable registry ``latest`` image because that
+mapping is not reproducible.
+
 Using the standard environment
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
