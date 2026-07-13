@@ -3,12 +3,9 @@ name: Build Runtime Images
 on:
   workflow_call:
     outputs:
-      py39_image:
-        description: "Python 3.9 runtime image tag"
-        value: ${{ jobs.build_runtime_images.outputs.py39_image }}
-      py310_image:
-        description: "Python 3.10 runtime image tag"
-        value: ${{ jobs.build_runtime_images.outputs.py310_image }}
+      images:
+        description: "Runtime image tags keyed by case runtime"
+        value: ${{ jobs.build_runtime_images.outputs.images }}
       build_locally:
         description: "Whether images should be built locally in autotests"
         value: ${{ jobs.build_runtime_images.outputs.build_locally }}
@@ -40,9 +37,8 @@ jobs:
       contents: read
       packages: write
     outputs:
-      py39_image: ${{ steps.set_outputs.outputs.py39_image }}
-      py310_image: ${{ steps.set_outputs.outputs.py310_image }}
-      build_locally: ${{ steps.set_outputs.outputs.build_locally }}
+      images: ${{ steps.build_images.outputs.images }}
+      build_locally: ${{ steps.build_images.outputs.build_locally }}
 
     steps:
       - name: Checkout code
@@ -84,6 +80,7 @@ jobs:
             requirements
           )
           BUILD_LOCALLY=false
+          IMAGES='{}'
           BUILD_DATE="${{ steps.metadata.outputs.build_date }}"
           COMMIT_SHA="${{ steps.metadata.outputs.commit_sha }}"
           COMMIT_REF="${{ steps.metadata.outputs.commit_ref }}"
@@ -95,14 +92,10 @@ jobs:
                 sha256sum | cut -d' ' -f1 | head -c 12
             )
             IMAGE="ghcr.io/${REPO}/rucio-dev-runtime:py${PYVER//.}-${HASH}"
+            IMAGE_KEY="py${PYVER//.}"
             echo "Python ${PYVER} image tag: $IMAGE"
-
-            # Export dynamic outputs
-            if [[ "$PYVER" == "3.9" ]]; then
-              echo "py39_image=$IMAGE" >> $GITHUB_OUTPUT
-            else
-              echo "py310_image=$IMAGE" >> $GITHUB_OUTPUT
-            fi
+            IMAGES=$(jq -c --arg key "$IMAGE_KEY" --arg image "$IMAGE" \
+              '. + {($key): $image}' <<< "$IMAGES")
 
             # Skip build if image exists
             if docker manifest inspect "$IMAGE" > /dev/null 2>&1; then
@@ -140,11 +133,5 @@ jobs:
               .
           done
 
+          echo "images=$IMAGES" >> $GITHUB_OUTPUT
           echo "build_locally=$BUILD_LOCALLY" >> $GITHUB_OUTPUT
-
-      - name: Set Final Outputs
-        id: set_outputs
-        run: |
-          echo "py39_image=${{ steps.build_images.outputs.py39_image }}" >> $GITHUB_OUTPUT
-          echo "py310_image=${{ steps.build_images.outputs.py310_image }}" >> $GITHUB_OUTPUT
-          echo "build_locally=${{ steps.build_images.outputs.build_locally }}" >> $GITHUB_OUTPUT
