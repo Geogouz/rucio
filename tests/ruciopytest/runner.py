@@ -82,6 +82,7 @@ def run_container_case(
     container_environment: "Optional[Mapping[str, str]]" = None,
     explicit_selectors: "Sequence[str]" = (),
 ) -> int:
+    pytest_args = qualify_cache_dir(pytest_args, case.id)
     manager = ContainerManager(case, root_dir, keep_db=keep_db)
     manager.start()
     try:
@@ -128,6 +129,7 @@ def run_unit_case(
     container_environment: "Optional[Mapping[str, str]]" = None,
     explicit_selectors: "Sequence[str]" = (),
 ) -> int:
+    pytest_args = qualify_cache_dir(pytest_args, case.id)
     environment = dict(os.environ)
     environment.pop("DOCKER_DEFAULT_PLATFORM", None)
     image = (
@@ -212,7 +214,7 @@ def _run_multi_vo(
             "RUCIO_HOME": f"/opt/rucio/etc/multi_vo/{leg}",
             "RUCIO_MULTI_VO_LEG": leg,
         })
-        arguments = qualify_junit(pytest_args, leg)
+        arguments = qualify_cache_dir(qualify_junit(pytest_args, leg), leg)
         if index:
             arguments = append_coverage(arguments)
         if index < len(legs) - 1:
@@ -384,6 +386,41 @@ def qualify_junit(arguments: "Sequence[str]", qualifier: str) -> list[str]:
             qualified[index + 1] = str(path.with_stem(f"{path.stem}-{qualifier}"))
             break
     return qualified
+
+
+def qualify_cache_dir(arguments: "Sequence[str]", qualifier: str) -> list[str]:
+    qualified = list(arguments)
+    found = False
+    for index, argument in enumerate(qualified):
+        if argument in ("-o", "--override-ini") and index + 1 < len(qualified):
+            setting, matches = _qualify_cache_setting(
+                qualified[index + 1], qualifier
+            )
+            qualified[index + 1] = setting
+            found = found or matches
+            continue
+        for prefix in ("-o=", "--override-ini=", "-o"):
+            if argument.startswith(prefix):
+                setting, matches = _qualify_cache_setting(
+                    argument[len(prefix):], qualifier
+                )
+                if matches:
+                    qualified[index] = f"{prefix}{setting}"
+                    found = True
+                break
+    if not found:
+        qualified.extend((
+            "-o",
+            f"cache_dir=/rucio_source/.pytest_cache/rucio-cases/{qualifier}",
+        ))
+    return qualified
+
+
+def _qualify_cache_setting(setting: str, qualifier: str) -> tuple[str, bool]:
+    key, separator, value = setting.partition("=")
+    if key != "cache_dir" or not separator:
+        return setting, False
+    return f"cache_dir={Path(value) / qualifier}", True
 
 
 def append_coverage(arguments: "Sequence[str]") -> list[str]:

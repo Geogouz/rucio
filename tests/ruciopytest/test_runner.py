@@ -123,6 +123,14 @@ def test_multi_vo_runs_both_legs_in_order(tmp_path: "Path", monkeypatch) -> None
     ]
     assert "--junitxml=results-tst.xml" in _Manager.commands[0]
     assert "--junitxml=results-ts2.xml" in _Manager.commands[1]
+    assert (
+        "cache_dir=/rucio_source/.pytest_cache/"
+        "rucio-cases/multi-vo-py39-postgres14/tst"
+    ) in _Manager.commands[0]
+    assert (
+        "cache_dir=/rucio_source/.pytest_cache/"
+        "rucio-cases/multi-vo-py39-postgres14/ts2"
+    ) in _Manager.commands[1]
 
 
 def test_multi_vo_combines_coverage(tmp_path: "Path", monkeypatch) -> None:
@@ -417,6 +425,28 @@ def test_no_cov_does_not_enable_coverage_aggregation() -> None:
     assert runner.defer_coverage_threshold(("-k", "rule")) == ["-k", "rule"]
 
 
+@pytest.mark.parametrize(
+    ("arguments", "expected"),
+    (
+        (("-o", "cache_dir=/tmp/cache"), "cache_dir=/tmp/cache/case"),
+        (("-ocache_dir=cache",), "-ocache_dir=cache/case"),
+        (
+            ("--override-ini=cache_dir=cache",),
+            "--override-ini=cache_dir=cache/case",
+        ),
+    ),
+)
+def test_cache_override_is_qualified(arguments, expected) -> None:
+    assert expected in runner.qualify_cache_dir(arguments, "case")
+
+
+def test_default_cache_is_case_specific() -> None:
+    assert (
+        "cache_dir=/rucio_source/.pytest_cache/rucio-cases/case"
+        in runner.qualify_cache_dir(("-q",), "case")
+    )
+
+
 def test_unit_case_builds_and_runs_requested_python(tmp_path: "Path", monkeypatch) -> None:
     commands = []
     timeouts = []
@@ -447,7 +477,8 @@ def test_unit_case_builds_and_runs_requested_python(tmp_path: "Path", monkeypatc
     assert "PYTHONPATH=/rucio_source/lib" in commands[1]
     assert "PYTEST_DISABLE_PLUGIN_AUTOLOAD=true" in commands[1]
     assert "RUCIO_LOGGING_FORMAT=json" in commands[1]
-    assert commands[1][-4:] == ["-k", "config", "tests/rucio", "tests/ruciopytest"]
+    assert commands[1][-2:] == ["tests/rucio", "tests/ruciopytest"]
+    assert commands[1][commands[1].index("-k"):][:2] == ["-k", "config"]
 
 
 def test_unit_case_ignores_inherited_default_platform(tmp_path: "Path", monkeypatch) -> None:
