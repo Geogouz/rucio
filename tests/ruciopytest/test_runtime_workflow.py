@@ -47,3 +47,10 @@ def test_runtime_cleanup_has_package_write_permission() -> None:
     workflow = CLEANUP_WORKFLOW.read_text()
 
     assert "packages: write" in workflow
+
+
+def test_runtime_cleanup_uses_organization_package_api() -> None:
+    workflow = CLEANUP_WORKFLOW.read_text()
+
+    assert "/orgs/${{ github.repository_owner }}/packages/" in workflow
+    assert "/users/" not in workflow
