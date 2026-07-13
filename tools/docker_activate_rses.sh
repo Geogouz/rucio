@@ -115,15 +115,17 @@ rucio account limit set root --rse SSH1 --bytes -1
 rucio scope add test --account root
 
 # Create initial transfer testing data
-dd if=/dev/urandom of=file1 bs=10M count=1
-dd if=/dev/urandom of=file2 bs=10M count=1
-dd if=/dev/urandom of=file3 bs=10M count=1
-dd if=/dev/urandom of=file4 bs=10M count=1
+TRANSFER_DATA=$(mktemp -d)
+trap 'rm -rf "$TRANSFER_DATA"' EXIT
+dd if=/dev/urandom of="$TRANSFER_DATA/file1" bs=10M count=1
+dd if=/dev/urandom of="$TRANSFER_DATA/file2" bs=10M count=1
+dd if=/dev/urandom of="$TRANSFER_DATA/file3" bs=10M count=1
+dd if=/dev/urandom of="$TRANSFER_DATA/file4" bs=10M count=1
 
-XrdSecGSISRVNAMES=xrd1 rucio upload --rse XRD1 --scope test file1
-XrdSecGSISRVNAMES=xrd1 rucio upload --rse XRD1 --scope test file2
-XrdSecGSISRVNAMES=xrd2 rucio upload --rse XRD2 --scope test file3
-XrdSecGSISRVNAMES=xrd2 rucio upload --rse XRD2 --scope test file4
+XrdSecGSISRVNAMES=xrd1 rucio upload --rse XRD1 --scope test "$TRANSFER_DATA/file1"
+XrdSecGSISRVNAMES=xrd1 rucio upload --rse XRD1 --scope test "$TRANSFER_DATA/file2"
+XrdSecGSISRVNAMES=xrd2 rucio upload --rse XRD2 --scope test "$TRANSFER_DATA/file3"
+XrdSecGSISRVNAMES=xrd2 rucio upload --rse XRD2 --scope test "$TRANSFER_DATA/file4"
 
 rucio did add --type dataset test:dataset1
 rucio did content add test:file1 test:file2 --to-did test:dataset1

@@ -11,12 +11,12 @@ General information, API/REST description and guides can be found in our [docume
 
 ## Try it out
 
-We provide a [dockerized environment](https://github.com/rucio/rucio/tree/master/etc/docker/dev) which serves both as a demo environment and a development environment.
-It includes all the necessary preconfigured components for multiple storage and transfers developments.
+We provide a [dockerized environment](etc/docker/dev/README.rst) for demonstrations and local development.
+It includes the workspace, canonical tests, debugging, profiling, observability, and performance-report workflows.
 
 ## Developers
 
-For information on how to contribute to Rucio, please refer and follow our [CONTRIBUTING](https://rucio.cern.ch/documentation/contributing) guidelines. We strongly recommend to use the [dockerized environment](https://github.com/rucio/rucio/tree/master/etc/docker/dev) for development.
+For information on how to contribute to Rucio, please refer and follow our [CONTRIBUTING](https://rucio.cern.ch/documentation/contributing) guidelines. Start local work with the [Rucio developer toolbox](etc/docker/dev/README.rst).
 
 Responsible for PR merging in [rucio/rucio](https://github.com/rucio/rucio/): [Martin Barisits](https://github.com/bari12), [Dimitrios Christidis](https://github.com/dchristidis)
 

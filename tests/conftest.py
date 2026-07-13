@@ -51,7 +51,11 @@ if TYPE_CHECKING:
 _del_test_prefix = functools.partial(re.compile(r'^[Tt][Ee][Ss][Tt]_?').sub, '')
 # local imports in the fixtures to make this file loadable in e.g. client tests
 
-pytest_plugins = ('tests.ruciopytest.artifacts_plugin', )
+pytest_plugins = (
+    'tests.ruciopytest.artifacts_plugin',
+    'tests.ruciopytest.collection',
+    'tests.ruciopytest.plugin',
+)
 
 
 def pytest_configure(config: pytest.Config) -> None:

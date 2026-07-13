@@ -1,0 +1,58 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Rucio: Debug test",
+      "type": "debugpy",
+      "request": "attach",
+      "connect": {
+        "host": "127.0.0.1",
+        "port": 5678
+      },
+      "pathMappings": [
+        {
+          "localRoot": "${workspaceFolder}",
+          "remoteRoot": "/rucio_source"
+        }
+      ],
+      "justMyCode": false,
+      "subProcess": true,
+      "preLaunchTask": "Rucio: Debug test"
+    },
+    {
+      "name": "Rucio: Attach to 5678",
+      "type": "debugpy",
+      "request": "attach",
+      "connect": {
+        "host": "127.0.0.1",
+        "port": 5678
+      },
+      "pathMappings": [
+        {
+          "localRoot": "${workspaceFolder}",
+          "remoteRoot": "/rucio_source"
+        }
+      ],
+      "justMyCode": false,
+      "subProcess": true
+    },
+    {
+      "name": "Rucio: Debug daemon",
+      "type": "debugpy",
+      "request": "attach",
+      "connect": {
+        "host": "127.0.0.1",
+        "port": 5678
+      },
+      "pathMappings": [
+        {
+          "localRoot": "${workspaceFolder}",
+          "remoteRoot": "/rucio_source"
+        }
+      ],
+      "justMyCode": false,
+      "subProcess": true,
+      "preLaunchTask": "Rucio: Debug daemon"
+    }
+  ]
+}

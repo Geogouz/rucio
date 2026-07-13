@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "protected_parent_blobs": {
+    ".github/workflows/autotest.yml": "d194b1cb9a8eb1c4f4ea11c0b077aa4118d7fed9",
+    ".github/workflows/cleanup_runtime_images.yml": "2b1f8a204d0e1ed6ebf3d848e7a90730aa1b5839",
+    ".github/workflows/integration_tests.yml": "3f7b731bb3858f9a0d82f59abea423f56fb09bfe",
+    ".github/workflows/runtime_images.yml": "20b74b0e518b64d2ce31929757b784c45809a07d",
+    ".github/workflows/unit_tests.yml": "ced1921227a31f06928d7349dccea06b625c7181",
+    ".github/workflows/vo_tests.yml": "27cd403ad4babe8a4106b1fc3d819d14cb0d65c5",
+    "etc/docker/dev/docker-compose.yml": "769fd58c84a6746d401aa00fc8a63ecc98d4d8ad",
+    "etc/docker/dev/rucio/entrypoint.sh": "a3d2621c48dbde33d1120c68af0d98ea316986bb",
+    "etc/docker/test/matrix.yml": "737fdc64e33dc392241f3d8bdb3eda65e60e2739",
+    "etc/docker/test/matrix_integration_tests.yml": "01c52e4cbce19e464e076f57b5a073d61fb4f9bf",
+    "etc/docker/test/matrix_nightly.yml": "37448d6efd239fab5e95105a6736c751f853ca90",
+    "etc/docker/test/matrix_policy_package_tests.yml": "51293ad805ef4443bd4a7ba77dd5d1aef3190aba",
+    "etc/docker/test/runtime.Dockerfile": "8a26ec92bdfb9582e37e1609e7cf3e9e4fec3559",
+    "tools/pytest.ini": "306a4d63c4d332f4e2f3cbb19453b0dea8c65bcd",
+    "tools/pytest.sh": "4a8cec56e9c8f70a2e00eb9f1aa794671d1061a4",
+    "tools/run_multi_vo_tests_docker.sh": "949305073c89c428dd24add3d77a8f09e6a1e5ea",
+    "tools/run_tests.sh": "a4e6d31d7d4fb3b1ae86773f7c26429e9f2caca7",
+    "tools/test/matrix_parser.py": "442446f91295cba534539a8ad105eeaf259d17a1",
+    "tools/test/run_tests.py": "75c9d4837698c73246baa1e963a096c8322d52a9",
+    "tools/test/test.sh": "e70bdf865fff15ef1e4c30ea24b27a313abc0fbb",
+    "tools/test/votest_helper.py": "1f3a5baace23c8e57c78b5342e92bcc1f692a8ff"
+  },
+  "intentional_case_exclusions": [
+    "remote-dbs-py39-mysql8",
+    "remote-dbs-py310-mysql8",
+    "sqlite-py39-sqlite",
+    "sqlite-py310-sqlite"
+  ]
+}

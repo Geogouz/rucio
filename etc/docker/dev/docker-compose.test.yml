@@ -1,0 +1,55 @@
+services:
+  elasticsearch:
+    platform: "${RUCIO_TEST_NATIVE_PLATFORM:-linux/amd64}"
+    profiles:
+      - test-dependencies
+
+  graphite:
+    platform: "${RUCIO_TEST_NATIVE_PLATFORM:-linux/amd64}"
+    profiles:
+      - test-dependencies
+
+  influxdb:
+    platform: "${RUCIO_TEST_NATIVE_PLATFORM:-linux/amd64}"
+    profiles:
+      - test-dependencies
+
+  activemq:
+    platform: "${RUCIO_TEST_NATIVE_PLATFORM:-linux/amd64}"
+    profiles:
+      - test-dependencies
+
+  web1:
+    profiles:
+      - test-dependencies
+
+  rucio:
+    platform: "${RUCIO_TEST_IMAGE_PLATFORM:-linux/amd64}"
+    image: "${RUCIO_TEST_IMAGE:?Set RUCIO_TEST_IMAGE to a test runtime image}"
+    command: ["httpd", "-D", "FOREGROUND"]
+    working_dir: /rucio_source
+    environment:
+      RDBMS:
+      DEV_PROFILES:
+      RUCIO_HOME: "${RUCIO_HOME:-/opt/rucio}"
+      RUCIO_PYTEST_INNER: "1"
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "true"
+    volumes:
+      - ../../../etc/mail_templates:/opt/rucio/etc/mail_templates:ro
+      - ../../../etc/automatix.json:/opt/rucio/etc/automatix.json:ro
+      - ../../../etc/google-cloud-storage-test.json:/opt/rucio/etc/google-cloud-storage-test.json:ro
+      - ../../../etc/rse_repository.json:/opt/rucio/etc/rse_repository.json:ro
+
+  ruciodb:
+    platform: "${RUCIO_TEST_NATIVE_PLATFORM:-linux/amd64}"
+    profiles:
+      - postgres14
+
+  minio:
+    platform: "${RUCIO_TEST_NATIVE_PLATFORM:-linux/amd64}"
+
+  mongo:
+    platform: "${RUCIO_TEST_NATIVE_PLATFORM:-linux/amd64}"
+
+  mongo-noauth:
+    platform: "${RUCIO_TEST_NATIVE_PLATFORM:-linux/amd64}"
