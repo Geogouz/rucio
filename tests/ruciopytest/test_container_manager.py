@@ -16,6 +16,8 @@ import os
 import subprocess  # noqa: S404
 from typing import TYPE_CHECKING
 
+import pytest
+
 from tests.ruciopytest.container_manager import ContainerManager
 from tests.ruciopytest.profiles import get_case
 
@@ -168,6 +170,36 @@ def test_keep_db_preserves_compose_volumes(tmp_path: "Path", monkeypatch) -> Non
     manager.stop()
 
     assert "--volumes" not in commands[-1]
+
+
+def test_reusable_project_rejects_concurrent_run(tmp_path: "Path") -> None:
+    first = _manager(tmp_path, keep_db=True)
+    second = _manager(tmp_path, keep_db=True)
+    first._acquire_project_lock()
+    try:
+        with pytest.raises(RuntimeError, match="already running"):
+            second._acquire_project_lock()
+    finally:
+        first._release_project_lock()
+
+
+def test_failed_cleanup_can_be_retried(tmp_path: "Path", monkeypatch) -> None:
+    manager = _manager(tmp_path)
+    down_results = iter((1, 0))
+    commands = []
+
+    def run(command, **kwargs):
+        commands.append(list(command))
+        returncode = next(down_results) if "down" in command else 0
+        return subprocess.CompletedProcess(command, returncode, stdout="")
+
+    monkeypatch.setattr(manager, "_run", run)
+
+    manager.stop()
+    manager.stop()
+
+    assert sum("down" in command for command in commands) == 2
+    assert manager._stopped
 
 
 def test_podman_uses_the_same_compose_model(tmp_path: "Path") -> None:

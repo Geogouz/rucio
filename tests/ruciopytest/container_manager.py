@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import fcntl
 import hashlib
 import os
 import secrets
@@ -74,6 +75,7 @@ class ContainerManager:
         )
         self.log_dir = self.root_dir / ".test-logs" / self.project_name
         self._stopped = False
+        self._lock_handle = None
 
         self.environment = dict(self._base_environment)
         self.environment.pop("COMPOSE_PROFILES", None)
@@ -117,6 +119,7 @@ class ContainerManager:
         self.stop()
 
     def start(self) -> None:
+        self._acquire_project_lock()
         try:
             if self.build_local:
                 image_key = (str(self.root_dir), self.image)
@@ -159,12 +162,15 @@ class ContainerManager:
     def stop(self) -> None:
         if self._stopped:
             return
-        self._stopped = True
-        self.capture_logs()
-        command = [*self.compose_command("down", "--timeout", "30")]
-        if not self.keep_db:
-            command.append("--volumes")
-        self._run(command, check=False, timeout=120)
+        try:
+            self.capture_logs()
+            command = [*self.compose_command("down", "--timeout", "30")]
+            if not self.keep_db:
+                command.append("--volumes")
+            result = self._run(command, check=False, timeout=120)
+            self._stopped = result.returncode == 0
+        finally:
+            self._release_project_lock()
 
     def compose_command(self, *arguments: str) -> list[str]:
         command = [self.runtime, "compose", "-p", self.project_name]
@@ -211,6 +217,27 @@ class ContainerManager:
                 (self.log_dir / "compose.log").write_text(result.stdout)
         except (OSError, subprocess.SubprocessError):
             pass
+
+    def _acquire_project_lock(self) -> None:
+        if not self.keep_db or self._lock_handle is not None:
+            return
+        self.log_dir.mkdir(parents=True, exist_ok=True)
+        lock_handle = (self.log_dir / "project.lock").open("w")
+        try:
+            fcntl.flock(lock_handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as error:
+            lock_handle.close()
+            raise RuntimeError(
+                f"Reusable test project {self.project_name} is already running"
+            ) from error
+        self._lock_handle = lock_handle
+
+    def _release_project_lock(self) -> None:
+        if self._lock_handle is None:
+            return
+        fcntl.flock(self._lock_handle, fcntl.LOCK_UN)
+        self._lock_handle.close()
+        self._lock_handle = None
 
     def _build_image(self) -> None:
         if self.runtime == "docker":
