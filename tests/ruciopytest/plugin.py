@@ -14,6 +14,7 @@
 
 import json
 import os
+import sys
 from dataclasses import replace
 from typing import TYPE_CHECKING
 
@@ -212,23 +213,28 @@ def _run_cases(
     for case in cases:
         print(f"\n===== {case.id} =====", flush=True)
         case_args = runner.qualify_junit(pytest_args, case.id)
-        if case.suite == "unit":
-            result = runner.run_unit_case(
-                case,
-                config.rootpath,
-                case_args,
-                container_environment=container_environment,
-                explicit_selectors=explicit_selectors,
-            )
-        else:
-            result = runner.run_container_case(
-                case,
-                config.rootpath,
-                case_args,
-                keep_db=config.getoption("keep_db"),
-                container_environment=container_environment,
-                explicit_selectors=explicit_selectors,
-            )
+        try:
+            if case.suite == "unit":
+                result = runner.run_unit_case(
+                    case,
+                    config.rootpath,
+                    case_args,
+                    container_environment=container_environment,
+                    explicit_selectors=explicit_selectors,
+                )
+            else:
+                result = runner.run_container_case(
+                    case,
+                    config.rootpath,
+                    case_args,
+                    keep_db=config.getoption("keep_db"),
+                    container_environment=container_environment,
+                    explicit_selectors=explicit_selectors,
+                )
+        except Exception as error:
+            print(f"Case {case.id} failed: {error}", file=sys.stderr)
+            failures.append(case.id)
+            continue
         if result:
             failures.append(case.id)
 

@@ -223,6 +223,26 @@ def test_suite_runs_every_matching_case(monkeypatch) -> None:
     ]
 
 
+def test_suite_continues_after_infrastructure_failure(monkeypatch, capsys) -> None:
+    config = _Config(suite="client")
+    cases = []
+
+    def run(case, *args, **kwargs):
+        cases.append(case.id)
+        if len(cases) == 1:
+            raise RuntimeError("compose failed")
+        return 0
+
+    monkeypatch.setattr(plugin.runner, "run_container_case", run)
+
+    assert plugin.pytest_cmdline_main(config) == 1
+    assert cases == [
+        "client-py39-postgres14",
+        "client-py310-postgres14",
+    ]
+    assert "compose failed" in capsys.readouterr().err
+
+
 def test_all_dry_run_json_is_machine_readable(capsys) -> None:
     config = _Config(suite="all", dry_run_json=True)
 
