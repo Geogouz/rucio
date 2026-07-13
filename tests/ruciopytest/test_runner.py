@@ -98,6 +98,82 @@ def test_forwarded_args_remove_only_runner_options() -> None:
     ]
 
 
+@pytest.mark.parametrize(
+    "config_args",
+    (
+        ("-c", "config.ini"),
+        ("-cconfig.ini",),
+        ("--config-file", "config.ini"),
+        ("--config-file=config.ini",),
+        ("--rootdir", "tests"),
+        ("--rootdir=tests",),
+    ),
+)
+def test_forwarded_args_remove_raw_config_options(config_args) -> None:
+    assert runner.forwarded_pytest_args((*config_args, "-q")) == [
+        "-q",
+        "-o",
+        "addopts=",
+    ]
+
+
+def test_forwarded_args_preserve_values_after_separator() -> None:
+    assert runner.forwarded_pytest_args(("--", "-c", "literal.ini")) == [
+        "-o",
+        "addopts=",
+        "--",
+        "-c",
+        "literal.ini",
+    ]
+
+
+def test_pytest_config_paths_are_mapped_into_container(tmp_path: "Path") -> None:
+    source_root = tmp_path / "source"
+    pytest_root = source_root / "tests"
+    config_path = source_root / "config" / "pytest.ini"
+
+    assert runner.container_pytest_config(
+        ("-q", "--", "test-name"),
+        source_root,
+        pytest_root,
+        config_path,
+    ) == [
+        "-q",
+        "--rootdir=/rucio_source/tests",
+        "-c",
+        "/rucio_source/config/pytest.ini",
+        "--",
+        "test-name",
+    ]
+
+
+@pytest.mark.parametrize("external", ("root", "config"))
+def test_pytest_config_paths_must_be_inside_checkout(
+    tmp_path: "Path",
+    external: str,
+) -> None:
+    source_root = tmp_path / "source"
+    pytest_root = source_root / "tests"
+    config_path = source_root / "pyproject.toml"
+    if external == "root":
+        pytest_root = tmp_path / "outside"
+    else:
+        config_path = tmp_path / "outside.ini"
+
+    with pytest.raises(pytest.UsageError, match="must be inside"):
+        runner.container_pytest_config(
+            (),
+            source_root,
+            pytest_root,
+            config_path,
+        )
+
+
+def test_pytest_configuration_file_is_required(tmp_path: "Path") -> None:
+    with pytest.raises(pytest.UsageError, match="configuration file is required"):
+        runner.container_pytest_config((), tmp_path, tmp_path, None)
+
+
 def test_outer_args_include_pytest_addopts(monkeypatch) -> None:
     monkeypatch.setenv("PYTEST_ADDOPTS", "-k 'rule creation' -q")
 
@@ -443,7 +519,6 @@ def test_postgres_uses_ci_worker_count(tmp_path: "Path", monkeypatch) -> None:
     )
 
     assert "--numprocesses=3" in _Manager.commands[0]
-    assert "/rucio_source/pyproject.toml" in _Manager.commands[0]
 
 
 def test_user_xdist_setting_is_preserved(tmp_path: "Path", monkeypatch) -> None:
@@ -580,7 +655,6 @@ def test_unit_case_builds_and_runs_requested_python(tmp_path: "Path", monkeypatc
     assert "--target" not in commands[0]
     assert "PYTHON=3.12" in commands[0]
     assert commands[1][:3] == ["docker", "run", "--rm"]
-    assert "/rucio_source/pyproject.toml" in commands[1]
     assert commands[0][commands[0].index("--tag") + 1] in commands[1]
     assert f"{tmp_path.resolve()}:/rucio_source:z" in commands[1]
     assert "PYTHONPATH=/rucio_source/lib" in commands[1]

@@ -17,6 +17,7 @@ import os
 import sys
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from dataclasses import replace
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
@@ -28,10 +29,12 @@ from .votest_support import collect_votest_paths, load_matrix
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
-    from pathlib import Path
     from typing import Optional
 
     from .profiles import TestCase
+
+
+SOURCE_ROOT = Path(__file__).resolve().parents[2]
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -88,7 +91,7 @@ def pytest_configure(config: pytest.Config) -> None:
     case_id = os.environ.get("RUCIO_TEST_CASE")
     if not case_id:
         raise pytest.UsageError("RUCIO_TEST_CASE is required inside the test container")
-    config.stash[case_key] = _resolve_policy_paths(get_case(case_id), config.rootpath)
+    config.stash[case_key] = _resolve_policy_paths(get_case(case_id), SOURCE_ROOT)
 
 
 def pytest_sessionstart(session: pytest.Session) -> None:
@@ -113,12 +116,12 @@ def pytest_cmdline_main(config: pytest.Config) -> "Optional[int]":
 
     if config.getoption("list_cases"):
         print(json.dumps([
-            _case_data(_resolve_policy_paths(case, config.rootpath))
+            _case_data(_resolve_policy_paths(case, SOURCE_ROOT))
             for case in iter_cases()
         ]))
         return 0
 
-    cases = resolve_requested_cases(config, config.rootpath)
+    cases = resolve_requested_cases(config, SOURCE_ROOT)
     if not cases:
         return None
     if config.getoption("suite"):
@@ -144,6 +147,12 @@ def pytest_cmdline_main(config: pytest.Config) -> "Optional[int]":
     )
     explicit_selectors = _explicit_selectors(config)
     pytest_args = runner.forwarded_pytest_args(outer_args)
+    pytest_args = runner.container_pytest_config(
+        pytest_args,
+        SOURCE_ROOT,
+        config.rootpath,
+        config.inipath,
+    )
     workers = config.getoption("xdist_workers")
     if workers is not None:
         pytest_args.extend(("-n", str(workers)))
@@ -153,7 +162,7 @@ def pytest_cmdline_main(config: pytest.Config) -> "Optional[int]":
     if case.suite == "unit":
         return runner.run_unit_case(
             case,
-            config.rootpath,
+            SOURCE_ROOT,
             pytest_args,
             container_environment=container_environment,
             explicit_selectors=explicit_selectors,
@@ -161,7 +170,7 @@ def pytest_cmdline_main(config: pytest.Config) -> "Optional[int]":
 
     return runner.run_container_case(
         case,
-        config.rootpath,
+        SOURCE_ROOT,
         pytest_args,
         keep_db=config.getoption("keep_db"),
         container_environment=container_environment,
@@ -205,6 +214,12 @@ def _run_cases(
     )
     explicit_selectors = _explicit_selectors(config)
     pytest_args = runner.forwarded_pytest_args(outer_args)
+    pytest_args = runner.container_pytest_config(
+        pytest_args,
+        SOURCE_ROOT,
+        config.rootpath,
+        config.inipath,
+    )
     workers = config.getoption("xdist_workers")
     if workers is not None:
         pytest_args.extend(("-n", str(workers)))
@@ -237,7 +252,7 @@ def _run_cases(
             if case.suite == "unit":
                 result = runner.run_unit_case(
                     case,
-                    config.rootpath,
+                    SOURCE_ROOT,
                     case_args,
                     container_environment=container_environment,
                     explicit_selectors=explicit_selectors,
@@ -246,7 +261,7 @@ def _run_cases(
             else:
                 result = runner.run_container_case(
                     case,
-                    config.rootpath,
+                    SOURCE_ROOT,
                     case_args,
                     keep_db=config.getoption("keep_db"),
                     container_environment=container_environment,

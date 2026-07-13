@@ -43,9 +43,11 @@ _RUNNER_OPTIONS = {
     "--suite",
     "--xdist-workers",
     "--rootdir",
+    "--config-file",
     "-c",
 }
 _UNIT_DOCKERFILE = "etc/docker/test/unit.Dockerfile"
+_CONTAINER_SOURCE_ROOT = Path("/rucio_source")
 
 
 def outer_pytest_args(
@@ -62,10 +64,13 @@ def outer_pytest_args(
 def forwarded_pytest_args(arguments: "Sequence[str]") -> list[str]:
     forwarded = []
     skip_next = False
-    for argument in arguments:
+    for index, argument in enumerate(arguments):
         if skip_next:
             skip_next = False
             continue
+        if argument == "--":
+            forwarded.extend(arguments[index:])
+            break
         if argument in _RUNNER_FLAGS:
             continue
         if argument in _RUNNER_OPTIONS:
@@ -73,10 +78,41 @@ def forwarded_pytest_args(arguments: "Sequence[str]") -> list[str]:
             continue
         if any(argument.startswith(f"{option}=") for option in _RUNNER_OPTIONS):
             continue
+        if argument.startswith("-c") and argument != "-c":
+            continue
         forwarded.append(argument)
     marker = forwarded.index("--") if "--" in forwarded else len(forwarded)
     forwarded[marker:marker] = ("-o", "addopts=")
     return forwarded
+
+
+def container_pytest_config(
+    arguments: "Sequence[str]",
+    source_root: Path,
+    pytest_root: Path,
+    config_path: "Optional[Path]",
+) -> list[str]:
+    source_root = source_root.resolve()
+    if config_path is None:
+        raise pytest.UsageError("pytest configuration file is required")
+
+    def map_path(path: Path, description: str) -> Path:
+        try:
+            relative = path.resolve().relative_to(source_root)
+        except ValueError as error:
+            raise pytest.UsageError(
+                f"pytest {description} must be inside {source_root}"
+            ) from error
+        return _CONTAINER_SOURCE_ROOT / relative
+
+    updated = list(arguments)
+    marker = updated.index("--") if "--" in updated else len(updated)
+    updated[marker:marker] = (
+        f"--rootdir={map_path(pytest_root, 'root directory')}",
+        "-c",
+        str(map_path(config_path, 'configuration file')),
+    )
+    return updated
 
 
 def run_container_case(
@@ -201,9 +237,6 @@ def run_unit_case(
         command.extend(("--env", f"{key}={value}"))
     command.extend((
         image,
-        "--rootdir=/rucio_source",
-        "-c",
-        "/rucio_source/pyproject.toml",
         "-r",
         "fExX",
         "--log-level=DEBUG",
@@ -407,9 +440,6 @@ def _run_inner_pytest(
         "-bb",
         "-m",
         "pytest",
-        "--rootdir=/rucio_source",
-        "-c",
-        "/rucio_source/pyproject.toml",
         "-r",
         "fExX",
         "--log-level=DEBUG",

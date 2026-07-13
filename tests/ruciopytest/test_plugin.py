@@ -47,6 +47,7 @@ class _Config:
         self.options = defaults
         self.ini_options = self.options.pop("ini_options", {})
         self.rootpath = REPO_ROOT
+        self.inipath = REPO_ROOT / "pyproject.toml"
         self.args = ["tests"]
         self.args_source = self.ArgsSource.TESTPATHS
         self.invocation_params = SimpleNamespace(args=())
@@ -171,6 +172,9 @@ def test_container_case_forwards_standard_pytest_args(monkeypatch) -> None:
         "tests/test_rule.py::test_rule",
         "-o",
         "addopts=",
+        "--rootdir=/rucio_source",
+        "-c",
+        "/rucio_source/pyproject.toml",
     ]
     assert captured["kwargs"]["explicit_selectors"] == (
         "tests/test_rule.py::test_rule",
@@ -193,7 +197,15 @@ def test_implicit_testpaths_are_not_explicit_selectors(monkeypatch) -> None:
     monkeypatch.setattr(plugin.runner, "run_container_case", run)
 
     assert plugin.pytest_cmdline_main(config) == 0
-    assert captured["args"] == ["-k", "tests", "-o", "addopts="]
+    assert captured["args"] == [
+        "-k",
+        "tests",
+        "-o",
+        "addopts=",
+        "--rootdir=/rucio_source",
+        "-c",
+        "/rucio_source/pyproject.toml",
+    ]
     assert captured["kwargs"]["explicit_selectors"] == ()
 
 
@@ -209,7 +221,16 @@ def test_container_case_forwards_pytest_addopts(monkeypatch) -> None:
     monkeypatch.setattr(plugin.runner, "run_container_case", run)
 
     assert plugin.pytest_cmdline_main(config) == 0
-    assert captured["args"] == ["-k", "rule", "-q", "-o", "addopts="]
+    assert captured["args"] == [
+        "-k",
+        "rule",
+        "-q",
+        "-o",
+        "addopts=",
+        "--rootdir=/rucio_source",
+        "-c",
+        "/rucio_source/pyproject.toml",
+    ]
 
 
 def test_container_case_forwards_configured_addopts(monkeypatch) -> None:
@@ -231,7 +252,28 @@ def test_container_case_forwards_configured_addopts(monkeypatch) -> None:
         "-q",
         "-o",
         "addopts=",
+        "--rootdir=/rucio_source",
+        "-c",
+        "/rucio_source/pyproject.toml",
     ]
+
+
+def test_container_case_maps_custom_pytest_paths(monkeypatch) -> None:
+    config = _Config(case="remote-dbs-py39-postgres14")
+    config.rootpath = REPO_ROOT / "tests"
+    config.inipath = REPO_ROOT / "tests" / "pytest.ini"
+    captured = {}
+
+    def run(case, root_path, pytest_args, **kwargs):
+        captured.update(root=root_path, args=pytest_args)
+        return 0
+
+    monkeypatch.setattr(plugin.runner, "run_container_case", run)
+
+    assert plugin.pytest_cmdline_main(config) == 0
+    assert captured["root"] == REPO_ROOT
+    assert "--rootdir=/rucio_source/tests" in captured["args"]
+    assert "/rucio_source/tests/pytest.ini" in captured["args"]
 
 
 def test_unit_case_uses_container(monkeypatch) -> None:
