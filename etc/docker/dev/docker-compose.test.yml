@@ -16,4 +16,4 @@ services:
 
   ruciodb:
     profiles:
-      - donotstart
+      - postgres14

@@ -67,9 +67,6 @@ services:
       ruciodb:
         condition: service_healthy
         required: false
-      postgres14:
-        condition: service_healthy
-        required: false
       elasticsearch:
         condition: service_healthy
         required: false
@@ -150,24 +147,6 @@ services:
       # web portal access, helpful for debugging
       ACTIVEMQ_WEB_USER: activemq
       ACTIVEMQ_WEB_PASSWORD: supersecret
-
-  postgres14:
-    image: docker.io/postgres:14
-    profiles:
-      - postgres14
-    environment:
-      - POSTGRES_USER=rucio
-      - POSTGRES_DB=rucio
-      - POSTGRES_PASSWORD=rucio
-    command: ["-c", "fsync=off","-c", "synchronous_commit=off","-c", "full_page_writes=off"]
-    volumes:
-      - vol-postgres14-data:/var/lib/postgresql/data
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB || exit 1" ]
-      interval: 10s
-      timeout: 5s
-      start_period: 30s
-      retries: 10
 
   oracle:
     image: docker.io/gvenzl/oracle-xe:18.4.0
@@ -519,6 +498,8 @@ volumes:
   # Named volumes for each container
   # ------------------------------------------------------------------
   vol-ruciodb-data:
+    labels:
+      rucio.test.database: postgres14
   vol-graphite-conf:
   vol-graphite-storage:
   vol-graphite-functions:
@@ -531,9 +512,6 @@ volumes:
   vol-influxdb-var:
   vol-ftsdb-mysql:
   vol-minio-data:
-  vol-postgres14-data:
-    labels:
-      rucio.test.database: postgres14
   vol-mongo-noauth-configdb:
   vol-mongo-noauth-db:
   vol-mongo-configdb:

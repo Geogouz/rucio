@@ -35,16 +35,26 @@ def test_database_services_have_healthchecks() -> None:
 
     assert all(
         "healthcheck" in compose["services"][service]
-        for service in ("postgres14", "oracle")
+        for service in ("ruciodb", "oracle")
     )
 
 
 def test_supported_databases_use_persistent_storage() -> None:
     compose = yaml.safe_load((COMPOSE_DIR / "docker-compose.yml").read_text())
 
-    assert "vol-postgres14-data:/var/lib/postgresql/data" in compose["services"]["postgres14"]["volumes"]
+    assert "vol-ruciodb-data:/var/lib/postgresql/data" in compose["services"]["ruciodb"]["volumes"]
     assert "vol-oracle-data:/opt/oracle/oradata" in compose["services"]["oracle"]["volumes"]
-    assert compose["volumes"]["vol-postgres14-data"]["labels"]["rucio.test.database"] == "postgres14"
+    assert compose["volumes"]["vol-ruciodb-data"]["labels"]["rucio.test.database"] == "postgres14"
+
+
+def test_dev_and_tests_share_postgres_service() -> None:
+    compose = yaml.safe_load((COMPOSE_DIR / "docker-compose.yml").read_text())
+    overlay = yaml.safe_load(
+        (COMPOSE_DIR / "docker-compose.test.yml").read_text()
+    )
+
+    assert "postgres14" not in compose["services"]
+    assert overlay["services"]["ruciodb"]["profiles"] == ["postgres14"]
 
 
 def test_compose_omits_unsupported_databases() -> None:
