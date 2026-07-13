@@ -72,6 +72,9 @@ def test_test_overlay_consumes_prebuilt_image() -> None:
     assert "image" in rucio
     assert "build" not in rucio
     assert rucio["environment"]["RUCIO_HOME"] == "${RUCIO_HOME:-/opt/rucio}"
+    assert compose["services"]["elasticsearch"]["platform"] == (
+        "${RUCIO_TEST_NATIVE_PLATFORM:-linux/amd64}"
+    )
 
 
 def test_unit_dockerfile_has_parameterized_runtime() -> None:

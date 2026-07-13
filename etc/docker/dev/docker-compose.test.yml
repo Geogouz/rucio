@@ -1,4 +1,7 @@
 services:
+  elasticsearch:
+    platform: "${RUCIO_TEST_NATIVE_PLATFORM:-linux/amd64}"
+
   rucio:
     image: "${RUCIO_TEST_IMAGE:?Set RUCIO_TEST_IMAGE to a test runtime image}"
     working_dir: /rucio_source

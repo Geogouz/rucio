@@ -33,12 +33,14 @@ def _manager(
     image: Optional[str] = "runtime:test",
     environ: Optional[dict[str, str]] = None,
 ) -> ContainerManager:
+    environment = {"RUCIO_TEST_NATIVE_PLATFORM": "linux/amd64"}
+    environment.update(environ or {})
     return ContainerManager(
         get_case("remote-dbs-py39-postgres14"),
         tmp_path,
         keep_db=keep_db,
         image=image,
-        environ=environ or {},
+        environ=environment,
     )
 
 
@@ -103,6 +105,28 @@ def test_manager_ignores_inherited_default_platform(tmp_path: "Path") -> None:
     )
 
     assert "DOCKER_DEFAULT_PLATFORM" not in manager.environment
+
+
+def test_manager_uses_docker_server_platform(tmp_path: "Path", monkeypatch) -> None:
+    manager = ContainerManager(
+        get_case("remote-dbs-py39-postgres14"),
+        tmp_path,
+        image="runtime:test",
+        environ={},
+    )
+
+    def run(command, **kwargs):
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout="linux/arm64\n",
+        )
+
+    monkeypatch.setattr(manager, "_run", run)
+
+    manager._set_native_platform()
+
+    assert manager.environment["RUCIO_TEST_NATIVE_PLATFORM"] == "linux/arm64"
 
 
 def test_compose_commands_use_project_and_service_profiles(tmp_path: "Path") -> None:

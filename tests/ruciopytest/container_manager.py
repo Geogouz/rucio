@@ -133,6 +133,7 @@ class ContainerManager:
     def start(self) -> None:
         self._acquire_project_lock()
         try:
+            self._set_native_platform()
             if self.build_local:
                 image_key = (str(self.root_dir), self.image)
                 if image_key not in self._locally_built_images:
@@ -302,6 +303,24 @@ class ContainerManager:
             timeout=60,
         )
         return result.returncode == 0
+
+    def _set_native_platform(self) -> None:
+        if "RUCIO_TEST_NATIVE_PLATFORM" in self.environment:
+            return
+        result = self._run(
+            (
+                "docker",
+                "version",
+                "--format",
+                "{{.Server.Os}}/{{.Server.Arch}}",
+            ),
+            capture_output=True,
+            timeout=30,
+        )
+        platform = result.stdout.strip()
+        if not platform:
+            raise RuntimeError("Docker did not report its server platform")
+        self.environment["RUCIO_TEST_NATIVE_PLATFORM"] = platform
 
     def _build_image(self) -> None:
         command = [
