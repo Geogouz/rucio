@@ -356,72 +356,30 @@ current checkout, while unit cases build ``etc/docker/test/unit.Dockerfile``.
 Source-only branch changes do not require rebuilding ``rucio-dev`` because the
 checkout is mounted into the interactive container.
 
-Start the daemons
-~~~~~~~~~~~~~~~~~~~
+Running transfer daemons manually
+---------------------------------
 
-Daemons are not running in the docker environment, but all daemons support single-execution mode with the --run-once argument. Reset the system first with::
+Daemons are not continuously running in the development environment. After
+starting and initializing the complete interactive integration environment,
+open a Rucio shell::
 
-    python -m tests.ruciopytest.infra_manager \
-        --case integration-py39-postgres14
+    docker compose --project-name dev \
+        --file etc/docker/dev/docker-compose.yml \
+        --profile storage \
+        --profile externalmetadata \
+        --profile iam \
+        exec rucio /bin/bash
 
-
-Some files are created. Let's add them to a new dataset::
+Create a dataset and rule, then run the relevant daemons once::
 
     rucio add-dataset test:mynewdataset
     rucio attach test:mynewdataset test:file1 test:file2 test:file3 test:file4
-
-
-If you run the command below, the files are not in the RSE XRD3, but only in XRD1 and 2.::
-
-    rucio list-file-replicas test:mynewdataset
-    > +---------+--------+------------+-----------+------------------------------------------------+
-    > | SCOPE   | NAME   | FILESIZE   | ADLER32   | RSE: REPLICA                                   |
-    > |---------+--------+------------+-----------+------------------------------------------------|
-    > | test    | file1  | 10.486 MB  | 141a641e  | XRD1: root://xrd1:1094//rucio/test/80/25/file1 |
-    > | test    | file2  | 10.486 MB  | fdfa7eea  | XRD1: root://xrd1:1094//rucio/test/f3/14/file2 |
-    > | test    | file3  | 10.486 MB  | c669167d  | XRD2: root://xrd2:1095//rucio/test/a9/23/file3 |
-    > | test    | file4  | 10.486 MB  | 65786e49  | XRD2: root://xrd2:1095//rucio/test/2b/c2/file4 |
-    > +---------+--------+------------+-----------+------------------------------------------------+
-
-
-So let's add a new rule on our new dataset to oblige Rucio to create replicas also on XRD3::
-
     rucio add-rule test:mynewdataset 1 XRD3
-    > 1aadd685d891400dba050ad43e71fea9
-
-
-Now we can check the status of the rule. We will see there are 4 files in `Replicating` state::
-
-    rucio rule-info 1aadd685d891400dba050ad43e71fea9|grep Locks
-    > Locks OK/REPLICATING/STUCK: 0/4/0
-
-
-Now we can run the daemons. First the rule evaluation daemon (judge-evaluator) will pick up our rule. Then the transfer submitter daemon (conveyor-submitter) will send the newly created transfers requests to the FTS server. After that, the transfer state check daemon (conveyor-poller) will retrieve from FTS the transfer state information. Finally, the transfer sign-off daemon (conveyor-finisher) updates the internal state of the Rucio catalogue to reflect the changes.::
 
     rucio-judge-evaluator --run-once
     rucio-conveyor-submitter --run-once
-    rucio-conveyor-poller --run-once
+    rucio-conveyor-poller --run-once --older-than 0
     rucio-conveyor-finisher --run-once
 
-
-If we see the state of the rule now, we see the locks are OK::
-
-    rucio rule-info 1aadd685d891400dba050ad43e71fea9|grep Locks
-    > Locks OK/REPLICATING/STUCK: 4/0/0
-
-
-And if we look at the replicas of the dataset, we see the there are replicas of the files also in XRD3::
-
-    rucio list-file-replicas test:mynewdataset
-    > +---------+--------+------------+-----------+------------------------------------------------+
-    > | SCOPE   | NAME   | FILESIZE   | ADLER32   | RSE: REPLICA                                   |
-    > |---------+--------+------------+-----------+------------------------------------------------|
-    > | test    | file1  | 10.486 MB  | 141a641e  | XRD3: root://xrd3:1096//rucio/test/80/25/file1 |
-    > | test    | file1  | 10.486 MB  | 141a641e  | XRD1: root://xrd1:1094//rucio/test/80/25/file1 |
-    > | test    | file2  | 10.486 MB  | fdfa7eea  | XRD3: root://xrd3:1096//rucio/test/f3/14/file2 |
-    > | test    | file2  | 10.486 MB  | fdfa7eea  | XRD1: root://xrd1:1094//rucio/test/f3/14/file2 |
-    > | test    | file3  | 10.486 MB  | c669167d  | XRD2: root://xrd2:1095//rucio/test/a9/23/file3 |
-    > | test    | file3  | 10.486 MB  | c669167d  | XRD3: root://xrd3:1096//rucio/test/a9/23/file3 |
-    > | test    | file4  | 10.486 MB  | 65786e49  | XRD2: root://xrd2:1095//rucio/test/2b/c2/file4 |
-    > | test    | file4  | 10.486 MB  | 65786e49  | XRD3: root://xrd3:1096//rucio/test/2b/c2/file4 |
-    > +---------+--------+------------+-----------+------------------------------------------------+
+Inspect the rule and replicas with ``rucio rule-info <rule-id>`` and
+``rucio list-file-replicas test:mynewdataset``.
