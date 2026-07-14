@@ -144,8 +144,9 @@ class InfraManager:
             config_dir / "rclone-init.cfg",
         )
         self._run((
-            "ln",
-            "-sf",
+            "install",
+            "-m",
+            "0600",
             "/root/.ssh/ruciouser_sshkey",
             "/root/.ssh/id_rsa",
         ))

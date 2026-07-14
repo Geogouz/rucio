@@ -186,7 +186,21 @@ def test_integration_configures_protocol_credentials(tmp_path: "Path", monkeypat
     assert (config_dir / "rse-accounts.cfg").read_text() == "accounts"
     assert (config_dir / "rse-accounts.cfg.template").read_text() == "accounts"
     assert (config_dir / "rclone-init.cfg").read_text() == "rclone"
-    assert run.call_count == 2
+    assert run.mock_calls == [
+        call((
+            "install",
+            "-m",
+            "0600",
+            "/root/.ssh/ruciouser_sshkey",
+            "/root/.ssh/id_rsa",
+        )),
+        call((
+            "ln",
+            "-sf",
+            "/root/.ssh/ruciouser_sshkey.pub",
+            "/root/.ssh/id_rsa.pub",
+        )),
+    ]
 
 
 def test_main_prepares_requested_case(monkeypatch) -> None:
