@@ -456,6 +456,7 @@ services:
   kibana:
     container_name: dev-kibana-1
     image: docker.io/kibana:7.4.0
+    platform: linux/amd64
     profiles:
       - monitoring
 
