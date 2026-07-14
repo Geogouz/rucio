@@ -111,9 +111,6 @@ jobs:
     needs: resolve_runtime_images
     if: inputs.publish && needs.resolve_runtime_images.outputs.missing != '[]'
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
 
     steps:
       - name: Checkout code

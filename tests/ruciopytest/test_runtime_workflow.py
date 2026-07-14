@@ -45,6 +45,7 @@ def test_test_workflows_cannot_publish_images() -> None:
     assert "default: false" in workflow
     assert "if: inputs.publish" in workflow
     assert "packages: read" in workflow
+    assert "packages: write" not in workflow
     assert "packages: write" in publisher
     assert "publish: true" in publisher
 
