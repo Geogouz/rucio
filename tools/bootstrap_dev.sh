@@ -560,6 +560,9 @@ else
   export DEV_PROFILES=""
 fi
 
+# Let multi-architecture images use the Docker daemon's native platform.
+unset DOCKER_DEFAULT_PLATFORM
+
 cd "$RUCIO_REPO_ROOT/etc/docker/dev"
 
 # Build an array of '--profile' arguments if the user gave them
