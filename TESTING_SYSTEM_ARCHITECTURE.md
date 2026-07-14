@@ -6,9 +6,11 @@ This document explains three related systems:
 
 1. the current upstream Rucio development and test architecture;
 2. [`maany/rucio#3`](https://github.com/maany/rucio/pull/3), the first pytest-runner proposal;
-3. the container-native testing system on the local `xreview/upstream-first-history` branch.
+3. the container-native testing system published on the
+   [`testing-refactor`](https://github.com/Geogouz/rucio/tree/testing-refactor)
+   branch.
 
-It also provides a complete user guide for the local system.
+It also provides a complete user guide for that system.
 
 ## Contents
 
@@ -38,11 +40,12 @@ solution” remain unambiguous.
 | Current upstream | [`rucio/rucio@1196c87d`](https://github.com/rucio/rucio/commit/1196c87d832230fa034ae4c3eb2877998cb8cc4f) | Live `master` verified on 2026-07-14 |
 | PR #3 base | `801caf7459a2b9139ad6b26b3d268054f214e560` | `maany/master` at the PR base |
 | PR #3 head | [`c001a3ae`](https://github.com/maany/rucio/commit/c001a3ae21366e0fb65f991ece06793efe396063) | Three commits; 26 files; +6,042/-37 |
-| This solution | `a08d38b6e90c737b9802c3c14dcc42fb7467280d` | 188 commits over current upstream; 74 files; +6,536/-3,540 |
+| This solution | [`Geogouz/rucio@0d5ad34f`](https://github.com/Geogouz/rucio/commit/0d5ad34f6cc729c32acd69da8ad8c14a4075078f) | Implementation snapshot before this documentation update; 192 commits over current upstream; 77 files; +9,031/-3,544 |
 | Containers repository | [`rucio/containers@b79108c1`](https://github.com/rucio/containers/commit/b79108c106e4c49f07965adfca4a031d437f0a21) | Used to describe the external `rucio-dev` image |
 
-The current solution is local and is not claimed to be merged upstream. The
-document distinguishes implemented behavior from recommended future work.
+The current solution is published on the `testing-refactor` branch of the
+`Geogouz/rucio` fork and is not claimed to be merged upstream. The document
+distinguishes implemented behavior from recommended future work.
 
 ### Terminology
 
@@ -734,6 +737,11 @@ GHCR image if present and builds it locally if absent. Publishing is separated
 into a trusted workflow; fork pull requests cannot publish. A separate cleanup
 workflow removes expired runtime-image versions.
 
+Test workflows default to read-only tokens. Unit jobs receive `contents: read`;
+container-backed suites receive `contents: read` and `packages: read`. The
+reusable runtime workflow inherits those caller permissions, while only the
+dedicated publisher grants `packages: write`.
+
 Unit cases use `unit.Dockerfile` and local Buildx caching rather than a
 prepublished unit image.
 
@@ -792,7 +800,7 @@ sends events directly to the base Elasticsearch service.
 
 | Area | PR #3 | Current solution |
 |---|---|---|
-| Git relationship | Three commits on `801caf745...` | Independent 188-commit implementation on later upstream `1196c87d...` |
+| Git relationship | Three commits on `801caf745...` | Independent 192-commit branch snapshot on later upstream `1196c87d...` |
 | Canonical model | Four frozen `SuiteProfile` records, dynamically replaced/merged for overrides | Six `SuiteDefinition` objects generate 15 exact `TestCase` objects |
 | Exact CI leg | No stable case identifier | `--case=ID` |
 | Enumeration | No case inventory command | `--list-cases` emits machine-readable JSON |
@@ -880,7 +888,7 @@ These figures describe implementation shape; they are not quality metrics.
   orchestration modules contain about 2,307 lines, about 37.9% fewer, while
   supporting more canonical modes.
 - PR #3 has five runner-test modules, about 1,501 lines and 62 test definitions.
-  The current solution has thirteen, about 3,205 lines and 175 definitions.
+  The current solution has fourteen, about 3,241 lines and 176 definitions.
 
 The important result is architectural: concepts were retained, but lifecycle,
 reporting, case modeling, setup reuse, isolation, and CI integration were
@@ -2361,25 +2369,35 @@ expensive dependency rebuild.
 
 ### Review and cherry-pick boundaries
 
-This branch intentionally separates 24 current-upstream fixes from the 164
-commits implementing/refining the new architecture. The boundary is local
-commit `0dbdeae62159c664cef804c1988f1551213d6eba`. The intentionally untracked
-`UPSTREAM_FIRST_FIXES.md` handoff records each upstream problem, dependency,
-cherry-pick order, and validation evidence.
+At the pinned implementation snapshot, the work comprises 26 current-upstream
+fixes and 166 refactor or documentation commits. The first 24 fixes are the
+contiguous prefix ending at `0dbdeae62159c664cef804c1988f1551213d6eba`,
+followed by the original 164-commit architecture series. Two upstream defects
+were found later and appear on `testing-refactor` as `7dca34286` and
+`0d5ad34f6`, after the architecture document and a refactor-specific CI fix.
+
+The clean 26-commit upstream-only series ends at local ref
+`xreview/upstream-first-fixes` commit `5723ea8e0`. The intentionally untracked
+`UPSTREAM_FIRST_FIXES.md` handoff maps the corresponding commits and records
+each upstream problem, dependency, cherry-pick order, and validation evidence.
 
 The StatsD guard from PR #3 is not silently included in that layer. If desired,
 it should be assessed and submitted as its own product fix.
 
 ## Validation status at the pinned revision
 
-At `a08d38b6e...`:
+At `0d5ad34f6...`:
 
-- all 188 commit bodies pass the configured issue/commit checks;
+- all 192 commit bodies pass the configured issue/commit checks;
 - per-commit whitespace checks pass;
 - pre-commit passes;
-- the `tests/ruciopytest` validation set reports 211 passing tests;
+- the `tests/ruciopytest` validation set reports 215 passing tests;
 - workflow validation, shell syntax checks, and full-profile Compose rendering
   pass;
+- workflow tests verify read-only defaults for all four test workflows and the
+  dedicated write grant for runtime-image publishing;
+- with `GITHUB_ACTIONS=true`, both complete client cases report 76 passed and
+  one pre-existing skip; the X.509 test runs and passes on Python 3.9 and 3.10;
 - unit Python 3.9–3.12, client Python 3.9/3.10, PostgreSQL Python 3.9/3.10,
   both multi-VO versions, and both policy cases were exercised successfully;
 - integration selectors 1–8 and 10–15 passed; selector 9's certificate failures
@@ -2422,7 +2440,7 @@ PR #3 sources:
 - [forwarding and report replay](https://github.com/maany/rucio/blob/c001a3ae21366e0fb65f991ece06793efe396063/tests/ruciopytest/forwarding.py)
 - [PR runner README](https://github.com/maany/rucio/blob/c001a3ae21366e0fb65f991ece06793efe396063/tests/ruciopytest/README.md)
 
-Current local implementation paths:
+Current `testing-refactor` implementation paths:
 
 - `tests/ruciopytest/profiles.py`
 - `tests/ruciopytest/plugin.py`
