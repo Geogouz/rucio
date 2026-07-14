@@ -116,8 +116,22 @@ def test_test_overlay_consumes_prebuilt_image() -> None:
     assert "image" in rucio
     assert "build" not in rucio
     assert rucio["environment"]["RUCIO_HOME"] == "${RUCIO_HOME:-/opt/rucio}"
-    assert compose["services"]["elasticsearch"]["platform"] == (
-        "${RUCIO_TEST_NATIVE_PLATFORM:-linux/amd64}"
+
+
+def test_test_overlay_runs_multiarch_services_natively() -> None:
+    compose = yaml.safe_load(
+        (COMPOSE_DIR / "docker-compose.test.yml").read_text()
+    )
+
+    assert all(
+        compose["services"][service]["platform"]
+        == "${RUCIO_TEST_NATIVE_PLATFORM:-linux/amd64}"
+        for service in (
+            "elasticsearch",
+            "minio",
+            "mongo",
+            "mongo-noauth",
+        )
     )
 
 

@@ -38,3 +38,12 @@ services:
   ruciodb:
     profiles:
       - postgres14
+
+  minio:
+    platform: "${RUCIO_TEST_NATIVE_PLATFORM:-linux/amd64}"
+
+  mongo:
+    platform: "${RUCIO_TEST_NATIVE_PLATFORM:-linux/amd64}"
+
+  mongo-noauth:
+    platform: "${RUCIO_TEST_NATIVE_PLATFORM:-linux/amd64}"
