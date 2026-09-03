@@ -2140,6 +2140,7 @@ def get_metadata_bulk(
     :param session:            The database session in use.
     """
     if inherit:
+        inherit_did_column_metadata = plugin.casefold() in ('did_column', 'all')
         parent_list = []
         unique_dids = []
         parents = [1, ]
@@ -2176,7 +2177,12 @@ def get_metadata_bulk(
             result = {'scope': dids[0][0], 'name': dids[0][1]}
             for did in dids:
                 for key, value in meta_dict[did].items():
-                    if key not in result:
+                    if key not in result or (
+                        inherit_did_column_metadata
+                        and result[key] is None
+                        and value is not None
+                        and did_meta_plugins.METADATA_PLUGIN_MODULES[0].manages_key(key, session=session)
+                    ):
                         result[key] = value
             yield result
     else:
