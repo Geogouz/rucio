@@ -54,6 +54,20 @@ class TestDidMetaDidColumn:
         add_did(scope=mock_scope, name=did_name, did_type='DATASET', meta=dataset_meta, account=root_account)
         assert get_metadata(scope=mock_scope, name=did_name)['project'] == 'data12_8TeV'
 
+    @pytest.mark.parametrize('plugin', ['DID_COLUMN', 'ALL'])
+    def test_get_metadata_bulk_inherits_did_column(self, did_factory, root_account, plugin):
+        if plugin == 'ALL':
+            skip_without_json()
+
+        project = 'test_project'
+        parent = did_factory.make_container()
+        child = did_factory.make_dataset()
+        set_metadata(**parent, key='project', value=project)
+        attach_dids(**parent, dids=[child], account=root_account)
+
+        [metadata] = get_metadata_bulk([child], plugin=plugin, inherit=True)
+        assert metadata['project'] == project
+
     @pytest.mark.dirty
     def test_list_did_meta(self, mock_scope, root_account):
         """ DID Meta (Hardcoded): List DID meta """
