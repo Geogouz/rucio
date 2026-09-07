@@ -1,89 +1,72 @@
-name: dev
+x-rucio-environment: &rucio-environment
+  REQUESTS_CA_BUNDLE: /etc/pki/tls/certs/ca-bundle.crt
+  RUCIO_SOURCE_DIR: /rucio_source
+  PYTHONPATH: /rucio_source/lib
+  PYTHONPYCACHEPREFIX: /tmp/rucio-pycache
+  RDBMS: "${RDBMS:-postgres14}"
+  DEV_PROFILES: "${DEV_PROFILES:-}"
+
+x-rucio-runtime: &rucio-runtime
+  image: "${RUCIO_DEV_IMAGE:-rucio-dev-runtime:missing}"
+  init: true
+  entrypoint: ["/rucio_source/etc/docker/dev/rucio/entrypoint.sh"]
+  working_dir: /rucio_source
+  volumes:
+    - ../../certs/rucio_ca.pem:/etc/grid-security/certificates/5fca1cb1.0:ro,z
+    - ../../certs/rucio_ca.pem:/etc/pki/ca-trust/source/anchors/rucio_ca.pem:ro,z
+    - ../../certs/hostcert_rucio.pem:/etc/grid-security/hostcert.pem:ro,z
+    - ../../certs/hostcert_rucio.key.pem:/etc/grid-security/hostkey.pem:ro,z
+    - ../../certs/ruciouser.pem:/tmp/usercert.pem:ro,z
+    - ../../certs/ruciouser.key.pem:/tmp/userkey.pem:ro,z
+    - ../../certs/ruciouser.certkey.pem:/opt/rucio/etc/usercertkey.pem:ro,z
+    - ../../certs/ssh/ruciouser_sshkey.pub:/root/.ssh/ruciouser_sshkey.pub:ro,z
+    - ../../certs/ssh/ruciouser_sshkey:/root/.ssh/ruciouser_sshkey:ro,z
+    - ./rucio/idpsecrets.json:/opt/rucio/etc/idpsecrets.json:ro,z
+    - ../../../:/rucio_source:z
+  environment: *rucio-environment
+  depends_on:
+    oracle:
+      condition: service_healthy
+      required: false
+    ruciodb:
+      condition: service_healthy
+      required: false
+    elasticsearch:
+      condition: service_healthy
+      required: false
+    influxdb:
+      condition: service_healthy
+      required: false
 
 services:
   # ------------------------------------------------------------------
   # Main Rucio dev containers
   # ------------------------------------------------------------------
-  rucioclient:
-    container_name: dev-rucioclient-1
-    image: "docker.io/${DOCKER_REPO:-rucio}/rucio-dev:${RUCIO_DEV_PREFIX:-}${RUCIO_TAG:-latest}"
-    platform: linux/amd64
-    entrypoint: ["/rucio_source/etc/docker/dev/rucio/entrypoint.sh"]
+  rucio:
+    <<: *rucio-runtime
+    command: ["httpd", "-D", "FOREGROUND"]
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "--insecure", "https://localhost/ping"]
+      interval: 2s
+      timeout: 5s
+      start_period: 10s
+      retries: 30
+
+  workspace:
+    <<: *rucio-runtime
     command: ["sleep", "infinity"]
     profiles:
-      - client
-    volumes:
-      - ../../certs/rucio_ca.pem:/etc/grid-security/certificates/5fca1cb1.0:ro
-      - ../../certs/rucio_ca.pem:/opt/rucio/etc/rucio_ca.pem:ro
-      - ../../certs/rucio_ca.pem:/etc/pki/ca-trust/source/anchors/rucio_ca.pem:ro
-      - ../../certs/hostcert_rucio.pem:/etc/grid-security/hostcert.pem:z
-      - ../../certs/hostcert_rucio.key.pem:/etc/grid-security/hostkey.pem:z
-      - ../../certs/ruciouser.pem:/tmp/usercert.pem:z
-      - ../../certs/ruciouser.key.pem:/tmp/userkey.pem:z
-      - ../../certs/ruciouser.certkey.pem:/opt/rucio/etc/usercertkey.pem:z
-      - ../../certs/ssh/ruciouser_sshkey.pub:/root/.ssh/ruciouser_sshkey.pub:z
-      - ../../certs/ssh/ruciouser_sshkey:/root/.ssh/ruciouser_sshkey:z
-      - ./rucio/idpsecrets.json:/opt/rucio/etc/idpsecrets.json:ro
-      - ../../../tools:/opt/rucio/tools:Z
-      - ../../../bin:/opt/rucio/bin:Z
-      - ../../../lib:/opt/rucio/lib:Z
-      - ../../../tests:/opt/rucio/tests:Z
-      - ../../../:/rucio_source:Z
+      - workspace
     environment:
-      - REQUESTS_CA_BUNDLE=/etc/pki/tls/certs/ca-bundle.crt
-      - RUCIO_SOURCE_DIR=/rucio_source
-      - RDBMS
-
-  rucio:
-    container_name: ${RUCIO_HTTPD_CONTAINER_NAME:-dev-rucio-1}
-    image: "docker.io/${DOCKER_REPO:-rucio}/rucio-dev:${RUCIO_DEV_PREFIX:-}${RUCIO_TAG:-latest}"
-    platform: linux/amd64
-    entrypoint: ["/rucio_source/etc/docker/dev/rucio/entrypoint.sh"]
-    command: ["httpd","-D","FOREGROUND"]
-    volumes:
-      - ../../certs/rucio_ca.pem:/etc/grid-security/certificates/5fca1cb1.0:ro
-      - ../../certs/rucio_ca.pem:/opt/rucio/etc/rucio_ca.pem:ro
-      - ../../certs/rucio_ca.pem:/etc/pki/ca-trust/source/anchors/rucio_ca.pem:ro
-      - ../../certs/hostcert_rucio.pem:/etc/grid-security/hostcert.pem:z
-      - ../../certs/hostcert_rucio.key.pem:/etc/grid-security/hostkey.pem:z
-      - ../../certs/ruciouser.pem:/tmp/usercert.pem:z
-      - ../../certs/ruciouser.key.pem:/tmp/userkey.pem:z
-      - ../../certs/ruciouser.certkey.pem:/opt/rucio/etc/usercertkey.pem:z
-      - ../../certs/ssh/ruciouser_sshkey.pub:/root/.ssh/ruciouser_sshkey.pub:z
-      - ../../certs/ssh/ruciouser_sshkey:/root/.ssh/ruciouser_sshkey:z
-      - ./rucio/idpsecrets.json:/opt/rucio/etc/idpsecrets.json:ro
-      - ../../../tools:/opt/rucio/tools:Z
-      - ../../../bin:/opt/rucio/bin:Z
-      - ../../../lib:/opt/rucio/lib:Z
-      - ../../../tests:/opt/rucio/tests:Z
-      - ../../../:/rucio_source
-    environment:
-      - REQUESTS_CA_BUNDLE=/etc/pki/tls/certs/ca-bundle.crt
-      - RUCIO_SOURCE_DIR=/rucio_source
-      - RDBMS
-      - DEV_PROFILES
-    depends_on:
-      oracle:
-        condition: service_healthy
-        required: false
-      ruciodb:
-        condition: service_healthy
-        required: false
-      postgres14:
-        condition: service_healthy
-        required: false
-      elasticsearch:
-        condition: service_healthy
-        required: false
-      influxdb:
-        condition: service_healthy
-        required: false
+      <<: *rucio-environment
+      PYTHONPATH: ""
+      RUCIO_CFG_CLIENT_RUCIO_HOST: https://rucio:443
+      RUCIO_CFG_CLIENT_AUTH_HOST: https://rucio:443
 
   # ------------------------------------------------------------------
   # Database, MQ, metrics, and other external services
   # ------------------------------------------------------------------
   ruciodb:
-    container_name: dev-ruciodb-1
     image: docker.io/postgres:14
     environment:
       - POSTGRES_USER=rucio
@@ -100,8 +83,9 @@ services:
       retries: 10
 
   graphite:
-    container_name: ${RUCIO_GRAPHITE_CONTAINER_NAME:-dev-graphite-1}
     image: docker.io/graphiteapp/graphite-statsd
+    profiles:
+      - test-dependencies
     volumes:
       - vol-graphite-conf:/opt/graphite/conf
       - vol-graphite-storage:/opt/graphite/storage
@@ -113,8 +97,9 @@ services:
       - vol-graphite-nginx:/etc/nginx
 
   influxdb:
-    container_name: ${RUCIO_INFLUXDB_CONTAINER_NAME:-dev-influxdb-1}
     image: docker.io/influxdb:latest
+    profiles:
+      - test-dependencies
     environment:
       - DOCKER_INFLUXDB_INIT_MODE=setup
       - DOCKER_INFLUXDB_INIT_USERNAME=myusername
@@ -132,8 +117,9 @@ services:
       retries: 5
 
   elasticsearch:
-    container_name: ${RUCIO_ELASTICSEARCH_CONTAINER_NAME:-dev-elasticsearch-1}
     image: docker.elastic.co/elasticsearch/elasticsearch:9.0.0
+    profiles:
+      - test-dependencies
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
@@ -148,54 +134,18 @@ services:
       retries: 10
 
   activemq:
-    container_name: ${RUCIO_ACTIVEMQ_CONTAINER_NAME:-dev-activemq-1}
     image: docker.io/apache/activemq-classic:5.18.7
     platform: linux/amd64
+    profiles:
+      - messaging
     volumes:
-      - ./activemq/users.properties:/opt/apache-activemq/conf/users.properties
+      - ./activemq/users.properties:/opt/apache-activemq/conf/users.properties:z
     environment:
       # web portal access, helpful for debugging
       ACTIVEMQ_WEB_USER: activemq
       ACTIVEMQ_WEB_PASSWORD: supersecret
 
-  postgres14:
-    container_name: ${RUCIO_POSTGRES14_CONTAINER_NAME:-dev-postgres14-1}
-    image: docker.io/postgres:14
-    profiles:
-      - postgres14
-    environment:
-      - POSTGRES_USER=rucio
-      - POSTGRES_DB=rucio
-      - POSTGRES_PASSWORD=rucio
-    command: ["-c", "fsync=off","-c", "synchronous_commit=off","-c", "full_page_writes=off"]
-    volumes:
-      - vol-postgres14-data:/var/lib/postgresql/data
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB || exit 1" ]
-      interval: 10s
-      timeout: 5s
-      start_period: 30s
-      retries: 10
-
-  mysql8:
-    container_name: ${RUCIO_MYSQL8_CONTAINER_NAME:-dev-mysql8-1}
-    image: docker.io/mysql:8.3
-    profiles:
-      - mysql8
-    environment:
-      - MYSQL_USER=rucio
-      - MYSQL_PASSWORD=rucio
-      - MYSQL_ROOT_PASSWORD=rucio
-      - MYSQL_DATABASE=rucio
-      - MYSQL_TCP_PORT=3308
-    command:
-      - "--default-authentication-plugin=mysql_native_password"
-      - "--character-set-server=latin1"
-    volumes:
-      - vol-mysql8-mysql:/var/lib/mysql
-
   oracle:
-    container_name: ${RUCIO_ORACLE_CONTAINER_NAME:-dev-oracle-1}
     image: docker.io/gvenzl/oracle-xe:18.4.0
     platform: linux/amd64
     profiles:
@@ -203,7 +153,8 @@ services:
     environment:
       - ORACLE_PASSWORD=rucio
     volumes:
-      - ./oracle/01_tune_oracle_limits.sql:/container-entrypoint-initdb.d/01_tune_oracle_limits.sql:ro
+      - ./oracle/01_tune_oracle_limits.sql:/container-entrypoint-initdb.d/01_tune_oracle_limits.sql:ro,z
+      - vol-oracle-data:/opt/oracle/oradata
     healthcheck:
       test: [ "CMD-SHELL", "/opt/oracle/healthcheck.sh > /dev/null || exit 1" ]
       interval: 10s
@@ -215,18 +166,17 @@ services:
   # FTS and XRootD containers (test RSEs)
   # ------------------------------------------------------------------
   fts:
-    container_name: dev-fts-1
     image: "docker.io/${DOCKER_REPO:-rucio}/test-fts:${RUCIO_TAG:-latest}"
     platform: linux/amd64
     profiles:
       - storage
     volumes:
-      - ./fts/entrypoint.sh:/docker-entrypoint.sh:ro
-      - ../../certs/rucio_ca.pem:/etc/pki/ca-trust/source/anchors/rucio_ca.pem:ro
+      - ./fts/entrypoint.sh:/docker-entrypoint.sh:ro,z
+      - ../../certs/rucio_ca.pem:/etc/pki/ca-trust/source/anchors/rucio_ca.pem:ro,z
       - ../../certs/rucio_ca.pem:/etc/grid-security/certificates/5fca1cb1.0:z
-      - ../../certs/hostcert_fts.pem:/etc/grid-security/hostcert.pem:Z
-      - ../../certs/hostcert_fts.key.pem:/etc/grid-security/hostkey.pem:Z
-      - ./fts/fts3restconfig:/etc/fts3/fts3restconfig:ro
+      - ../../certs/hostcert_fts.pem:/etc/grid-security/hostcert.pem:z
+      - ../../certs/hostcert_fts.key.pem:/etc/grid-security/hostkey.pem:z
+      - ./fts/fts3restconfig:/etc/fts3/fts3restconfig:ro,z
     environment:
       - REQUESTS_CA_BUNDLE=/etc/pki/tls/certs/ca-bundle.crt
     ulimits:
@@ -235,7 +185,6 @@ services:
         hard: 10240
 
   ftsdb:
-    container_name: dev-ftsdb-1
     image: docker.io/mysql:8.3
     profiles:
       - storage
@@ -249,9 +198,7 @@ services:
       - vol-ftsdb-mysql:/var/lib/mysql
 
   xrd1:
-    container_name: dev-xrd1-1
     image: "docker.io/${DOCKER_REPO:-rucio}/test-xrootd:${RUCIO_TAG:-latest}"
-    platform: linux/amd64
     profiles:
       - storage
     environment:
@@ -259,17 +206,15 @@ services:
       - XRDPORT=1094
     volumes:
       - ../../certs/rucio_ca.pem:/etc/grid-security/certificates/5fca1cb1.0:z
-      - ../../certs/hostcert_xrd1.pem:/tmp/xrdcert.pem:Z
-      - ../../certs/hostcert_xrd1.key.pem:/tmp/xrdkey.pem:Z
+      - ../../certs/hostcert_xrd1.pem:/tmp/xrdcert.pem:z
+      - ../../certs/hostcert_xrd1.key.pem:/tmp/xrdkey.pem:z
     ulimits:
       nofile:
         soft: 10240
         hard: 10240
 
   xrd2:
-    container_name: dev-xrd2-1
     image: "docker.io/${DOCKER_REPO:-rucio}/test-xrootd:${RUCIO_TAG:-latest}"
-    platform: linux/amd64
     profiles:
       - storage
     environment:
@@ -277,17 +222,15 @@ services:
       - XRDPORT=1095
     volumes:
       - ../../certs/rucio_ca.pem:/etc/grid-security/certificates/5fca1cb1.0:z
-      - ../../certs/hostcert_xrd2.pem:/tmp/xrdcert.pem:Z
-      - ../../certs/hostcert_xrd2.key.pem:/tmp/xrdkey.pem:Z
+      - ../../certs/hostcert_xrd2.pem:/tmp/xrdcert.pem:z
+      - ../../certs/hostcert_xrd2.key.pem:/tmp/xrdkey.pem:z
     ulimits:
       nofile:
         soft: 10240
         hard: 10240
 
   xrd3:
-    container_name: dev-xrd3-1
     image: "docker.io/${DOCKER_REPO:-rucio}/test-xrootd:${RUCIO_TAG:-latest}"
-    platform: linux/amd64
     profiles:
       - storage
     environment:
@@ -295,17 +238,15 @@ services:
       - XRDPORT=1096
     volumes:
       - ../../certs/rucio_ca.pem:/etc/grid-security/certificates/5fca1cb1.0:z
-      - ../../certs/hostcert_xrd3.pem:/tmp/xrdcert.pem:Z
-      - ../../certs/hostcert_xrd3.key.pem:/tmp/xrdkey.pem:Z
+      - ../../certs/hostcert_xrd3.pem:/tmp/xrdcert.pem:z
+      - ../../certs/hostcert_xrd3.key.pem:/tmp/xrdkey.pem:z
     ulimits:
       nofile:
         soft: 10240
         hard: 10240
 
   xrd4:
-    container_name: dev-xrd4-1
     image: "docker.io/${DOCKER_REPO:-rucio}/test-xrootd:${RUCIO_TAG:-latest}"
-    platform: linux/amd64
     profiles:
       - storage
     environment:
@@ -313,17 +254,15 @@ services:
       - XRDPORT=1097
     volumes:
       - ../../certs/rucio_ca.pem:/etc/grid-security/certificates/5fca1cb1.0:z
-      - ../../certs/hostcert_xrd4.pem:/tmp/xrdcert.pem:Z
-      - ../../certs/hostcert_xrd4.key.pem:/tmp/xrdkey.pem:Z
+      - ../../certs/hostcert_xrd4.pem:/tmp/xrdcert.pem:z
+      - ../../certs/hostcert_xrd4.key.pem:/tmp/xrdkey.pem:z
     ulimits:
       nofile:
         soft: 10240
         hard: 10240
 
   xrd5:
-    container_name: dev-xrd5-1
     image: "docker.io/${DOCKER_REPO:-rucio}/test-xrootd:${RUCIO_TAG:-latest}"
-    platform: linux/amd64
     profiles:
       - storage
     environment:
@@ -334,39 +273,38 @@ services:
       - QBITTORRENT_UI_PORT=8098
       - QBITTORRENT_LISTEN_PORT=10000
     volumes:
-      - ./xrd/entrypoint.sh:/docker-entrypoint.sh:ro
-      - ./xrd:/configs:ro
-      - ./configure_qbittorrent.py:/configure_qbittorrent.py:ro
+      - ./xrd/entrypoint.sh:/docker-entrypoint.sh:ro,z
+      - ./xrd:/configs:ro,z
+      - ./configure_qbittorrent.py:/configure_qbittorrent.py:ro,z
       - ../../certs/rucio_ca.pem:/etc/grid-security/certificates/5fca1cb1.0:z
-      - ../../certs/hostcert_xrd5.pem:/tmp/xrdcert.pem:Z
-      - ../../certs/hostcert_xrd5.key.pem:/tmp/xrdkey.pem:Z
+      - ../../certs/hostcert_xrd5.pem:/tmp/xrdcert.pem:z
+      - ../../certs/hostcert_xrd5.key.pem:/tmp/xrdkey.pem:z
     ulimits:
       nofile:
         soft: 10240
         hard: 10240
 
   web1:
-    container_name: ${RUCIO_WEB1_CONTAINER_NAME:-dev-web1-1}
     image: "docker.io/${DOCKER_REPO:-rucio}/test-webdav:latest"
-    platform: linux/amd64
+    profiles:
+      - storage
     environment:
       - QBITTORRENT_UI_USERNAME=rucio
       - QBITTORRENT_UI_PASSWORD=rucio90df
       - QBITTORRENT_UI_PORT=8099
       - QBITTORRENT_LISTEN_PORT=10000
     volumes:
-      - ./web1/entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro
-      - ./configure_qbittorrent.py:/configure_qbittorrent.py:ro
-      - ../../certs/rucio_ca.pem:/etc/grid-security/certificates/5fca1cb1.0:ro
-      - ../../certs/hostcert_web1.key.pem:/etc/grid-security/hostkey.pem:ro
-      - ../../certs/hostcert_web1.pem:/etc/grid-security/hostcert.pem:Z
-      - ./web1/default-ssl.conf:/etc/apache2/sites-available/default-ssl.conf
+      - ./web1/entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro,z
+      - ./configure_qbittorrent.py:/configure_qbittorrent.py:ro,z
+      - ../../certs/rucio_ca.pem:/etc/grid-security/certificates/5fca1cb1.0:ro,z
+      - ../../certs/hostcert_web1.key.pem:/etc/grid-security/hostkey.pem:ro,z
+      - ../../certs/hostcert_web1.pem:/etc/grid-security/hostcert.pem:z
+      - ./web1/default-ssl.conf:/etc/apache2/sites-available/default-ssl.conf:z
 
   # ------------------------------------------------------------------
   # Other services
   # ------------------------------------------------------------------
   minio:
-    container_name: dev-minio-1
     image: docker.io/minio/minio
     profiles:
       - storage
@@ -375,24 +313,21 @@ services:
       - MINIO_ROOT_PASSWORD=password
     volumes:
       - vol-minio-data:/data
-      - ../../certs/hostcert_minio.pem:/root/.minio/certs/public.crt:Z
-      - ../../certs/hostcert_minio.key.pem:/root/.minio/certs/private.key:Z
+      - ../../certs/hostcert_minio.pem:/root/.minio/certs/public.crt:z
+      - ../../certs/hostcert_minio.key.pem:/root/.minio/certs/private.key:z
     command: ["server", "/data"]
 
   ssh1:
-    container_name: dev-ssh1-1
     image: "docker.io/${DOCKER_REPO:-rucio}/test-ssh:${RUCIO_TAG:-latest}"
-    platform: linux/amd64
     profiles:
       - storage
     volumes:
-      - ../../certs/ssh/ruciouser_sshkey.pub:/tmp/sshkey.pub:Z
+      - ../../certs/ssh/ruciouser_sshkey.pub:/tmp/sshkey.pub:z
 
   # ------------------------------------------------------------------
   # External metadata services
   # ------------------------------------------------------------------
   mongo:
-    container_name: dev-mongo-1
     image: docker.io/mongo:5.0
     profiles:
       - externalmetadata
@@ -404,7 +339,6 @@ services:
       - vol-mongo-db:/data/db
 
   mongo-noauth:
-    container_name: dev-mongo-noauth-1
     image: docker.io/mongo:5.0
     profiles:
       - externalmetadata
@@ -413,7 +347,6 @@ services:
       - vol-mongo-noauth-db:/data/db
 
   postgres:
-    container_name: dev-postgres-1
     image: docker.io/postgres:14
     profiles:
       - externalmetadata
@@ -426,7 +359,6 @@ services:
       - vol-postgres-data:/var/lib/postgresql/data
 
   elasticsearch_meta:
-    container_name: dev-elasticsearch_meta-1
     image: docker.elastic.co/elasticsearch/elasticsearch:8.15.0
     platform: linux/amd64
     profiles:
@@ -441,35 +373,9 @@ services:
       - cluster.routing.allocation.disk.threshold_enabled=false
 
   # ------------------------------------------------------------------
-  # Monitoring stack
-  # ------------------------------------------------------------------
-  logstash:
-    container_name: dev-logstash-1
-    image: docker.elastic.co/logstash/logstash-oss:7.3.2
-    platform: linux/amd64
-    profiles:
-      - monitoring
-    command: bash -c "logstash-plugin install logstash-input-stomp ; /usr/local/bin/docker-entrypoint"
-    volumes:
-      - ./pipeline.conf:/usr/share/logstash/pipeline/pipeline.conf:Z
-
-  kibana:
-    container_name: dev-kibana-1
-    image: docker.io/kibana:7.4.0
-    profiles:
-      - monitoring
-
-  grafana:
-    container_name: dev-grafana-1
-    image: docker.io/grafana/grafana:latest
-    profiles:
-      - monitoring
-
-  # ------------------------------------------------------------------
   # IAM / Keycloak for auth
   # ------------------------------------------------------------------
   iam-db:
-    container_name: dev-iam-db-1
     image: mariadb:10.11
     profiles:
       - iam
@@ -481,13 +387,12 @@ services:
       - TZ=Europe/Paris
       - MARIADB_ROOT_PASSWORD=supersecret
     volumes:
-      - ./iam/dbs_and_users.sql:/docker-entrypoint-initdb.d/01_dbs_and_users.sql:ro
-      - ./iam/keycloak_db.sql:/docker-entrypoint-initdb.d/02_keycloak.sql:ro
-      - ./iam/indigoiam_db.sql:/docker-entrypoint-initdb.d/03_indigoiam.sql:ro
+      - ./iam/dbs_and_users.sql:/docker-entrypoint-initdb.d/01_dbs_and_users.sql:ro,z
+      - ./iam/keycloak_db.sql:/docker-entrypoint-initdb.d/02_keycloak.sql:ro,z
+      - ./iam/indigoiam_db.sql:/docker-entrypoint-initdb.d/03_indigoiam.sql:ro,z
       - vol-iam-db-mysql:/var/lib/mysql
 
   indigoiam:
-    container_name: dev-indigoiam-1
     image: nginx
     profiles:
       - iam
@@ -501,12 +406,11 @@ services:
       - ../../certs/hostcert_indigoiam.pem:/etc/grid-security/hostcert.pem:z
       - ../../certs/hostcert_indigoiam.key.pem:/etc/grid-security/hostkey.pem:z
       - /dev/urandom:/dev/random
-      - ./iam/indigoiam_nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./iam/indigoiam_nginx.conf:/etc/nginx/conf.d/default.conf:ro,z
     depends_on:
       - indigoiam-login-service
 
   indigoiam-login-service:
-    container_name: dev-indigoiam-login-service-1
     image: indigoiam/iam-login-service:v1.8.2p2
     platform: linux/amd64
     profiles:
@@ -537,13 +441,12 @@ services:
       - IAM_DB_USERNAME=indigoiam
       - IAM_DB_PASSWORD=secret
     volumes:
-      - ./iam/indigoiam_keystore.jwks:/keystore.jwks:ro
+      - ./iam/indigoiam_keystore.jwks:/keystore.jwks:ro,z
     depends_on:
       iam-db:
         condition: service_healthy
 
   keycloak:
-    container_name: dev-keycloak-1
     image: quay.io/keycloak/keycloak:23.0.1
     command: start-dev --features=token-exchange,admin-fine-grained-authz,dynamic-scopes --db mariadb --db-url-host iam-db --db-username keycloak --db-password secret --https-certificate-file=/cert.pem --https-certificate-key-file=/key.pem
     profiles:
@@ -564,6 +467,8 @@ volumes:
   # Named volumes for each container
   # ------------------------------------------------------------------
   vol-ruciodb-data:
+    labels:
+      rucio.test.database: postgres14
   vol-graphite-conf:
   vol-graphite-storage:
   vol-graphite-functions:
@@ -576,13 +481,14 @@ volumes:
   vol-influxdb-var:
   vol-ftsdb-mysql:
   vol-minio-data:
-  vol-postgres14-data:
   vol-mongo-noauth-configdb:
   vol-mongo-noauth-db:
   vol-mongo-configdb:
   vol-mongo-db:
   vol-iam-db-mysql:
-  vol-mysql8-mysql:
+  vol-oracle-data:
+    labels:
+      rucio.test.database: oracle
   vol-postgres-data:
 
 networks:

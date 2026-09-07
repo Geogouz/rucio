@@ -58,7 +58,7 @@ def rse_update(
         once=once,
         graceful_stop=graceful_stop,
         executable=DAEMON_NAME,
-        partition_wait_time=1,
+        partition_wait_time=0 if once else 1,
         sleep_time=sleep_time,
         run_once_fnc=run_once,
     )

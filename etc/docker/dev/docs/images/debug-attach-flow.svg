@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080" role="img" aria-labelledby="title description">
+  <title id="title">Rucio debugger attachment flow</title>
+  <desc id="description">VS Code, PyCharm, or a terminal launches tools dev. The toolbox starts a container target under debugpy, publishes loopback port 5678, and waits. The IDE attaches using a source path mapping, runs breakpoints and inspection, and disconnects. Workspace targets restore the base workspace; isolated tests remove their test project.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto"><path d="M0 0 L12 6 L0 12 Z" fill="#24736b"/></marker>
+  </defs>
+  <rect width="1920" height="1080" fill="#f4f7f6"/>
+  <text x="90" y="88" fill="#102a26" font-family="Arial, sans-serif" font-size="46" font-weight="700">Debug the container runtime from either IDE</text>
+  <text x="90" y="137" fill="#506762" font-family="Arial, sans-serif" font-size="25">A single DAP contract keeps launch and path mapping consistent; cleanup follows the target type.</text>
+
+  <rect x="90" y="202" width="1740" height="700" rx="28" fill="#ffffff" stroke="#cbd8d5" stroke-width="3"/>
+  <rect x="90" y="202" width="1740" height="106" rx="28" fill="#163d37"/>
+  <rect x="90" y="280" width="1740" height="28" fill="#163d37"/>
+  <text x="154" y="268" fill="#ffffff" font-family="Arial, sans-serif" font-size="28" font-weight="700">IDE / developer terminal</text>
+  <text x="1092" y="268" fill="#ffffff" font-family="Arial, sans-serif" font-size="28" font-weight="700">Container target</text>
+  <line x1="960" y1="308" x2="960" y2="902" stroke="#cbd8d5" stroke-width="3" stroke-dasharray="10 12"/>
+
+  <g font-family="Arial, sans-serif">
+    <rect x="150" y="358" width="650" height="106" rx="18" fill="#e2f1ee"/>
+    <text x="184" y="401" fill="#102a26" font-size="25" font-weight="700">1 · Launch a bounded target</text>
+    <text x="184" y="437" fill="#506762" font-size="20">test · daemon --run-once · Flask server · command</text>
+
+    <rect x="1110" y="358" width="570" height="106" rx="18" fill="#eaf0f7"/>
+    <text x="1144" y="401" fill="#102a26" font-size="25" font-weight="700">2 · Start under debugpy</text>
+    <text x="1144" y="437" fill="#506762" font-size="20">wait before user code · publish 127.0.0.1:5678</text>
+
+    <rect x="150" y="518" width="650" height="132" rx="18" fill="#f3eaf4"/>
+    <text x="184" y="561" fill="#102a26" font-size="25" font-weight="700">3 · Attach with DAP</text>
+    <text x="184" y="598" fill="#506762" font-size="20">VS Code F5 or PyCharm “Attach to DAP”</text>
+    <text x="184" y="628" fill="#506762" font-family="monospace" font-size="19">local checkout ⇄ /rucio_source</text>
+
+    <rect x="1110" y="518" width="570" height="132" rx="18" fill="#f1ece2"/>
+    <text x="1144" y="561" fill="#102a26" font-size="25" font-weight="700">4 · Investigate real code</text>
+    <text x="1144" y="598" fill="#506762" font-size="20">breakpoints · stack · variables · watches</text>
+    <text x="1144" y="628" fill="#506762" font-size="20">same dependencies and services as normal execution</text>
+
+    <rect x="150" y="712" width="650" height="106" rx="18" fill="#e9f0ed"/>
+    <text x="184" y="755" fill="#102a26" font-size="25" font-weight="700">5 · Stop launcher and attachment</text>
+    <text x="184" y="791" fill="#506762" font-size="20">The target exit status remains visible in its terminal.</text>
+
+    <rect x="1110" y="712" width="570" height="106" rx="18" fill="#e2f1ee"/>
+    <text x="1144" y="755" fill="#102a26" font-size="25" font-weight="700">6 · Target-specific cleanup</text>
+    <text x="1144" y="791" fill="#506762" font-size="20">restore workspace or remove the isolated test project</text>
+  </g>
+
+  <path d="M800 411 H1088" stroke="#24736b" stroke-width="5" fill="none" marker-end="url(#arrow)"/>
+  <path d="M1110 584 H822" stroke="#24736b" stroke-width="5" fill="none" marker-end="url(#arrow)"/>
+  <path d="M800 765 H1088" stroke="#24736b" stroke-width="5" fill="none" marker-end="url(#arrow)"/>
+
+  <rect x="90" y="940" width="1740" height="90" rx="18" fill="#fff6dc" stroke="#e4c55c" stroke-width="2"/>
+  <text x="130" y="995" fill="#5a4611" font-family="Arial, sans-serif" font-size="23" font-weight="700">Scope: Python application code in the container runtime. Apache/mod_wsgi and production TLS termination are outside this path.</text>
+</svg>

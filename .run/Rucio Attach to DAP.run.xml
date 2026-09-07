@@ -1,0 +1,9 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Rucio: Attach to DAP" type="PythonDapAttachConfiguration" factoryName="Attach to DAP">
+    <option name="remoteAddress" value="127.0.0.1:5678" />
+    <option name="justMyCode" value="false" />
+    <option name="localRoot" value="$PROJECT_DIR$" />
+    <option name="remoteRoot" value="/rucio_source" />
+    <method v="2" />
+  </configuration>
+</component>

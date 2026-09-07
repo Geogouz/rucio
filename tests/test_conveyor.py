@@ -915,7 +915,7 @@ def test_stager(rse_factory, did_factory, root_account, replica_client):
 @pytest.mark.noparallel(groups=[NoParallelGroups.SUBMITTER, NoParallelGroups.FINISHER])
 def test_transfer_to_mas_existing_replica(rse_factory, did_factory, root_account, jdoe_account):
     """
-    Test qos: transfer from tape to disk
+    Test transfer from tape to disk
     Assert rse maximum_pin_lifetime is passed to transfer tool in the transfer request
     Test rule and lock state transitions
     """
@@ -978,7 +978,7 @@ def test_transfer_to_mas_existing_replica(rse_factory, did_factory, root_account
 @pytest.mark.noparallel(groups=[NoParallelGroups.SUBMITTER, NoParallelGroups.POLLER, NoParallelGroups.FINISHER])
 def test_failed_transfers_to_mas_existing_replica(rse_factory, did_factory, root_account, jdoe_account):
     """
-    Test qos: transfer from tape to disk
+    Test transfer from tape to disk
     Assert rse maximum_pin_lifetime is passed to transfer tool in the transfer request
     Test rule and lock state transitions
     """
@@ -1682,7 +1682,7 @@ def test_transfer_with_tokens(vo, did_factory, root_account, caches_mock, file_c
             RECEIVER_GRACEFUL_STOP.clear()
 
 
-@pytest.mark.noparallel(groups=[NoParallelGroups.PREPARER])
+@pytest.mark.noparallel(reason="dependency cleanup touches shared transfer rows")
 @pytest.mark.parametrize("file_config_mock", [{
     "overrides": [('conveyor', 'use_preparer', 'true')]
 }], indirect=True)

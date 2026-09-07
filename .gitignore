@@ -44,6 +44,8 @@ examples/whip/results/
 cache/
 changed_files.txt
 docs/
+!etc/docker/dev/docs/
+!etc/docker/dev/docs/**
 *.egg-info
 
 # Backup and temp files
@@ -52,8 +54,9 @@ docs/
 *.swp
 *~
 .venv
+/.venv.backup-*
+/.venv.tmp-*
 lib/rucio/vcsversion.py
-pylint.out
 
 # Mac OS X Finder
 .DS_Store
@@ -63,13 +66,23 @@ tools/test.file.1G
 
 # autotest logs/data
 /.autotest
+/.rucio-dev/
 
 # JetBrains IDE
 .idea/
 
-# VSCode
-.vscode/
+# VSCode local state; keep the shared project configuration tracked
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/settings.json
+!.vscode/tasks.json
 
 # Node.js dependencies for commitlint
 node_modules/
 package-lock.json
+
+# Rucio container log capture
+/.test-logs/
+# Rucio pytest / CI junit output
+/test-results/

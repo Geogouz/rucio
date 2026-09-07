@@ -14,18 +14,24 @@
 # limitations under the License.
 
 CFG_PATH="$RUCIO_SOURCE_DIR/etc/docker/test/extra"
+DEV_CFG="$RUCIO_SOURCE_DIR/etc/docker/dev/rucio/rucio_dev.cfg"
 if [ -z "$RUCIO_HOME" ]; then
     RUCIO_HOME=/opt/rucio
 fi
 
 mkdir -p "$RUCIO_HOME/etc"
 
-generate_rucio_cfg(){
-  	local override=$1
-  	local destination=$2
+generate_rucio_cfg() {
+    local destination=$1
+    shift
+    local sources=("$@")
 
-    python3 $RUCIO_SOURCE_DIR/tools/merge_rucio_configs.py --use-env \
-        -s "$CFG_PATH/rucio_autotests_common.cfg" "$override" \
+    if [ "${RUCIO_PYTEST_INNER:-}" != "1" ]; then
+        sources+=("$DEV_CFG")
+    fi
+
+    python3 "$RUCIO_SOURCE_DIR/tools/merge_rucio_configs.py" --use-env \
+        -s "${sources[@]}" \
         -d "$destination"
 }
 
@@ -40,25 +46,20 @@ fi
 echo "Generating alembic.ini and rucio.cfg"
 
 if [ -z "$RDBMS" ]; then
-    cp "$CFG_PATH/rucio_default.cfg" $RUCIO_HOME/etc/rucio.cfg
-    cp "$CFG_PATH/alembic_default.ini" $RUCIO_HOME/etc/alembic.ini
+    generate_rucio_cfg "$RUCIO_HOME/etc/rucio.cfg" "$CFG_PATH/rucio_default.cfg"
+    cp "$CFG_PATH/alembic_default.ini" "$RUCIO_HOME/etc/alembic.ini"
 
 elif [ "$RDBMS" == "oracle" ]; then
-    generate_rucio_cfg "$CFG_PATH/rucio_oracle.cfg" $RUCIO_HOME/etc/rucio.cfg
-    cp "$CFG_PATH/alembic_oracle.ini" $RUCIO_HOME/etc/alembic.ini
-
-elif [ "$RDBMS" == "mysql8" ]; then
-    generate_rucio_cfg "$CFG_PATH/rucio_mysql8.cfg" $RUCIO_HOME/etc/rucio.cfg
-    cp "$CFG_PATH/alembic_mysql8.ini" $RUCIO_HOME/etc/alembic.ini
-
-elif [ "$RDBMS" == "sqlite" ]; then
-    generate_rucio_cfg "$CFG_PATH/rucio_sqlite.cfg" $RUCIO_HOME/etc/rucio.cfg
-    cp "$CFG_PATH/alembic_sqlite.ini" $RUCIO_HOME/etc/alembic.ini
+    generate_rucio_cfg "$RUCIO_HOME/etc/rucio.cfg" "$CFG_PATH/rucio_autotests_common.cfg" "$CFG_PATH/rucio_oracle.cfg"
+    cp "$CFG_PATH/alembic_oracle.ini" "$RUCIO_HOME/etc/alembic.ini"
 
 elif [ "$RDBMS" == "postgres14" ]; then
-    generate_rucio_cfg "$CFG_PATH/rucio_postgres14.cfg" $RUCIO_HOME/etc/rucio.cfg
-    cp "$CFG_PATH/alembic_postgres14.ini" $RUCIO_HOME/etc/alembic.ini
+    generate_rucio_cfg "$RUCIO_HOME/etc/rucio.cfg" "$CFG_PATH/rucio_autotests_common.cfg" "$CFG_PATH/rucio_postgres14.cfg"
+    cp "$CFG_PATH/alembic_default.ini" "$RUCIO_HOME/etc/alembic.ini"
 
+else
+    echo "Unsupported RDBMS: $RDBMS" >&2
+    exit 1
 fi
 
 update-ca-trust
