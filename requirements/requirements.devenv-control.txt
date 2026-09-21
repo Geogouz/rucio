@@ -1,0 +1,11 @@
+# Host-side dependencies used only by ./tools/dev to invoke the canonical test adapter.
+coverage==7.10.7
+execnet==2.1.2
+iniconfig==2.1.0
+packaging==26.2
+pluggy==1.6.0
+pytest==7.4.3
+pytest-cov==7.1.0
+pytest-rerunfailures==16.0.1
+pytest-xdist==3.5.0
+PyYAML==6.0.3

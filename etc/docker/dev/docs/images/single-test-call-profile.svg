@@ -1,0 +1,167 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-labelledby="title description">
+  <title id="title">Single-test Python call profile</title>
+  <desc id="description">A static vector rendering of genuine Yappi call-profile data for one passing Rucio ping REST test. It shows 15,900 functions, 3,076,039 calls, 15.026221 measured seconds, setup-heavy cumulative timings, and a logarithmic zoom of the pytest setup, test function, and teardown.</desc>
+  <defs>
+    <linearGradient id="header" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#14284a"/>
+      <stop offset="1" stop-color="#244f78"/>
+    </linearGradient>
+    <linearGradient id="bar-blue" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#3275e8"/>
+      <stop offset="1" stop-color="#65a6ff"/>
+    </linearGradient>
+    <linearGradient id="bar-teal" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#188f91"/>
+      <stop offset="1" stop-color="#3fc0b4"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="5" stdDeviation="8" flood-color="#16243a" flood-opacity="0.10"/>
+    </filter>
+    <style>
+      text { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #172033; }
+      .mono { font-variant-numeric: tabular-nums; }
+      .eyebrow { font-size: 16px; font-weight: 700; letter-spacing: 2.2px; }
+      .title { font-size: 42px; font-weight: 750; }
+      .subtitle { font-size: 20px; }
+      .section { font-size: 23px; font-weight: 750; }
+      .body { font-size: 17px; }
+      .small { font-size: 14px; }
+      .metric { font-size: 30px; font-weight: 750; }
+      .metric-label { font-size: 15px; fill: #667187; }
+      .label { font-size: 16px; font-weight: 650; }
+      .value { font-size: 15px; font-weight: 700; }
+      .muted { fill: #667187; }
+      .white { fill: #ffffff; }
+      .grid { stroke: #dce3ed; stroke-width: 1; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="900" fill="#f4f7fb"/>
+  <rect width="1600" height="170" fill="url(#header)"/>
+  <circle cx="1490" cy="-10" r="190" fill="#65a6ff" opacity="0.10"/>
+  <circle cx="1370" cy="130" r="110" fill="#3fc0b4" opacity="0.08"/>
+
+  <text x="64" y="45" class="eyebrow white" opacity="0.74">RUCIO DEVELOPER TOOLBOX</text>
+  <text x="64" y="96" class="title white">Single-test call profile</text>
+  <text x="64" y="132" class="subtitle white" opacity="0.82">Ping REST test · PostgreSQL 14 · Python 3.10</text>
+  <g transform="translate(1370 55)">
+    <rect width="166" height="52" rx="26" fill="#dff7ed"/>
+    <circle cx="27" cy="26" r="8" fill="#18865d"/>
+    <text x="48" y="33" font-size="18" font-weight="750" fill="#126344">PASSED</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="64" y="194" width="1472" height="104" rx="18" fill="#ffffff"/>
+  </g>
+  <g class="mono">
+    <text x="104" y="238" class="metric">15,900</text>
+    <text x="104" y="267" class="metric-label">profiled functions</text>
+    <line x1="382" y1="216" x2="382" y2="276" stroke="#e2e7ef"/>
+
+    <text x="422" y="238" class="metric">3,076,039</text>
+    <text x="422" y="267" class="metric-label">function calls</text>
+    <line x1="742" y1="216" x2="742" y2="276" stroke="#e2e7ef"/>
+
+    <text x="782" y="238" class="metric">15.026221 s</text>
+    <text x="782" y="267" class="metric-label">measured profile time</text>
+    <line x1="1112" y1="216" x2="1112" y2="276" stroke="#e2e7ef"/>
+
+    <text x="1152" y="238" class="metric">1</text>
+    <text x="1152" y="267" class="metric-label">selected test</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="64" y="326" width="900" height="510" rx="20" fill="#ffffff"/>
+  </g>
+  <text x="100" y="372" class="section">Where cumulative time accumulates</text>
+  <text x="100" y="401" class="body muted">Inclusive rows reveal the setup path; nested timings overlap.</text>
+
+  <g>
+    <line x1="350" y1="430" x2="350" y2="785" class="grid"/>
+    <line x1="520" y1="430" x2="520" y2="785" class="grid"/>
+    <line x1="689" y1="430" x2="689" y2="785" class="grid"/>
+    <line x1="859" y1="430" x2="859" y2="785" class="grid"/>
+    <text x="350" y="421" text-anchor="middle" class="small muted mono">0 s</text>
+    <text x="520" y="421" text-anchor="middle" class="small muted mono">5 s</text>
+    <text x="689" y="421" text-anchor="middle" class="small muted mono">10 s</text>
+    <text x="859" y="421" text-anchor="middle" class="small muted mono">15 s</text>
+  </g>
+
+  <g class="mono">
+    <text x="100" y="471" class="label">Pytest session</text>
+    <rect x="350" y="451" width="510" height="28" rx="7" fill="#edf1f7"/>
+    <rect x="350" y="451" width="504.34" height="28" rx="7" fill="url(#bar-blue)"/>
+    <text x="881" y="471" class="value">14.859420 s</text>
+
+    <text x="100" y="527" class="label">Environment setup</text>
+    <rect x="350" y="507" width="510" height="28" rx="7" fill="#edf1f7"/>
+    <rect x="350" y="507" width="460.05" height="28" rx="7" fill="url(#bar-teal)"/>
+    <text x="881" y="527" class="value">13.554480 s</text>
+
+    <text x="100" y="583" class="label">Alembic migration</text>
+    <rect x="350" y="563" width="510" height="28" rx="7" fill="#edf1f7"/>
+    <rect x="350" y="563" width="158.84" height="28" rx="7" fill="#d99a38"/>
+    <text x="881" y="583" class="value">4.680011 s</text>
+
+    <text x="100" y="639" class="label">Memcached readiness</text>
+    <rect x="350" y="619" width="510" height="28" rx="7" fill="#edf1f7"/>
+    <rect x="350" y="619" width="34.21" height="28" rx="7" fill="#7d69c4"/>
+    <text x="881" y="639" class="value">1.008016 s</text>
+
+    <text x="100" y="695" class="label">Database reset</text>
+    <rect x="350" y="675" width="510" height="28" rx="7" fill="#edf1f7"/>
+    <rect x="350" y="675" width="33.50" height="28" rx="7" fill="#40a9bd"/>
+    <text x="881" y="695" class="value">0.986917 s</text>
+
+    <text x="100" y="751" class="label">Test protocol</text>
+    <rect x="350" y="731" width="510" height="28" rx="7" fill="#edf1f7"/>
+    <rect x="350" y="731" width="26.98" height="28" rx="7" fill="#239a73"/>
+    <text x="881" y="751" class="value">0.794970 s</text>
+  </g>
+  <text x="100" y="805" class="small muted">Bar scale: 0–15.026221 seconds · Values are cumulative, not additive.</text>
+
+  <g filter="url(#shadow)">
+    <rect x="992" y="326" width="544" height="510" rx="20" fill="#ffffff"/>
+  </g>
+  <text x="1028" y="372" class="section">Test protocol zoom</text>
+  <text x="1028" y="401" class="body muted">Logarithmic scale exposes the actual test call.</text>
+
+  <g>
+    <line x1="1055" y1="445" x2="1465" y2="445" class="grid"/>
+    <line x1="1055" y1="445" x2="1055" y2="651" class="grid"/>
+    <line x1="1137" y1="445" x2="1137" y2="651" class="grid"/>
+    <line x1="1219" y1="445" x2="1219" y2="651" class="grid"/>
+    <line x1="1301" y1="445" x2="1301" y2="651" class="grid"/>
+    <line x1="1383" y1="445" x2="1383" y2="651" class="grid"/>
+    <line x1="1465" y1="445" x2="1465" y2="651" class="grid"/>
+    <text x="1055" y="435" text-anchor="middle" class="small muted mono">0.01</text>
+    <text x="1137" y="435" text-anchor="middle" class="small muted mono">0.1</text>
+    <text x="1219" y="435" text-anchor="middle" class="small muted mono">1</text>
+    <text x="1301" y="435" text-anchor="middle" class="small muted mono">10</text>
+    <text x="1383" y="435" text-anchor="middle" class="small muted mono">100</text>
+    <text x="1465" y="435" text-anchor="middle" class="small muted mono">1,000 ms</text>
+  </g>
+
+  <g class="mono">
+    <text x="1028" y="490" class="label">Setup</text>
+    <line x1="1055" y1="512" x2="1465" y2="512" stroke="#edf1f7" stroke-width="8" stroke-linecap="round"/>
+    <circle cx="1451.63" cy="512" r="10" fill="#188f91" stroke="#ffffff" stroke-width="4"/>
+    <text x="1465" y="490" text-anchor="end" class="value">790.530 ms</text>
+
+    <text x="1028" y="556" class="label">Test function</text>
+    <line x1="1055" y1="578" x2="1465" y2="578" stroke="#edf1f7" stroke-width="8" stroke-linecap="round"/>
+    <circle cx="1241.08" cy="578" r="10" fill="#3275e8" stroke="#ffffff" stroke-width="4"/>
+    <text x="1465" y="556" text-anchor="end" class="value">2.139 ms</text>
+
+    <text x="1028" y="622" class="label">Teardown</text>
+    <line x1="1055" y1="644" x2="1465" y2="644" stroke="#edf1f7" stroke-width="8" stroke-linecap="round"/>
+    <circle cx="1130.17" cy="644" r="10" fill="#d99a38" stroke="#ffffff" stroke-width="4"/>
+    <text x="1465" y="622" text-anchor="end" class="value">0.095 ms</text>
+  </g>
+
+  <rect x="1028" y="688" width="472" height="104" rx="15" fill="#eef7f6"/>
+  <circle cx="1060" cy="720" r="10" fill="#188f91"/>
+  <text x="1082" y="726" class="label">Setup-bound profile</text>
+  <text x="1060" y="758" class="body">13.554480 s reaches environment setup;</text>
+  <text x="1060" y="782" class="body">the selected test function completes in 2.139 ms.</text>
+</svg>

@@ -14,10 +14,6 @@
 # limitations under the License.
 
 # Run this once to set up the database.
-#   PYTHONPATH=/opt/rucio/.venv/lib/python2.7/site-packages/rucio python tools/bootstrap.py
-#
-# Verify for default SQLite:
-#   for i in `sqlite3 /tmp/rucio.db ".tables"`; do echo $i:; sqlite3 /tmp/rucio.db "select * from $i"; echo; done
 
 import os.path
 import sys

@@ -1,0 +1,4 @@
+services:
+  rucio:
+    ports:
+      - "127.0.0.1:${RUCIO_DEBUG_PORT:-5678}:5678"

@@ -1,0 +1,197 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1050" role="img" aria-labelledby="title description">
+  <title id="title">Full PostgreSQL test performance report</title>
+  <desc id="description">A static vector rendering of genuine report data from a comparable Rucio remote database test run with PostgreSQL 14 and four workers: 1,624 tests, no failures, a 721.4 second pytest wall time, runtime quantiles, and concentration of 76.4 percent of summed test time in the slowest five percent.</desc>
+  <defs>
+    <linearGradient id="header" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#14284a"/>
+      <stop offset="1" stop-color="#245b74"/>
+    </linearGradient>
+    <linearGradient id="tail" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#d97835"/>
+      <stop offset="1" stop-color="#efad49"/>
+    </linearGradient>
+    <linearGradient id="runtime" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#2f6fdb"/>
+      <stop offset="1" stop-color="#5da2f2"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="5" stdDeviation="8" flood-color="#16243a" flood-opacity="0.10"/>
+    </filter>
+    <clipPath id="outcome-clip"><rect x="105" y="426" width="850" height="30" rx="9"/></clipPath>
+    <clipPath id="time-clip"><rect x="1064" y="458" width="430" height="34" rx="10"/></clipPath>
+    <clipPath id="tail-clip"><rect x="104" y="848" width="620" height="38" rx="11"/></clipPath>
+    <style>
+      text { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #172033; }
+      .mono { font-variant-numeric: tabular-nums; }
+      .eyebrow { font-size: 16px; font-weight: 700; letter-spacing: 2.2px; }
+      .title { font-size: 42px; font-weight: 750; }
+      .subtitle { font-size: 20px; }
+      .section { font-size: 23px; font-weight: 750; }
+      .body { font-size: 17px; }
+      .small { font-size: 14px; }
+      .metric { font-size: 30px; font-weight: 750; }
+      .metric-label { font-size: 15px; fill: #667187; }
+      .label { font-size: 16px; font-weight: 650; }
+      .value { font-size: 15px; font-weight: 700; }
+      .muted { fill: #667187; }
+      .white { fill: #ffffff; }
+      .grid { stroke: #dce3ed; stroke-width: 1; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="1050" fill="#f4f7fb"/>
+  <rect width="1600" height="170" fill="url(#header)"/>
+  <circle cx="1490" cy="-10" r="190" fill="#5da2f2" opacity="0.10"/>
+  <circle cx="1370" cy="130" r="110" fill="#3fc0b4" opacity="0.08"/>
+
+  <text x="64" y="45" class="eyebrow white" opacity="0.74">RUCIO DEVELOPER TOOLBOX</text>
+  <text x="64" y="96" class="title white">Full PostgreSQL performance report</text>
+  <text x="64" y="132" class="subtitle white" opacity="0.82">Remote database suite · PostgreSQL 14 · Python 3.10 · 4 fixed workers</text>
+  <g transform="translate(1296 54)">
+    <rect width="240" height="52" rx="26" fill="#dff7ed"/>
+    <circle cx="27" cy="26" r="8" fill="#18865d"/>
+    <text x="48" y="33" font-size="18" font-weight="750" fill="#126344">COMPARABLE · PASS</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="64" y="194" width="1472" height="104" rx="18" fill="#ffffff"/>
+  </g>
+  <g class="mono">
+    <text x="104" y="238" class="metric">1,624</text>
+    <text x="104" y="267" class="metric-label">tests</text>
+    <line x1="340" y1="216" x2="340" y2="276" stroke="#e2e7ef"/>
+
+    <text x="380" y="238" class="metric">1,242</text>
+    <text x="380" y="267" class="metric-label">passed</text>
+    <line x1="620" y1="216" x2="620" y2="276" stroke="#e2e7ef"/>
+
+    <text x="660" y="238" class="metric">376</text>
+    <text x="660" y="267" class="metric-label">skipped</text>
+    <line x1="900" y1="216" x2="900" y2="276" stroke="#e2e7ef"/>
+
+    <text x="940" y="238" class="metric">6</text>
+    <text x="940" y="267" class="metric-label">expected failures</text>
+    <line x1="1210" y1="216" x2="1210" y2="276" stroke="#e2e7ef"/>
+
+    <text x="1250" y="238" class="metric" fill="#18865d">0</text>
+    <text x="1250" y="267" class="metric-label">failed / errors</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="64" y="326" width="930" height="368" rx="20" fill="#ffffff"/>
+  </g>
+  <text x="104" y="372" class="section">Outcome and runtime distribution</text>
+  <text x="104" y="401" class="body muted">Every collected result, then duration landmarks on a log scale.</text>
+
+  <g clip-path="url(#outcome-clip)">
+    <rect x="105" y="426" width="650.18" height="30" fill="#238b68"/>
+    <rect x="755.18" y="426" width="196.68" height="30" fill="#6a83a8"/>
+    <rect x="951.86" y="426" width="3.14" height="30" fill="#d99a38"/>
+  </g>
+  <g class="small mono">
+    <circle cx="111" cy="485" r="6" fill="#238b68"/><text x="125" y="490">Passed 1,242</text>
+    <circle cx="275" cy="485" r="6" fill="#6a83a8"/><text x="289" y="490">Skipped 376</text>
+    <circle cx="449" cy="485" r="6" fill="#d99a38"/><text x="463" y="490">Xfailed 6</text>
+    <circle cx="600" cy="485" r="6" fill="#cbd3df"/><text x="614" y="490">Failed / errors 0</text>
+  </g>
+
+  <text x="104" y="535" class="label">Per-test duration landmarks</text>
+  <text x="955" y="535" text-anchor="end" class="small muted">seconds · logarithmic axis</text>
+  <line x1="130" y1="588" x2="950" y2="588" stroke="#8f9cb0" stroke-width="2"/>
+  <g class="small muted mono">
+    <line x1="130" y1="577" x2="130" y2="599" class="grid"/><text x="130" y="620" text-anchor="middle">0.001</text>
+    <line x1="294" y1="577" x2="294" y2="599" class="grid"/><text x="294" y="620" text-anchor="middle">0.01</text>
+    <line x1="458" y1="577" x2="458" y2="599" class="grid"/><text x="458" y="620" text-anchor="middle">0.1</text>
+    <line x1="622" y1="577" x2="622" y2="599" class="grid"/><text x="622" y="620" text-anchor="middle">1</text>
+    <line x1="786" y1="577" x2="786" y2="599" class="grid"/><text x="786" y="620" text-anchor="middle">10</text>
+    <line x1="950" y1="577" x2="950" y2="599" class="grid"/><text x="950" y="620" text-anchor="middle">100</text>
+  </g>
+  <g class="mono">
+    <line x1="228.74" y1="559" x2="228.74" y2="588" stroke="#238b68" stroke-width="2"/>
+    <circle cx="228.74" cy="588" r="8" fill="#238b68" stroke="#ffffff" stroke-width="3"/>
+    <text x="228.74" y="552" text-anchor="middle" class="value">Median 0.004 s</text>
+
+    <line x1="704.69" y1="559" x2="704.69" y2="588" stroke="#2f6fdb" stroke-width="2"/>
+    <circle cx="704.69" cy="588" r="8" fill="#2f6fdb" stroke="#ffffff" stroke-width="3"/>
+    <text x="704.69" y="552" text-anchor="middle" class="value">P95 3.193 s</text>
+
+    <line x1="810.22" y1="588" x2="810.22" y2="639" stroke="#7d69c4" stroke-width="2"/>
+    <circle cx="810.22" cy="588" r="8" fill="#7d69c4" stroke="#ffffff" stroke-width="3"/>
+    <text x="810.22" y="660" text-anchor="middle" class="value">P99 14.05 s</text>
+
+    <line x1="948.34" y1="559" x2="948.34" y2="588" stroke="#d97835" stroke-width="2"/>
+    <circle cx="948.34" cy="588" r="8" fill="#d97835" stroke="#ffffff" stroke-width="3"/>
+    <text x="948" y="552" text-anchor="end" class="value">Max 97.69 s</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="1022" y="326" width="514" height="368" rx="20" fill="#ffffff"/>
+  </g>
+  <text x="1062" y="372" class="section">Suite time budget</text>
+  <text x="1062" y="401" class="body muted">Elapsed harness time, split into pytest and overhead.</text>
+  <g clip-path="url(#time-clip)">
+    <rect x="1064" y="458" width="397.44" height="34" fill="url(#runtime)"/>
+    <rect x="1461.44" y="458" width="32.56" height="34" fill="#d99a38"/>
+  </g>
+  <text x="1064" y="445" class="small muted">0</text>
+  <text x="1494" y="445" text-anchor="end" class="small muted mono">780.5 s harness wall</text>
+
+  <g class="mono">
+    <circle cx="1068" cy="530" r="6" fill="#2f6fdb"/>
+    <text x="1084" y="535" class="label">Pytest wall</text>
+    <text x="1494" y="535" text-anchor="end" class="value">721.4 s</text>
+
+    <circle cx="1068" cy="568" r="6" fill="#d99a38"/>
+    <text x="1084" y="573" class="label">Harness overhead</text>
+    <text x="1494" y="573" text-anchor="end" class="value">59.13 s</text>
+
+    <line x1="1062" y1="595" x2="1496" y2="595" stroke="#e2e7ef"/>
+    <text x="1062" y="625" class="metric-label">Summed test time</text>
+    <text x="1494" y="625" text-anchor="end" class="value">1,272.1 s</text>
+    <text x="1062" y="656" class="metric-label">Effective concurrency</text>
+    <text x="1494" y="656" text-anchor="end" class="value">1.76×</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="64" y="722" width="720" height="280" rx="20" fill="#ffffff"/>
+  </g>
+  <text x="104" y="768" class="section">The slow tail owns the run</text>
+  <text x="104" y="797" class="body muted">The slowest 5% consumes most summed testcase time.</text>
+
+  <g clip-path="url(#tail-clip)">
+    <rect x="104" y="848" width="473.68" height="38" fill="url(#tail)"/>
+    <rect x="577.68" y="848" width="146.32" height="38" fill="#dce3ed"/>
+  </g>
+  <text x="124" y="873" class="label white mono">76.4%</text>
+  <text x="704" y="873" text-anchor="end" class="label mono">23.6%</text>
+
+  <g class="mono">
+    <text x="104" y="925" class="metric">82 tests ≥ 3.194 s</text>
+    <text x="104" y="954" class="metric-label">971.4 s of summed time · 76.4% tail share</text>
+  </g>
+  <text x="104" y="982" class="small muted">Median runtime is 0.004 s: optimization value is concentrated in the tail.</text>
+
+  <g filter="url(#shadow)">
+    <rect x="812" y="722" width="724" height="280" rx="20" fill="#ffffff"/>
+  </g>
+  <text x="852" y="768" class="section">Largest slow-tail module clusters</text>
+  <text x="852" y="797" class="body muted">Tail time and share, with test counts in the slowest 5%.</text>
+
+  <g class="mono">
+    <text x="852" y="838" class="label">CLI structure · 19 tests</text>
+    <rect x="1070" y="820" width="420" height="22" rx="6" fill="#edf1f7"/>
+    <rect x="1070" y="820" width="420" height="22" rx="6" fill="#2f6fdb"/>
+    <text x="1496" y="838" text-anchor="end" class="value white">273.0 s · 28.1%</text>
+
+    <text x="852" y="892" class="label">CLI commands · 21 tests</text>
+    <rect x="1070" y="874" width="420" height="22" rx="6" fill="#edf1f7"/>
+    <rect x="1070" y="874" width="307.08" height="22" rx="6" fill="#188f91"/>
+    <text x="1496" y="892" text-anchor="end" class="value">199.6 s · 20.5%</text>
+
+    <text x="852" y="946" class="label">Replica recovery · 2 tests</text>
+    <rect x="1070" y="928" width="420" height="22" rx="6" fill="#edf1f7"/>
+    <rect x="1070" y="928" width="123.97" height="22" rx="6" fill="#7d69c4"/>
+    <text x="1496" y="946" text-anchor="end" class="value">80.59 s · 8.3%</text>
+  </g>
+  <text x="852" y="982" class="small muted">Start with the first two clusters: together they account for 48.6% of tail time.</text>
+</svg>

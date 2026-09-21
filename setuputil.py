@@ -30,11 +30,9 @@ clients_requirements_table = {
     'extras_require': {
         'ssh': ['paramiko'],
         'kerberos': [
-            'kerberos',
-            'pykerberos',
-            'requests-kerberos',
+            'requests-kerberos>=0.15.0',
         ],
-        'swift': ['python-swiftclient'],
+        'swift': [],
         'argcomplete': ['argcomplete'],
         'sftp': ['paramiko'],
         'dumper': [
@@ -47,13 +45,8 @@ dev_requirements = [
     'pytest',
     'pytest-xdist',
     'pytest-cov',
-    'pyflakes',
-    'pylint',
-    'isort',
     'xmltodict',
-    'pytz',
     'pydoc-markdown',
-    'docspec_python',
     'sh',
     'PyYAML',
 ]
@@ -69,19 +62,16 @@ server_requirements_table = {
         'rich<=15.0.0',
         'typing_extensions<=4.16.0',
         'argcomplete<=3.7.0',
-        'boto',  # no upper limit is set in .in or .txt req files
         'python-magic<=0.4.27',
         'paramiko<=5.0.0',
         'boto3<=1.42.97',
         'sqlalchemy<=2.0.51',
         'alembic<=1.16.5',
         'pymemcache<=4.0.0',
-        'python-dateutil<=2.9.0.post0',
         'stomp-py<=8.2.0',
         'statsd<=4.0.1',
         'geoip2<=5.1.0',
         'google-auth<=2.50.0',
-        'redis<=7.0.1',
         'flask<=3.1.3',
         'oic<=1.7.0',
         'prometheus_client<=0.25.0',
@@ -97,9 +87,7 @@ server_requirements_table = {
         ],
         'mysql': ['PyMySQL<=1.2.0'],
         'kerberos': [
-            'kerberos<=1.3.1',
-            'pykerberos<=1.2.4',
-            'requests-kerberos<=0.15.0',
+            'requests-kerberos>=0.15.0,<=0.15.0',
         ],
         'globus': [
             'PyYAML<=6.0.3',

@@ -1,0 +1,23 @@
+name: Publish Runtime Images
+
+on:
+  push:
+    branches:
+      - master
+      - 'release-*'
+  schedule:
+    - cron: '0 1 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: publish-runtime-images-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    uses: ./.github/workflows/runtime_images.yml
+    with:
+      publish: true
+    permissions:
+      contents: read
+      packages: write

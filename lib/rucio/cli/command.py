@@ -14,6 +14,7 @@
 import importlib
 import signal
 import sys
+import threading
 import time
 from typing import Final, Optional, Union
 
@@ -24,7 +25,7 @@ from rich.theme import Theme
 from rich.traceback import install
 
 from rucio import version
-from rucio.cli.bin_legacy.rucio import ping, test_server, whoami_account
+from rucio.cli.bin_legacy.rucio import ping, whoami_account
 from rucio.cli.utils import Arguments, RichCLITheme, RichUtils, exception_handler, get_client, setup_gfal2_logger, signal_handler
 from rucio.common.config import config_get_list
 from rucio.common.exception import ConfigurationError
@@ -242,7 +243,8 @@ def main(
     client = get_client(args, logger)  # TODO Future improvement - use envvar functionality in click to remove conditionals checking env vars
 
     setup_gfal2_logger()
-    signal.signal(signal.SIGINT, lambda sig, frame: signal_handler(sig, frame, logger))
+    if threading.current_thread() is threading.main_thread():
+        signal.signal(signal.SIGINT, lambda sig, frame: signal_handler(sig, frame, logger))
 
     ctx.obj.client = client
     ctx.obj.logger = logger
@@ -264,7 +266,8 @@ def _teardown(ctx):
             if ctx.obj.verbose:
                 command_output += "Completed in %-0.4f sec." % (time_elapsed)
             # Ignore SIGINT during pager execution.
-            signal.signal(signal.SIGINT, signal.SIG_IGN)
+            if threading.current_thread() is threading.main_thread():
+                signal.signal(signal.SIGINT, signal.SIG_IGN)
             ctx.obj.pager(command_output)
     else:
         if ctx.obj.verbose:
@@ -283,10 +286,3 @@ def exe_whoami(ctx):
 def exe_ping(ctx):
     args = Arguments({"no_pager": ctx.obj.no_pager})
     ping(args, ctx.obj.client, ctx.obj.logger, ctx.obj.console, ctx.obj.spinner)
-
-
-@main.command(name="test-server", help="Test client against the server")
-@click.pass_context
-def exe_test_server(ctx):
-    args = Arguments({"no_pager": ctx.obj.no_pager})
-    test_server(args, ctx.obj.client, ctx.obj.logger, ctx.obj.console, ctx.obj.spinner)
