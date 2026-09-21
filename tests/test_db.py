@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 from unittest.mock import patch
 
 import pytest
@@ -23,7 +24,7 @@ from rucio.common.exception import DatabaseException, InputValidationError
 from rucio.common.utils import generate_uuid
 from rucio.db.sqla import models
 from rucio.db.sqla.constants import DatabaseOperationType
-from rucio.db.sqla.session import NullPool, QueuePool, SingletonThreadPool, _get_engine_poolclass, db_session, get_session
+from rucio.db.sqla.session import NullPool, QueuePool, SingletonThreadPool, _get_engine_poolclass, db_session, get_session, read_session, stream_session, transactional_session
 
 
 def test_db_connection():
@@ -43,6 +44,49 @@ def test_config_poolclass():
 
     with pytest.raises(InputValidationError, match='Unknown poolclass: unknown'):
         _get_engine_poolclass('unknown')
+
+
+@pytest.mark.parametrize('decorator', [read_session, transactional_session])
+def test_implicit_session_warning(decorator, caplog, monkeypatch):
+    """ DB (CORE): a session decorator warns once per function when it has to create the session """
+    monkeypatch.setattr('rucio.db.sqla.session._IMPLICIT_SESSION_WARNED', set())
+
+    @decorator
+    def first(*, session):
+        pass
+
+    @decorator
+    def second(*, session):
+        pass
+
+    with caplog.at_level(logging.WARNING, logger='rucio.db.sqla.session'):
+        with db_session(DatabaseOperationType.READ) as session:
+            first(session=session)
+        assert not caplog.records
+        first()
+        first()
+        second()
+
+    assert len(caplog.records) == 2
+    assert all('test_implicit_session_warning' in record.stack_info for record in caplog.records)
+
+
+def test_implicit_session_warning_stream(caplog, monkeypatch):
+    """ DB (CORE): stream_session warns once when it has to create the session """
+    monkeypatch.setattr('rucio.db.sqla.session._IMPLICIT_SESSION_WARNED', set())
+
+    @stream_session
+    def stream(*, session):
+        yield session
+
+    with caplog.at_level(logging.WARNING, logger='rucio.db.sqla.session'):
+        with db_session(DatabaseOperationType.READ) as session:
+            list(stream(session=session))
+        assert not caplog.records
+        list(stream())
+        list(stream())
+
+    assert len(caplog.records) == 1
 
 
 @pytest.mark.noparallel(reason='Changes an internal method of MethodView.')
