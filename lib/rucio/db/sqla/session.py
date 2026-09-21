@@ -39,6 +39,7 @@ from rucio.db.sqla.constants import DatabaseOperationType
 EXTRA_MODULES = import_extras(['MySQLdb', 'pymysql'])
 
 LOG = logging.getLogger(__name__)
+_IMPLICIT_SESSION_WARNED: set[str] = set()
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
@@ -383,6 +384,14 @@ def _update_session_wrapper(
     return wrapper
 
 
+def _warn_implicit_session(function: "Callable[..., Any]") -> None:
+    name = f'{function.__module__}.{function.__qualname__}'
+    if name not in _IMPLICIT_SESSION_WARNED:
+        _IMPLICIT_SESSION_WARNED.add(name)
+        LOG.warning('%s was called without a session; session will become a required parameter '
+                    '(https://github.com/rucio/rucio/issues/6989)', name, stack_info=True)
+
+
 def read_session(function: "Callable[P, R]"):
     '''
     decorator that set the session variable to use inside a function.
@@ -402,6 +411,7 @@ def read_session(function: "Callable[P, R]"):
                 'read_session decorator should not be used with generator. Use stream_session instead.')
 
         if not session:
+            _warn_implicit_session(function)
             session_scoped = get_session()
             session = session_scoped()
             session.begin()  # type: ignore
@@ -446,6 +456,7 @@ def stream_session(function: "Callable[P, R]"):
                 'stream_session decorator should be used only with generator. Use read_session instead.')
 
         if not session:
+            _warn_implicit_session(function)
             session_scoped = get_session()
             session = session_scoped()
             session.begin()  # type: ignore
@@ -486,6 +497,7 @@ def transactional_session(function: "Callable[P, R]") -> 'Callable':
             **kwargs
     ) -> "R":  # pylint:disable=missing-kwoa
         if not session:
+            _warn_implicit_session(function)
             session_scoped = get_session()
             session = session_scoped()
             session.begin()  # type: ignore
